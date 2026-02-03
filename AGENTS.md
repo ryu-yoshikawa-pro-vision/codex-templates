@@ -46,6 +46,10 @@ If no active run folder is specified by the user **and** you have not already cr
 4) Stop only when:
    - All non-blocked tasks are done, or
    - You are blocked (then write a “Blocked” entry with concrete next actions)
+5) Thinking/Logging rules:
+   - 思考や判断理由は `.codex/runs/<run_id>/PLAN.md` の Thinking Log に必ず追記する
+   - 行動ログ（調査/編集/判断/実行）は `.codex/runs/<run_id>/REPORT.md` に必ず追記する
+   - 追加タスクは必ず `.codex/runs/<run_id>/TASKS.md` の `## Discovered` に追記する
 
 ---
 
@@ -93,6 +97,7 @@ Example (format only):
 ## 5. Living documentation rule (do not skip)
 - When you learn something new about the codebase (structure, gotchas, workflows, invariants):
   - Update `docs/PROJECT_CONTEXT.md` (add concise notes, keep it readable)
+  - `docs/PROJECT_CONTEXT.md` は各プロジェクトの実態に合わせて調整し、開発の進行に伴って更新し続ける
 - When you make a significant architectural decision (interfaces, data model, dependency direction, build/deploy strategy):
   - Add/update an ADR under `docs/adr/` (keep it short and decision-focused)
 
