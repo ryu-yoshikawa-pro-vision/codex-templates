@@ -47,9 +47,9 @@ If no active run folder is specified by the user **and** you have not already cr
    - All non-blocked tasks are done, or
    - You are blocked (then write a “Blocked” entry with concrete next actions)
 5) Thinking/Logging rules:
-   - 思考や判断理由は `.codex/runs/<run_id>/PLAN.md` の Thinking Log に必ず追記する
-   - 行動ログ（調査/編集/判断/実行）は `.codex/runs/<run_id>/REPORT.md` に必ず追記する
-   - 追加タスクは必ず `.codex/runs/<run_id>/TASKS.md` の `## Discovered` に追記する
+   - Always append thinking notes and decision reasons to the Thinking Log in `.codex/runs/<run_id>/PLAN.md`.
+   - Always append action logs (investigation/editing/decision/execution) to `.codex/runs/<run_id>/REPORT.md`.
+   - Always append newly discovered tasks to `## Discovered` in `.codex/runs/<run_id>/TASKS.md`.
 
 ---
 
@@ -88,7 +88,9 @@ Example (format only):
 
 ## Language policy (thinking in English, output in Japanese)
 - Internal thinking: English.
-- User-facing output: Japanese (summaries, progress reports, explanations, PRコメント、.mdドキュメントの追記を含む).
+- User-facing output: Japanese (summaries, progress reports, explanations, PR comments, and `.md` document updates).
+- All run artifacts and working documents (for example, `PLAN.md`, `TASKS.md`, and `REPORT.md`) must be written in Japanese.
+- `AGENTS.md` must be written in English only.
 - Do NOT reveal chain-of-thought / internal reasoning. Only provide concise conclusions and evidence.
 - Code: follow existing code style; do not translate identifiers unless the repo convention does.
 
@@ -97,7 +99,7 @@ Example (format only):
 ## 5. Living documentation rule (do not skip)
 - When you learn something new about the codebase (structure, gotchas, workflows, invariants):
   - Update `docs/PROJECT_CONTEXT.md` (add concise notes, keep it readable)
-  - `docs/PROJECT_CONTEXT.md` は各プロジェクトの実態に合わせて調整し、開発の進行に伴って更新し続ける
+  - Keep `docs/PROJECT_CONTEXT.md` aligned to the real project state and continuously update it as development progresses.
 - When you make a significant architectural decision (interfaces, data model, dependency direction, build/deploy strategy):
   - Add/update an ADR under `docs/adr/` (keep it short and decision-focused)
 
@@ -108,9 +110,11 @@ Example (format only):
 ## 6. Quality gates (before claiming done)
 - Run relevant checks depending on the change:
   - unit/integration tests
+  - formatter
   - lint
   - typecheck
   - build
+- If a project configures formatter/lint/typecheck, run those checks and confirm there are no errors before sending a completion report.
 - If tests are not available, state it explicitly in REPORT and in the user-facing report.
 
 ---
@@ -134,6 +138,7 @@ Goal: Implement the user request end-to-end.
 Process requirements:
 - If no active run exists, create `.codex/runs/<run_id>/` using `run_id = YYYYMMDD-HHMMSS-JST` and copy from `.codex/templates/{PLAN,TASKS,REPORT}.md`.
 - Fill `.codex/runs/<run_id>/PLAN.md` (Objective/Scope/Assumptions/DoD) and create an ordered checkbox list in `.codex/runs/<run_id>/TASKS.md`.
+- Write `PLAN.md`, `TASKS.md`, and `REPORT.md` entries in Japanese (while keeping `AGENTS.md` in English only).
 - Execute tasks top-to-bottom. After each completed task:
   - Check the box in TASKS.md
   - Append an entry to REPORT.md with JST timestamp
@@ -141,7 +146,8 @@ Process requirements:
 - If you discover new tasks, add them under `## Discovered` and continue.
 - Continuously update `docs/PROJECT_CONTEXT.md` with any new understanding.
 - For significant architectural decisions, add/update an ADR under `docs/adr/`.
-- Run relevant checks (tests/lint/typecheck/build) before finishing.
+- Run relevant checks (tests/formatter/lint/typecheck/build) before finishing.
+- If formatter/lint/typecheck are configured in the project, run them and verify there are no errors before sending a completion report.
 
 User-facing output requirement (every time you respond):
 - Provide <=5 bullet summary + progress percent + next steps (if not done) + evidence (commands/results and key file paths).
