@@ -9,6 +9,8 @@
 - 実装・調査などの行動ログは REPORT に逐次追記する。
 - 追加タスクは TASKS の Discovered に追記する。
 - `docs/PROJECT_CONTEXT.md` は各プロジェクトの実態に合わせて調整し、開発の進行に伴って更新し続ける。
+- 完了報告前の品質ゲートでは、プロジェクトで設定されている formatter / lint / typecheck を実行し、エラーがないことを確認してから報告する。
+- 運用ドキュメントの言語方針として、`PLAN.md` / `TASKS.md` / `REPORT.md` は日本語で記述し、`AGENTS.md` は英語のみで管理する。
 
 ## ディレクトリ構成
 - `.codex/templates/`: PLAN/TASKS/REPORT のテンプレート
