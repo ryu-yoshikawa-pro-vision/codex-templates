@@ -36,3 +36,7 @@
 - 2026-02-11 21:14 JST: Will update PROJECT_CONTEXT with the newly clarified quality-gate expectation as part of living documentation.
 
 - 2026-02-11 21:22 JST: 追加要望に基づき、AGENTS.mdへ「思考は英語・出力は日本語」、およびrun系ドキュメント日本語・AGENTS英語のみの方針を明文化する。
+
+- 2026-02-11 21:35 JST: ユーザー質問（AGENTSの別ファイル管理）に対する比較回答のため、PROJECT_CONTEXTへ推奨運用（参照型と階層型の使い分け）を追記する。
+
+- 2026-02-11 22:46 JST: 追加依頼に対応し、AGENTS.mdへ`docs/agent/overrides.md`の存在確認（存在時のみ読込）ルールを明記する。

@@ -10,6 +10,7 @@ Codex must follow this document before doing any work in this repository.
 2) docs/adr/ (scan recent ADRs)
 3) .codex/runs/ (if any recent run exists)
 4) This AGENTS.md
+5) `docs/agent/overrides.md` (only if the file exists; check before starting work)
 
 > Keep `docs/PROJECT_CONTEXT.md` as a living document by updating it when new understanding is gained.
 > Record significant architecture decisions as ADRs.
@@ -30,6 +31,7 @@ If no active run folder is specified by the user **and** you have not already cr
 3) Write the user request into PLAN.md (Objective / Scope / DoD)
 4) Build TASKS.md as an executable checkbox list ordered top-to-bottom
 5) **Same-session rule**: In the same conversation/session, keep updating the same PLAN/TASKS/REPORT files. Do not create a new run folder per turn unless the user explicitly asks to start a new run.
+6) **Cross-session rule**: In a different/new conversation session, do **not** append to previous run folders by default. Create a new run folder unless the user explicitly designates an existing run folder to continue.
 
 ---
 
@@ -137,6 +139,7 @@ Goal: Implement the user request end-to-end.
 
 Process requirements:
 - If no active run exists, create `.codex/runs/<run_id>/` using `run_id = YYYYMMDD-HHMMSS-JST` and copy from `.codex/templates/{PLAN,TASKS,REPORT}.md`.
+- In a new/different conversation session, always start a new run folder by default; continue an old run folder only when the user explicitly specifies it.
 - Fill `.codex/runs/<run_id>/PLAN.md` (Objective/Scope/Assumptions/DoD) and create an ordered checkbox list in `.codex/runs/<run_id>/TASKS.md`.
 - Write `PLAN.md`, `TASKS.md`, and `REPORT.md` entries in Japanese (while keeping `AGENTS.md` in English only).
 - Execute tasks top-to-bottom. After each completed task:
