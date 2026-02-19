@@ -4,6 +4,7 @@
 - Codexが多様なタスクを実行する際に、計画（PLAN）→タスク（TASKS）→行動ログ（REPORT）を厳密に運用できるようテンプレートと規約を整備する。
 
 ## 運用の要点
+- ユーザーが「計画を立てるように」と依頼した場合は、`docs/plans/TEMPLATE.md` をベースに `docs/plans/{yyyy-mm-dd}_{プラン名}.md` で計画書を新規作成する（JST日付）。
 - セッション開始時に `.codex/runs/<run_id>/` を作成し、テンプレートをコピーする。
 - 別セッションでは既存runへの追記をデフォルトで行わず、新しいrunを作成する（既存runの継続はユーザー明示時のみ）。
 - 思考や判断理由は PLAN の Thinking Log に追記する。
@@ -17,6 +18,8 @@
 - `.codex/templates/`: PLAN/TASKS/REPORT のテンプレート
 - `.codex/runs/`: セッションごとの実行ログ
 - `docs/adr/`: 運用や方針の意思決定記録
+- `docs/plans/`: ユーザー向け計画書のテンプレートと成果物
+- `docs/plans/README.md`: 計画書の命名規則と運用手順のガイド
 
 ## AGENTS拡張運用の指針
 - プロジェクト固有のツール/スキル指示を分離したい場合は、ルート `AGENTS.md` に「追加指示ファイルの読込順」を明記し、詳細は別ファイル（例: `docs/agent/overrides.md`）に置く。
