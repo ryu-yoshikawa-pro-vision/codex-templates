@@ -160,6 +160,15 @@ PROMPT END
 
 ---
 
+
+## 9. Plan document rule (when user asks for a plan)
+- If the user asks you to create a plan, you MUST create a plan document under `docs/plans/`.
+- File name format: `{yyyy-mm-dd}_{plan_name}.md` (example: `2026-02-19_release-plan.md`).
+- The date part must use JST (`Asia/Tokyo`) calendar date.
+- When creating the plan file, use `docs/plans/TEMPLATE.md` as the base template.
+
+---
+
 ## Notes (source pointers)
 - Codex reads AGENTS.md before doing work; use it to encode project-specific norms.
 - `codex exec` can run non-interactively; GitHub Action can run it in CI.
