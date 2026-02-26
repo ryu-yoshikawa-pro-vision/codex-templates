@@ -127,6 +127,12 @@ Example (format only):
 - Prefer small, reviewable commits (if committing)
 - If assumptions are required, write them into PLAN.md and REPORT.md
 
+## 7.1 Local Codex Safety Harness (repository-specific)
+- For manual or CI Codex runs in this repository, prefer `scripts/codex-safe.ps1` instead of invoking `codex` directly.
+- Do not use `--dangerously-bypass-approvals-and-sandbox` in this repository unless the user explicitly asks and the environment is externally sandboxed.
+- Keep repository execpolicy rules under `.codex/rules/*.rules` and validate changes with `codex execpolicy check` (or wrapper preflight) before reporting completion.
+- Treat user-provided `-c/--config` overrides, `--add-dir`, and unsafe sandbox/approval overrides as disallowed in the local safety wrapper.
+
 ---
 
 ## 8. “One-shot to the end” instruction (copy/paste for `codex exec`)

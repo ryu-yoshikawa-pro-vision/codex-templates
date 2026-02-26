@@ -1,2 +1,21 @@
-# Auto detect text files and perform LF normalization
+# Auto detect text files and normalize in the index
 * text=auto
+
+# Default text files in this repo should use LF in the working tree.
+*.md text eol=lf
+*.toml text eol=lf
+*.rules text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.txt text eol=lf
+*.sh text eol=lf
+*.gitattributes text eol=lf
+*.gitignore text eol=lf
+
+# Windows shell scripts are easier to edit/run locally with CRLF.
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf

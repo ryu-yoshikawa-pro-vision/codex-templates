@@ -1,0 +1,309 @@
+# Report (append-only)
+- 行動のたびに追記する（調査/編集/判断も含む）
+- コマンドや確認結果は必ず記録する
+
+## 2026-02-26 23:12 (JST)
+- Summary:
+- runを初期化し、今回の依頼向けにPLAN/TASKSを作成した。
+- Completed:
+- runフォルダ作成
+- PLAN/TASKS/REPORT 初期化
+- Changes:
+- `.codex/runs/20260226-231150-JST/PLAN.md`
+- `.codex/runs/20260226-231150-JST/TASKS.md`
+- `.codex/runs/20260226-231150-JST/REPORT.md`
+- Commands:
+  - `New-Item ... .codex/runs/20260226-231150-JST` => runフォルダ作成
+  - `Copy-Item .codex/templates/{PLAN,TASKS,REPORT}.md ...` => テンプレートコピー
+- Notes/Decisions:
+- レポート保存先は `docs/reports/` を新規作成する想定で進める。
+- New tasks:
+- なし
+- Remaining:
+- TASK 1-4
+- Progress: 0% (0/4)
+
+## 2026-02-26 23:19 (JST)
+- Summary:
+  - 危険コマンドの分類軸を整理し、カテゴリ別のMarkdownレポートを新規作成した。
+- Completed:
+  - TASK 1 完了
+  - TASK 2 完了
+  - TASK 3 完了
+- Changes:
+  - `docs/reports/2026-02-26_ai-agent-dangerous-commands.md`
+  - `.codex/runs/20260226-231150-JST/PLAN.md`
+  - `.codex/runs/20260226-231150-JST/TASKS.md`
+  - `.codex/runs/20260226-231150-JST/REPORT.md`
+- Commands:
+  - `apply_patch` => レポート新規作成とrunログ更新
+- Notes/Decisions:
+  - OS横断で使える分類（削除/破壊、権限、停止、永続化、外部実行、流出、クラウド/DB、コンテナ、VCS）を採用した。
+  - 具体的な攻撃手順ではなく、防御目的の注意点・レビュー観点を中心に記載した。
+- New tasks:
+  - なし
+- Remaining:
+  - TASK 4
+- Progress: 75% (3/4)
+
+## 2026-02-26 23:24 (JST)
+- Summary:
+  - `PROJECT_CONTEXT` に `docs/reports/` の運用を追記し、最終確認を実施した。
+  - doc中心のリポジトリで、formatter/lint/typecheck 設定ファイルは見当たらないことを確認した。
+- Completed:
+  - TASK 4 完了
+- Changes:
+  - `docs/PROJECT_CONTEXT.md`
+  - `.codex/runs/20260226-231150-JST/PLAN.md`
+  - `.codex/runs/20260226-231150-JST/TASKS.md`
+  - `.codex/runs/20260226-231150-JST/REPORT.md`
+- Commands:
+  - `git status --short` => 新規追加のみ確認
+  - `git diff --check` => 問題なし
+  - `rg --files -g \"package.json\" ...` => 該当設定ファイルなし（exit 1）
+- Notes/Decisions:
+  - 品質ゲートはドキュメント整合性確認（差分チェック）を実施。テスト/formatter/lint/typecheckは構成未設定のため未実行。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (4/4)
+
+## 2026-02-26 23:31 (JST)
+- Summary:
+  - フォローアップ相談として、危険コマンド防止のルール/ハーネス設計案を整理して回答する方針を決定した。
+- Completed:
+  - D2 完了（回答方針整理）
+- Changes:
+  - `.codex/runs/20260226-231150-JST/PLAN.md`
+  - `.codex/runs/20260226-231150-JST/TASKS.md`
+  - `.codex/runs/20260226-231150-JST/REPORT.md`
+- Commands:
+  - `apply_patch` => runログにフォローアップ対応記録を追記
+- Notes/Decisions:
+  - 実装例は「許可リスト」「危険フラグ検出」「承認段階」「サンドボックス」の4層で説明する。
+  - 具体的な破壊コマンドの詳細実行手順は避け、防御設定の観点に絞る。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (5/5)
+
+## 2026-02-26 23:59 (JST)
+- Summary:
+  - Codex のハーネス/ルール設定方法を調査し、`docs/plans/` に実装計画書を作成した。
+  - ローカル CLI ヘルプと OpenAI 公式 Codex docs を照合し、`AGENTS.md` / Rules / config / sandbox / approval / requirements / wrapper を使う多層構成の計画に整理した。
+- Completed:
+  - D3 完了
+- Changes:
+  - `docs/plans/2026-02-26_codex-harness-rules-implementation-plan.md`
+  - `.codex/runs/20260226-231150-JST/PLAN.md`
+  - `.codex/runs/20260226-231150-JST/TASKS.md`
+  - `.codex/runs/20260226-231150-JST/REPORT.md`
+- Commands:
+  - `codex --help` / `codex exec --help` => sandbox/approval/config/profile オプション確認
+  - `codex sandbox --help` / `codex execpolicy --help` / `codex execpolicy check --help` => sandbox・rules検証機能確認
+  - `codex --version` => `codex-cli 0.104.0-alpha.1`
+  - `codex features list` => 機能一覧確認
+  - `git diff --check` => 改行警告のみ（差分エラーなし）
+- Notes/Decisions:
+  - 計画書は AGENTS §9 に従い `docs/plans/TEMPLATE.md` ベースで作成した。
+  - 実装は未着手。次フェーズで `.codex/rules/` と wrapper を PoC 実装するのが自然。
+  - 調査参照（公式）: `developers.openai.com/codex/{agents-md,rules,config,config-reference,security}`
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (6/6)
+
+## 2026-02-27 00:07 (JST)
+- Summary:
+  - 実装計画書をレビューし、重大度付きで懸念点を抽出した。
+  - 主な論点は wrapper の回避経路（`--config` 等）、`.rules` の実行時適用確認、`requirements.toml` の適用条件確認。
+- Completed:
+  - D4 完了
+- Changes:
+  - `.codex/runs/20260226-231150-JST/PLAN.md`
+  - `.codex/runs/20260226-231150-JST/TASKS.md`
+  - `.codex/runs/20260226-231150-JST/REPORT.md`
+- Commands:
+  - `Get-Content docs/plans/2026-02-26_codex-harness-rules-implementation-plan.md`
+  - `Get-Content ... | ForEach-Object { 行番号付き出力 }` => 指摘箇所特定
+- Notes/Decisions:
+  - 今回はレビュー回答のみで、計画書本文の修正は未実施（ユーザー判断待ち）。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (7/7)
+
+## 2026-02-27 00:14 (JST)
+- Summary:
+  - 計画書に懸念点を反映して修正し、再レビューで重大/中程度の懸念が解消されたことを確認した。
+  - 追加修正として、wrapper回避経路対策、`.rules` 実行時適用/fallback、`requirements.toml` 分岐、PowerShell回避ケース検証を計画へ明記した。
+- Completed:
+  - D5 完了
+  - D6 完了
+- Changes:
+  - `docs/plans/2026-02-26_codex-harness-rules-implementation-plan.md`
+  - `.codex/runs/20260226-231150-JST/PLAN.md`
+  - `.codex/runs/20260226-231150-JST/TASKS.md`
+  - `.codex/runs/20260226-231150-JST/REPORT.md`
+- Commands:
+  - `apply_patch` => 計画書修正（懸念点反映）
+  - `Get-Content ... | ForEach-Object { 行番号付き出力 }` => 再レビュー
+  - `git diff --check` => 改行警告のみ（差分エラーなし）
+- Notes/Decisions:
+  - 再レビューでは新たな重大/中程度の懸念はなし。残留リスクは計画の「リスクと対策」節で管理する前提。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (9/9)
+
+## 2026-02-27 00:52 (JST)
+- Summary:
+  - Codex 安全ハーネスを実装した（`.codex/rules` + `scripts/codex-safe.ps1` + project config/requirements + ドキュメント + 検証スクリプト）。
+  - `codex execpolicy check` と `scripts/tests/Test-CodexSafetyHarness.ps1` により、主要な allow/prompt/forbidden 判定と wrapper の危険引数拒否を検証した。
+- Completed:
+  - D7 完了
+  - D8 完了
+  - D9 完了
+  - D10 完了
+  - D11 完了
+- Changes:
+  - `.codex/rules/10-readonly-allow.rules`
+  - `.codex/rules/20-risky-prompt.rules`
+  - `.codex/rules/30-destructive-forbidden.rules`
+  - `.codex/rules/README.md`
+  - `.codex/config.toml`
+  - `.codex/requirements.toml`
+  - `scripts/codex-safe.ps1`
+  - `scripts/tests/Test-CodexSafetyHarness.ps1`
+  - `docs/agent/codex-safety-harness.md`
+  - `docs/reports/2026-02-27_codex-harness-validation.md`
+  - `AGENTS.md`
+  - `docs/PROJECT_CONTEXT.md`
+  - `.codex/runs/20260226-231150-JST/PLAN.md`
+  - `.codex/runs/20260226-231150-JST/TASKS.md`
+  - `.codex/runs/20260226-231150-JST/REPORT.md`
+- Commands:
+  - `codex --version` => `codex-cli 0.104.0-alpha.1`
+  - `codex execpolicy --help` / `codex execpolicy check --help` => `execpolicy` 利用可能確認
+  - `codex execpolicy check --rules ... -- git reset --hard HEAD~1` => `forbidden`
+  - `codex execpolicy check --rules ... -- docker ps` => `prompt`
+  - `powershell -ExecutionPolicy Bypass -File scripts/codex-safe.ps1 -PreflightOnly` => PASS
+  - `powershell -ExecutionPolicy Bypass -File scripts/tests/Test-CodexSafetyHarness.ps1` => PASS
+  - `git diff --check` => 改行警告のみ（差分エラーなし）
+- Notes/Decisions:
+  - `.rules` の実行時自動読込の完全実測は未実施（認証/実行フロー依存）。代替として wrapper preflight に `codex execpolicy check` を組み込み、主要ルール判定の崩れを起動前に検知する構成にした。
+  - `.codex/requirements.toml` は schema に沿って作成したが、実際の強制可否は managed policy / feature 設定に依存するため、wrapper+rules を主 enforcement とした。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (14/14)
+
+## 2026-02-27 01:10 (JST)
+- Summary:
+  - 実装完全性レビューを行い、不足点（wrapperログ出力未実装、回避ケース検証不足、`.codex/logs` 運用整備不足、`-c` 略称衝突バグ）を修正した。
+  - 修正後に検証スクリプトを再実行し、拡張ケースを含めて PASS を確認した。
+- Completed:
+  - D12 完了
+  - D13 完了
+  - D14 完了
+- Changes:
+  - `scripts/codex-safe.ps1`
+  - `scripts/tests/Test-CodexSafetyHarness.ps1`
+  - `.codex/logs/.gitignore`
+  - `docs/PROJECT_CONTEXT.md`
+  - `docs/agent/codex-safety-harness.md`
+  - `docs/reports/2026-02-27_codex-harness-validation.md`
+  - `docs/plans/2026-02-26_codex-harness-rules-implementation-plan.md`
+  - `.codex/runs/20260226-231150-JST/PLAN.md`
+  - `.codex/runs/20260226-231150-JST/TASKS.md`
+  - `.codex/runs/20260226-231150-JST/REPORT.md`
+- Commands:
+  - `powershell -ExecutionPolicy Bypass -File scripts/tests/Test-CodexSafetyHarness.ps1` => PASS（拡張ケース含む）
+  - `git diff --check` => 改行警告のみ（差分エラーなし）
+- Notes/Decisions:
+  - wrapper のログは既定ON、`.codex/logs/` 配下 JSONL。テスト/実運用での git 汚染を避けるため `.codex/logs/.gitignore` を追加した。
+  - `CodexArgs` は `-c` と略称衝突するため `PassthroughArgs` に改名し、`--config`/`-c` ブロックが確実に効くようにした。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (17/17)
+
+## 2026-02-27 01:19 (JST)
+- Summary:
+  - GitHub Desktop の「LF→CRLF」警告について、リポジトリ設定と Git の改行設定を確認して原因を整理した。
+- Completed:
+  - D15 完了
+- Changes:
+  - `.codex/runs/20260226-231150-JST/PLAN.md`
+  - `.codex/runs/20260226-231150-JST/TASKS.md`
+  - `.codex/runs/20260226-231150-JST/REPORT.md`
+- Commands:
+  - `Get-Content .gitattributes` => `* text=auto`
+  - `git config --show-origin --get core.autocrlf` => `true`（system gitconfig）
+  - `git config --show-origin --get core.eol` => 未設定
+  - `git status --short` => 変更ファイル一覧確認
+- Notes/Decisions:
+  - 設定変更は未実施。今回は警告の意味と影響・対処方法の説明に留める。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (18/18)
+
+## 2026-02-27 01:27 (JST)
+- Summary:
+  - GitHub Desktop の改行警告を減らすため、`.gitattributes` に拡張子別 `eol` を追加し、`.editorconfig` を新規作成した。
+  - `AGENTS.md` と `docs/PROJECT_CONTEXT.md` の混在改行を LF に正規化し、`git ls-files --eol` で `w/lf` を確認した。
+- Completed:
+  - D16 完了
+- Changes:
+  - `.gitattributes`
+  - `.editorconfig`
+  - `AGENTS.md`（改行正規化）
+  - `docs/PROJECT_CONTEXT.md`（改行正規化）
+  - `.codex/runs/20260226-231150-JST/PLAN.md`
+  - `.codex/runs/20260226-231150-JST/TASKS.md`
+  - `.codex/runs/20260226-231150-JST/REPORT.md`
+- Commands:
+  - `git ls-files --eol` => tracked file の EOL 状態確認（`w/mixed` を検出）
+  - `Get-Content .gitattributes` => `* text=auto` を確認
+  - `git config --show-origin --get core.autocrlf` => `true`
+  - `apply_patch` => `.gitattributes` / `.editorconfig` を更新・追加
+  - `System.IO.File::WriteAllText(...)` => `AGENTS.md`, `docs/PROJECT_CONTEXT.md` を LF 正規化
+  - `git ls-files --eol AGENTS.md docs/PROJECT_CONTEXT.md .gitattributes .editorconfig` => `w/lf`
+  - `git diff --check` => 問題なし
+- Notes/Decisions:
+  - `.md/.toml/.rules` などは LF、PowerShell/batch 系は CRLF を明示して、Windows 環境でも意図しない行末差分を減らす方針にした。
+  - 既存ファイル全体の再正規化（`git add --renormalize .`）は今回は未実施。必要なら別途実施可能。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (19/19)
+
+## 2026-02-27 00:22 (JST)
+- Summary:
+  - ユーザー依頼により、計画書レビュー段階から実装段階へ移行した。
+  - 実装用タスク（D7-D11）を追加し、前提確認→rules→wrapper→ドキュメント→検証の順で進める方針にした。
+- Completed:
+  - なし（実装タスク追加のみ）
+- Changes:
+  - `.codex/runs/20260226-231150-JST/PLAN.md`
+  - `.codex/runs/20260226-231150-JST/TASKS.md`
+  - `.codex/runs/20260226-231150-JST/REPORT.md`
+- Commands:
+  - `apply_patch` => runログに実装フェーズタスクを追加
+- Notes/Decisions:
+  - 進捗分母は D7-D11 を追加したため増加する。
+- New tasks:
+  - D7-D11 を追加
+- Remaining:
+  - D7-D11
+- Progress: 64% (9/14)

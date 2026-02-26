@@ -17,9 +17,25 @@
 ## ディレクトリ構成
 - `.codex/templates/`: PLAN/TASKS/REPORT のテンプレート
 - `.codex/runs/`: セッションごとの実行ログ
+- `.codex/rules/`: Codex `execpolicy` のリポジトリローカルルール（`*.rules`）
+- `.codex/logs/`: Codex安全ハーネスの実行ログ（JSONL、通常は `.gitignore` で管理）
+- `.codex/config.toml`: Codex の project-scoped 設定プリセット（任意利用）
+- `.codex/requirements.toml`: Codex の要件ドキュメント（管理配布/機能有効時の補助用途）
 - `docs/adr/`: 運用や方針の意思決定記録
 - `docs/plans/`: ユーザー向け計画書のテンプレートと成果物
 - `docs/plans/README.md`: 計画書の命名規則と運用手順のガイド
+- `docs/reports/`: 調査メモ、比較表、運用レポートなどの成果物（Markdown中心）
+- `docs/agent/`: エージェント運用向け補助ドキュメント（例: Codex安全ハーネス）
+- `scripts/`: 補助スクリプト（例: `scripts/codex-safe.ps1`）
+
+## 成果物配置メモ
+- 計画書ではない調査・分析系のドキュメントは `docs/reports/` に日付付きMarkdownで配置すると整理しやすい。
+
+## Codex安全運用メモ
+- Codex の危険コマンド抑止は、`AGENTS.md`（ソフト制御）だけでなく、`.codex/rules/*.rules`（`execpolicy`）と `scripts/codex-safe.ps1`（wrapper）を組み合わせる多層防御で運用する。
+- `scripts/codex-safe.ps1` は、危険な CLI 引数の拒否、`sandbox/approval` の固定注入、`codex execpolicy check` による preflight を行う。
+- `scripts/codex-safe.ps1` は既定で `.codex/logs/codex-safe-YYYYMMDD.jsonl` にイベントログを書き出す（`-NoLog` で無効化可能）。
+- `.codex/requirements.toml` は補助的な要件定義として保持し、実際の強制可否は Codex の利用形態（managed policy / feature 設定）に依存する。
 
 ## AGENTS拡張運用の指針
 - プロジェクト固有のツール/スキル指示を分離したい場合は、ルート `AGENTS.md` に「追加指示ファイルの読込順」を明記し、詳細は別ファイル（例: `docs/agent/overrides.md`）に置く。
