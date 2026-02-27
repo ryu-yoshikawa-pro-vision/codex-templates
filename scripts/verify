@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+set -u -o pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+cd "$repo_root"
+
+pass_count=0
+fail_count=0
+skip_count=0
+
+log_pass() {
+  echo "PASS: $1"
+  pass_count=$((pass_count + 1))
+}
+
+log_fail() {
+  echo "FAIL: $1"
+  fail_count=$((fail_count + 1))
+}
+
+log_skip() {
+  echo "SKIP: $1"
+  skip_count=$((skip_count + 1))
+}
+
+run_check() {
+  local name="$1"
+  shift
+  if "$@"; then
+    log_pass "$name"
+  else
+    log_fail "$name"
+  fi
+}
+
+decision_from_json() {
+  local output="$1"
+  local decision
+  decision="${output##*\"decision\":\"}"
+  decision="${decision%%\"*}"
+  [[ -n "$decision" && "$decision" != "$output" ]] || return 1
+  printf '%s' "$decision"
+}
+
+check_execpolicy_baseline() {
+  local rule_args=(
+    --rules .codex/rules/10-readonly-allow.rules
+    --rules .codex/rules/20-risky-prompt.rules
+    --rules .codex/rules/30-destructive-forbidden.rules
+  )
+
+  local out decision
+
+  out="$(codex execpolicy check "${rule_args[@]}" -- git status)" || return 1
+  decision="$(decision_from_json "$out")" || return 1
+  [[ "$decision" == "allow" ]] || return 1
+
+  out="$(codex execpolicy check "${rule_args[@]}" -- git add .)" || return 1
+  decision="$(decision_from_json "$out")" || return 1
+  [[ "$decision" == "prompt" ]] || return 1
+
+  out="$(codex execpolicy check "${rule_args[@]}" -- git reset --hard HEAD~1)" || return 1
+  decision="$(decision_from_json "$out")" || return 1
+  [[ "$decision" == "forbidden" ]] || return 1
+
+  return 0
+}
+
+check_powershell_has_codex() {
+  powershell.exe -NoProfile -Command "if (Get-Command codex -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }" >/dev/null 2>&1
+}
+
+check_powershell_harness() {
+  powershell.exe -ExecutionPolicy Bypass -File scripts/tests/Test-CodexSafetyHarness.ps1 >/tmp/codex-safe-ps.log 2>&1
+}
+
+check_bash_harness() {
+  bash scripts/tests/test-codex-safety-harness.sh >/tmp/codex-safe-bash.log 2>&1
+}
+
+check_bash_wrapper_preflight() {
+  bash scripts/codex-safe.sh --preflight-only >/tmp/codex-safe-preflight.log 2>&1
+}
+
+if ! command -v codex >/dev/null 2>&1; then
+  echo "codex command is required for verify" >&2
+  exit 1
+fi
+
+run_check "execpolicy baseline decisions" check_execpolicy_baseline
+
+if [[ -x scripts/codex-safe.sh ]]; then
+  run_check "bash wrapper preflight" check_bash_wrapper_preflight
+else
+  log_skip "bash wrapper preflight (scripts/codex-safe.sh not found)"
+fi
+
+if [[ -x scripts/tests/test-codex-safety-harness.sh ]]; then
+  run_check "bash safety harness tests" check_bash_harness
+else
+  log_skip "bash safety harness tests (scripts/tests/test-codex-safety-harness.sh not found)"
+fi
+
+if command -v powershell.exe >/dev/null 2>&1; then
+  if check_powershell_has_codex; then
+    run_check "PowerShell safety harness tests" check_powershell_harness
+  else
+    log_skip "PowerShell safety harness tests (codex not found in PowerShell PATH)"
+  fi
+else
+  log_skip "PowerShell safety harness tests (powershell.exe not available)"
+fi
+
+echo "Summary: PASS=$pass_count FAIL=$fail_count SKIP=$skip_count"
+
+if (( fail_count > 0 )); then
+  exit 1
+fi
+
+exit 0

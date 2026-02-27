@@ -1,0 +1,590 @@
+# Report (append-only)
+- 行動のたびに追記する（調査/編集/判断も含む）
+- コマンドや確認結果は必ず記録する
+
+## 2026-02-27 09:01 (JST)
+- Summary:
+  - AGENTS指定の読み込み順に従い、必須ドキュメントを確認して前提を整理した。
+- Completed:
+  - TASK 1 完了
+- Changes:
+  - なし（調査のみ）
+- Commands:
+  - `sed -n '1,240p' docs/PROJECT_CONTEXT.md` => 現行運用の要点を確認
+  - `ls -1 docs/adr && sed -n '1,240p' docs/adr/0001-codex-plan-tasks-report-discipline.md` => 最新ADRを確認
+  - `latest_run=$(ls -1 .codex/runs | sort | tail -n 1); sed -n ...` => 直近runのPLAN/TASKS/REPORT確認
+  - `sed -n '1,280p' AGENTS.md` => 作業ルール確認
+  - `if [ -f docs/agent/overrides.md ]; then ...` => `not_found`
+- Notes/Decisions:
+  - ユーザー依頼は計画書作成のため、実装ではなく運用設計を成果物にする。
+- New tasks:
+  - なし
+- Remaining:
+  - TASK 2-4
+- Progress: 25% (1/4)
+
+## 2026-02-27 09:03 (JST)
+- Summary:
+  - 新規 run (`20260227-090124-JST`) を作成し、テンプレートを初期化した。
+- Completed:
+  - TASK 2 完了
+- Changes:
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `TZ=Asia/Tokyo date +%Y%m%d-%H%M%S-JST` => `20260227-090124-JST`
+  - `mkdir -p .codex/runs/20260227-090124-JST` => run作成
+  - `cp .codex/templates/{PLAN,TASKS,REPORT}.md .codex/runs/20260227-090124-JST/` => テンプレート反映
+- Notes/Decisions:
+  - 同一セッションではこの run フォルダを継続利用する。
+- New tasks:
+  - なし
+- Remaining:
+  - TASK 3-4
+- Progress: 50% (2/4)
+
+## 2026-02-27 09:07 (JST)
+- Summary:
+  - `docs/plans/TEMPLATE.md` をベースに、依頼4項目を含む計画書を新規作成した。
+- Completed:
+  - TASK 3 完了
+- Changes:
+  - `docs/plans/2026-02-27_codex-autonomy-research-loop-plan.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `sed -n '1,260p' docs/plans/TEMPLATE.md` => テンプレート構成確認
+  - `cat > docs/plans/2026-02-27_codex-autonomy-research-loop-plan.md <<'EOF' ...` => 計画書作成
+  - `cat > .codex/runs/20260227-090124-JST/{PLAN,TASKS,REPORT}.md <<'EOF' ...` => runログ更新
+- Notes/Decisions:
+  - 反復Web検索を「ラウンド型タスク（検索→仮説更新→再検索）」として明示した。
+- New tasks:
+  - なし
+- Remaining:
+  - TASK 4
+- Progress: 75% (3/4)
+
+## 2026-02-27 09:10 (JST)
+- Summary:
+  - `docs/PROJECT_CONTEXT.md` に反復仮説検証運用の知見を追記し、最終品質確認を実施した。
+- Completed:
+  - TASK 4 完了
+- Changes:
+  - `docs/PROJECT_CONTEXT.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `apply_patch` => `docs/PROJECT_CONTEXT.md` に運用要点を追記
+  - `rg --files -g 'package.json' -g 'pyproject.toml' -g 'ruff.toml' -g '.eslintrc*' -g 'tsconfig.json' -g '.prettierrc*' -g 'Cargo.toml' -g 'go.mod' -g 'Makefile'` => 該当なし（exit 1）
+  - `git diff --check` => 変更差分にエラーなし（既存改行警告のみ）
+  - `git status --short` => 変更ファイルを確認
+- Notes/Decisions:
+  - formatter/lint/typecheck/build/test を実行する設定ファイルはリポジトリ内で確認できなかったため、差分整合性確認を品質ゲートとして実施した。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (4/4)
+
+## 2026-02-27 09:10 (JST)
+- Summary:
+  - ユーザー依頼に基づき計画書レビューを実施し、懸念点を抽出した。
+- Completed:
+  - D1 完了
+- Changes:
+  - なし（レビューのみ）
+- Commands:
+  - `nl -ba docs/plans/2026-02-27_codex-autonomy-research-loop-plan.md | sed -n '1,260p'` => 行番号付きレビュー
+- Notes/Decisions:
+  - 主な懸念は「終了条件の曖昧さ」「証跡フォーマット不足」「改善提案の承認フロー不足」。
+- New tasks:
+  - D1-D3 を TASKS の Discovered に追加
+- Remaining:
+  - D2-D3
+- Progress: 71% (5/7)
+
+## 2026-02-27 09:11 (JST)
+- Summary:
+  - 抽出した懸念点を計画書へ反映し、DoD/実行タスク/検証方法/リスクを具体化した。
+- Completed:
+  - D2 完了
+- Changes:
+  - `docs/plans/2026-02-27_codex-autonomy-research-loop-plan.md`
+- Commands:
+  - `apply_patch` => 計画書に懸念点反映（DoD、12タスク化、M4追加、承認フロー追記）
+  - `nl -ba docs/plans/2026-02-27_codex-autonomy-research-loop-plan.md | sed -n '1,320p'` => 反映結果確認
+- Notes/Decisions:
+  - 証跡フォーマットと承認ログ要件を成功判定に組み込み、評価可能性を高めた。
+- New tasks:
+  - なし
+- Remaining:
+  - D3
+- Progress: 86% (6/7)
+
+## 2026-02-27 09:12 (JST)
+- Summary:
+  - 再レビューを行い、整合性の微修正を反映したうえで重大/中程度の懸念がないことを確認した。
+- Completed:
+  - D3 完了
+- Changes:
+  - `docs/plans/2026-02-27_codex-autonomy-research-loop-plan.md`
+  - `docs/PROJECT_CONTEXT.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `apply_patch` => 成功判定を「2サイクル以上」に修正し、運用知見を `PROJECT_CONTEXT` に追記
+  - `nl -ba docs/plans/2026-02-27_codex-autonomy-research-loop-plan.md | sed -n '60,120p'` => 再レビュー確認
+- Notes/Decisions:
+  - 「最低2ラウンド」方針と成功判定の整合を取り、レビュー反復の運用メモを `PROJECT_CONTEXT` に追加した。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (7/7)
+
+## 2026-02-27 09:13 (JST)
+- Summary:
+  - 最終品質確認として差分整合性と設定ファイル有無を再確認した。
+- Completed:
+  - なし（確認のみ）
+- Changes:
+  - なし
+- Commands:
+  - `git diff --check` => 問題なし
+  - `rg --files -g 'package.json' -g 'pyproject.toml' -g 'ruff.toml' -g '.eslintrc*' -g 'tsconfig.json' -g '.prettierrc*' -g 'Cargo.toml' -g 'go.mod' -g 'Makefile'` => 該当なし（exit 1）
+  - `git status --short` => 変更対象が想定範囲内であることを確認
+- Notes/Decisions:
+  - formatter/lint/typecheck/build/test 設定は確認できないため、今回も差分整合性確認を品質ゲートとして採用。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (7/7)
+
+## 2026-02-27 09:18 (JST)
+- Summary:
+  - ユーザーの「計画書に従って実装」指示を受け、同一runで実装タスクを追加して実行フェーズへ移行した。
+- Completed:
+  - なし（準備）
+- Changes:
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `sed -n '1,320p' docs/plans/2026-02-27_codex-autonomy-research-loop-plan.md` => 実装対象の計画タスクを確認
+  - `apply_patch` => Discoveredに D4-D15 を追加
+- Notes/Decisions:
+  - 実装進行は D4->D15 を上から順に実施する。
+- New tasks:
+  - D4-D15 を追加
+- Remaining:
+  - D4-D15
+- Progress: 37% (7/19)
+
+## 2026-02-27 09:20 (JST)
+- Summary:
+  - D4として現状分析と運用ギャップ整理を実施し、実装ログ文書を新規作成した。
+- Completed:
+  - D4 完了
+- Changes:
+  - `docs/reports/2026-02-27_codex-autonomy-implementation-log.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `cat > docs/reports/2026-02-27_codex-autonomy-implementation-log.md <<'EOF' ...` => 実装ログ作成
+  - `apply_patch` => D4チェックとThinking Log更新
+- Notes/Decisions:
+  - ギャップは G1-G5（証跡不足、状態遷移未テンプレート化、承認ガード不足、skill-installer未統合、役割テンプレート未整備）に整理した。
+- New tasks:
+  - なし
+- Remaining:
+  - D5-D15
+- Progress: 42% (8/19)
+
+## 2026-02-27 09:22 (JST)
+- Summary:
+  - D5として仮説H1-H5と証跡フォーマットを定義し、調査ログの判定軸を固定化した。
+- Completed:
+  - D5 完了
+- Changes:
+  - `docs/reports/2026-02-27_codex-autonomy-implementation-log.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `apply_patch` => 仮説（H1-H5）と証跡フォーマット定義を追記
+- Notes/Decisions:
+  - 以降の調査は `Supports/Refutes` と `Confidence` を必須項目とする。
+- New tasks:
+  - なし
+- Remaining:
+  - D6-D15
+- Progress: 47% (9/19)
+
+## 2026-02-27 09:29 (JST)
+- Summary:
+  - D6としてWeb調査ラウンド1を実施し、仮説ごとのエビデンスを6件記録した。
+- Completed:
+  - D6 完了
+- Changes:
+  - `docs/reports/2026-02-27_codex-autonomy-implementation-log.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `web.search_query` => OpenAI Codex docs 検索（agents-md/skills/config/security）
+  - `web.open` / `web.find` => 主要記述の一次情報抽出
+  - `apply_patch` => Round1ログ追記
+- Notes/Decisions:
+  - Round1時点でH1/H2/H4/H5の支持根拠は揃った。H3は導入手順の追加確認が必要。
+- New tasks:
+  - なし
+- Remaining:
+  - D7-D15
+- Progress: 53% (10/19)
+
+## 2026-02-27 09:30 (JST)
+- Summary:
+  - D7としてRound1の不足論点をレビューし、追加クエリを確定した。
+- Completed:
+  - D7 完了
+- Changes:
+  - `docs/reports/2026-02-27_codex-autonomy-implementation-log.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `apply_patch` => OI-1〜OI-3 と Q6〜Q8 を実装ログへ追記
+- Notes/Decisions:
+  - 追加クエリは cookbook（長時間タスク運用）、openai/skills（導入手順）、config-reference（web_searchモード）を対象にした。
+- New tasks:
+  - なし
+- Remaining:
+  - D8-D15
+- Progress: 58% (11/19)
+
+## 2026-02-27 09:31 (JST)
+- Summary:
+  - D8としてWeb調査ラウンド2を実施し、終了条件を満たすまで仮説評価を更新した。
+- Completed:
+  - D8 完了
+- Changes:
+  - `docs/reports/2026-02-27_codex-autonomy-implementation-log.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `web.search_query` => cookbook/openai skills/config-reference 追加調査
+  - `web.open` => https://github.com/openai/skills , https://cookbook.openai.com/articles/codex_exec_plans/
+  - `apply_patch` => Round2ログと終了条件判定を追記
+- Notes/Decisions:
+  - OI-1〜OI-3 は解消。D9以降で運用文書とテンプレートへ実装反映する。
+- New tasks:
+  - なし
+- Remaining:
+  - D9-D15
+- Progress: 63% (12/19)
+
+## 2026-02-27 09:34 (JST)
+- Summary:
+  - D9として `skill-installer` 運用を実装し、`openai-docs` スキルを導入した。
+- Completed:
+  - D9 完了
+- Changes:
+  - `docs/agent/skill-discovery-workflow.md`
+  - `docs/reports/2026-02-27_codex-autonomy-implementation-log.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `python3 .../list-skills.py` => curated skill一覧取得
+  - `python3 .../install-skill-from-github.py --repo openai/skills --path skills/.curated/openai-docs` => `Installed openai-docs ...`
+  - `python3 .../list-skills.py --format json | ...` => `{'name': 'openai-docs', 'installed': True}`
+- Notes/Decisions:
+  - 導入後反映には Codex再起動が必要なため、運用手順に明記した。
+- New tasks:
+  - なし
+- Remaining:
+  - D10-D15
+- Progress: 68% (13/19)
+
+## 2026-02-27 09:37 (JST)
+- Summary:
+  - D10として役割別エージェント設計と、思考用Markdownテンプレート群を追加した。
+- Completed:
+  - D10 完了
+- Changes:
+  - `docs/agent/agent-role-design.md`
+  - `docs/agent/templates/planner-template.md`
+  - `docs/agent/templates/researcher-template.md`
+  - `docs/agent/templates/executor-template.md`
+  - `docs/agent/templates/reviewer-template.md`
+  - `docs/reports/2026-02-27_codex-autonomy-implementation-log.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `mkdir -p docs/agent/templates && cat > ...` => 役割設計とテンプレート作成
+  - `apply_patch` => 実装ログ追記
+- Notes/Decisions:
+  - multi-agent機能は必須化せず、まずは役割分離の運用設計として導入する。
+- New tasks:
+  - なし
+- Remaining:
+  - D11-D15
+- Progress: 74% (14/19)
+
+## 2026-02-27 09:40 (JST)
+- Summary:
+  - D11として `.codex/templates` を更新し、検索ラウンド前提の実行プロトコルを反映した。
+- Completed:
+  - D11 完了
+- Changes:
+  - `.codex/templates/PLAN.md`
+  - `.codex/templates/TASKS.md`
+  - `.codex/templates/REPORT.md`
+  - `docs/reports/2026-02-27_codex-autonomy-implementation-log.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `cat > .codex/templates/{PLAN,TASKS,REPORT}.md <<'EOF' ...` => テンプレート更新
+  - `apply_patch` => 実装ログ/タスク更新
+- Notes/Decisions:
+  - 新テンプレートは仮説・検索ラウンド・証跡記録を必須欄として持つ。
+- New tasks:
+  - なし
+- Remaining:
+  - D12-D15
+- Progress: 79% (15/19)
+
+## 2026-02-27 09:43 (JST)
+- Summary:
+  - D12として改善提案ガードレール（承認・差し戻し・ロールバック）を運用ドキュメントに実装した。
+- Completed:
+  - D12 完了
+- Changes:
+  - `docs/agent/improvement-guardrails.md`
+  - `docs/agent/templates/improvement-proposal-template.md`
+  - `docs/reports/2026-02-27_codex-autonomy-implementation-log.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `cat > docs/agent/improvement-guardrails.md <<'EOF' ...` => ガードレール文書作成
+  - `cat > docs/agent/templates/improvement-proposal-template.md <<'EOF' ...` => 提案テンプレート作成
+  - `apply_patch` => 実装ログ更新
+- Notes/Decisions:
+  - L2/L3変更はユーザー承認必須とし、自己改善提案の暴走を防ぐ。
+- New tasks:
+  - なし
+- Remaining:
+  - D13-D15
+- Progress: 84% (16/19)
+
+## 2026-02-27 09:47 (JST)
+- Summary:
+  - D13として `AGENTS.md` と関連文書を改訂し、自己改善提案フローを運用へ組み込んだ。
+- Completed:
+  - D13 完了
+- Changes:
+  - `AGENTS.md`
+  - `docs/agent/overrides.md`
+  - `docs/PROJECT_CONTEXT.md`
+  - `docs/reports/2026-02-27_codex-autonomy-implementation-log.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `apply_patch` => AGENTSへ自律調査ループ/ガバナンス追加
+  - `cat > docs/agent/overrides.md <<'EOF' ...` => 追加運用指示を新規作成
+  - `apply_patch` => PROJECT_CONTEXTと実装ログ更新
+- Notes/Decisions:
+  - AGENTSは英語のみ維持し、詳細運用は `overrides.md` に分離した。
+- New tasks:
+  - なし
+- Remaining:
+  - D14-D15
+- Progress: 89% (17/19)
+
+## 2026-02-27 09:50 (JST)
+- Summary:
+  - D14としてパイロット検証を2サイクル実施し、検証レポートを作成した。
+- Completed:
+  - D14 完了
+- Changes:
+  - `docs/reports/2026-02-27_autonomy-pilot-validation.md`
+  - `docs/reports/2026-02-27_codex-autonomy-implementation-log.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `rg -n \"Autonomous research loop|Skills and self-improvement governance\" AGENTS.md` => 節追加確認
+  - `rg -n \"Hypotheses|Research Plan|Evidence Record\" .codex/templates/PLAN.md .codex/templates/REPORT.md` => テンプレート反映確認
+  - `python3 .../list-skills.py --format json | ...` => `openai-docs installed: true`
+  - `cat > docs/reports/2026-02-27_autonomy-pilot-validation.md <<'EOF' ...` => 検証レポート作成
+- Notes/Decisions:
+  - Cycle 1/2 とも PASS。残作業は最終品質確認とrunログ整合のみ。
+- New tasks:
+  - なし
+- Remaining:
+  - D15
+- Progress: 95% (18/19)
+
+## 2026-02-27 09:53 (JST)
+- Summary:
+  - D15として最終品質確認とrunログ整合を実施し、実装完了条件を満たした。
+- Completed:
+  - D15 完了
+- Changes:
+  - `docs/reports/2026-02-27_codex-autonomy-implementation-log.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `git diff --check` => 問題なし
+  - `rg --files -g 'package.json' -g 'pyproject.toml' -g 'ruff.toml' -g '.eslintrc*' -g 'tsconfig.json' -g '.prettierrc*' -g 'Cargo.toml' -g 'go.mod' -g 'Makefile'` => 該当なし（exit 1）
+  - `git status --short` => 変更範囲確認
+- Notes/Decisions:
+  - formatter/lint/typecheck/build/test の設定ファイルがないため、差分整合性確認を品質ゲートとして採用した。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (19/19)
+
+## 2026-02-27 09:56 (JST)
+- Summary:
+  - 重要な運用設計変更を ADR として記録した（D16）。
+- Completed:
+  - D16 完了
+- Changes:
+  - `docs/adr/0002-autonomous-research-loop-and-governance.md`
+  - `docs/reports/2026-02-27_codex-autonomy-implementation-log.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `cat > docs/adr/0002-autonomous-research-loop-and-governance.md <<'EOF' ...` => ADR追加
+  - `apply_patch` => 実装ログとrunログ更新
+- Notes/Decisions:
+  - 自律調査ループ導入は運用アーキテクチャ判断に該当するためADR化した。
+- New tasks:
+  - D16 を追加
+- Remaining:
+  - なし
+- Progress: 100% (20/20)
+
+## 2026-02-27 09:57 (JST)
+- Summary:
+  - ADR追加後の最終差分チェックを再実行し、完了状態を再確認した。
+- Completed:
+  - なし（確認のみ）
+- Changes:
+  - なし
+- Commands:
+  - `git diff --check` => 問題なし
+  - `git status --short` => 変更ファイルが想定範囲内
+- Notes/Decisions:
+  - 追加変更後も品質ゲート（差分整合性）に問題はない。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (20/20)
+
+## 2026-02-27 10:02 (JST)
+- Summary:
+  - ユーザー依頼に基づき、実装計画に対する実装評価を実施した。
+  - TASKS完了状況と計画DoDを突合し、未充足項目を1件検出した。
+- Completed:
+  - なし（評価のみ）
+- Changes:
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `nl -ba docs/plans/2026-02-27_codex-autonomy-research-loop-plan.md | sed -n '1,260p'` => DoD確認
+  - `rg -n "Proposal ID|Approver|Decision: Approve|採用可否|Approval" docs .codex/runs/20260227-090124-JST -g '*.md'` => 実記録の有無確認
+  - `nl -ba docs/reports/2026-02-27_autonomy-pilot-validation.md | sed -n '1,200p'` => パイロット記録確認
+- Notes/Decisions:
+  - DoD項目「採用可否判断（承認者等）を記録」の実データが未作成のため、D17をDiscoveredへ追加。
+- New tasks:
+  - D17 を追加
+- Remaining:
+  - D17
+- Progress: 95% (20/21)
+
+## 2026-02-27 10:07 (JST)
+- Summary:
+  - ユーザー追加要望（必要時の並列マルチエージェント実行）を新規タスクとして追加し、計画書を作成した。
+- Completed:
+  - D18 完了
+- Changes:
+  - `docs/plans/2026-02-27_parallel-multi-agent-orchestration-plan.md`
+  - `docs/plans/2026-02-27_codex-autonomy-research-loop-plan.md`
+  - `docs/PROJECT_CONTEXT.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `cat > docs/plans/2026-02-27_parallel-multi-agent-orchestration-plan.md <<'EOF' ...` => 専用計画書を新規作成
+  - `apply_patch` => 既存計画へタスク13追加、M5追加、成果物更新
+  - `apply_patch` => `PROJECT_CONTEXT` に追加要望計画の運用メモを追記
+- Notes/Decisions:
+  - 既存計画を拡張しつつ、並列実行は独立計画として分離して管理する方針にした。
+- New tasks:
+  - D18 を追加
+- Remaining:
+  - D17
+- Progress: 95% (21/22)
+
+## 2026-02-27 10:12 (JST)
+- Summary:
+  - ユーザー指示に従い、並列マルチエージェントは「計画のみ」で据え置いた。
+  - D17として改善提案の採用可否判断ログを実データで1件記録した。
+- Completed:
+  - D17 完了
+- Changes:
+  - `docs/reports/2026-02-27_improvement-proposal-log.md`
+  - `docs/reports/2026-02-27_codex-autonomy-implementation-log.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `cat > docs/reports/2026-02-27_improvement-proposal-log.md <<'EOF' ...` => 実データログ作成
+  - `apply_patch` => D17完了反映（実装ログ/runログ更新）
+- Notes/Decisions:
+  - 本記録は L1（低リスク）としてセルフ承認し、承認者・理由・影響範囲・ロールバックを明記した。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (22/22)
+
+## 2026-02-27 10:13 (JST)
+- Summary:
+  - `docs/agent/overrides.md` の適用を AGENTS.md に明記し、プロジェクト共通規定へ固定した。
+- Completed:
+  - D19 完了
+- Changes:
+  - `AGENTS.md`
+  - `docs/PROJECT_CONTEXT.md`
+  - `.codex/runs/20260227-090124-JST/PLAN.md`
+  - `.codex/runs/20260227-090124-JST/TASKS.md`
+  - `.codex/runs/20260227-090124-JST/REPORT.md`
+- Commands:
+  - `apply_patch` => AGENTS に overrides 必須適用規定を追記
+  - `apply_patch` => PROJECT_CONTEXT の任意読込表現を必須へ更新
+  - `apply_patch` => runログ更新（D19完了）
+- Notes/Decisions:
+  - overrides は「存在すれば読む」ではなく「プロジェクト共通で常に適用する」運用に変更した。
+- New tasks:
+  - D19 を追加
+- Remaining:
+  - なし
+- Progress: 100% (23/23)

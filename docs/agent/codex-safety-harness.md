@@ -13,6 +13,10 @@
   - 安全デフォルト（`--sandbox`, `--ask-for-approval`）を固定注入
   - 起動前に `codex execpolicy check` でルールのスモークテストを実施（preflight）
   - JSONL ログ（既定: `.codex/logs/codex-safe-YYYYMMDD.jsonl`）に開始/ブロック/preflight/起動イベントを追記
+- `scripts/codex-safe.sh`
+  - bash 向け Codex 起動 wrapper（PowerShell 版と同方針）
+  - 危険 CLI 引数の拒否、`--sandbox` / `--ask-for-approval` 固定注入、preflight を実施
+  - `--print-command` / `--preflight-only` / `--allow-search` / `--log-path` をサポート
 - `.codex/rules/*.rules`
   - `execpolicy` ルール
   - 読み取り系の allow、広い prompt、破壊系の forbidden を定義
@@ -20,6 +24,9 @@
   - 任意の project profile（`repo_safe`, `repo_readonly`）
 - `.codex/requirements.toml`
   - 管理配布/機能有効化時に使う補助的な最小要件定義（このリポジトリでは wrapper+rules を主軸に運用）
+- `scripts/verify`
+  - 品質ゲート実行の統一エントリポイント
+  - execpolicy 判定、bash wrapper preflight、bash/PowerShell テスト（可能環境のみ）を実行
 
 ## 推奨起動方法
 
@@ -45,6 +52,24 @@ preflight のみ（ルール検証）:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/codex-safe.ps1 -PreflightOnly
+```
+
+bash から実行:
+
+```bash
+bash scripts/codex-safe.sh
+```
+
+bash preflight のみ:
+
+```bash
+bash scripts/codex-safe.sh --preflight-only
+```
+
+品質ゲート一括実行:
+
+```bash
+bash scripts/verify
 ```
 
 ## 何をブロックするか（例）
@@ -82,3 +107,4 @@ powershell -ExecutionPolicy Bypass -File scripts/codex-safe.ps1 -PreflightOnly
 - ルール変更後は `-PreflightOnly` と `codex execpolicy check` で確認する。
 - 破壊系ルールの追加時は、`docs/reports/` に検証結果を残す。
 - wrapper や検証スクリプトを変更したら `scripts/tests/Test-CodexSafetyHarness.ps1` を実行する。
+- bash wrapper 変更時は `scripts/tests/test-codex-safety-harness.sh` も実行する。

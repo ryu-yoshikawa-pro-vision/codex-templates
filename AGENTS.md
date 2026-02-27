@@ -10,10 +10,11 @@ Codex must follow this document before doing any work in this repository.
 2) docs/adr/ (scan recent ADRs)
 3) .codex/runs/ (if any recent run exists)
 4) This AGENTS.md
-5) `docs/agent/overrides.md` (only if the file exists; check before starting work)
+5) `docs/agent/overrides.md` (project-common mandatory policy file; always read and apply)
 
 > Keep `docs/PROJECT_CONTEXT.md` as a living document by updating it when new understanding is gained.
 > Record significant architecture decisions as ADRs.
+> In this repository, `docs/agent/overrides.md` is mandatory. If it is missing or unreadable, stop and report blocked status.
 
 ---
 
@@ -175,6 +176,49 @@ PROMPT END
 
 ---
 
+## 10. Autonomous research loop (PLAN -> SEARCH -> TASKS -> EXECUTE -> REPORT)
+- For requests with unknowns, define hypotheses in PLAN before implementation.
+- Run web research in rounds and record evidence using:
+  - `Record ID`, `Round`, `Query`, `Source`, `Supports/Refutes`, `Confidence`, `Decision`, `Rationale`, `Open Issues`, `Next Action`
+- Use at least 2 rounds when uncertainty remains after the first pass.
+- Move actionable findings into `TASKS.md` (`Now` / `Discovered`) and execute top-to-bottom.
+- Treat REPORT as append-only execution trace; every major action must be logged with evidence.
+- Exit the loop only when major hypotheses have support/refute evidence and open issues have next actions.
+
+---
+
+## 11. Skills and self-improvement governance
+- Skill discovery and installation must follow `docs/agent/skill-discovery-workflow.md`.
+- Role-oriented execution (Planner/Researcher/Executor/Reviewer) should follow `docs/agent/agent-role-design.md` and templates under `docs/agent/templates/`.
+- Improvement proposals must follow `docs/agent/improvement-guardrails.md`.
+- `docs/agent/overrides.md` is project-common mandatory guidance and must be enforced for every request.
+- Approval boundary:
+  - L1 (low risk): self-approval allowed with REPORT log.
+  - L2/L3 (medium/high risk): explicit user approval required before execution.
+- Every improvement proposal must include rollback planning before applying changes.
+
+---
+
 ## Notes (source pointers)
 - Codex reads AGENTS.md before doing work; use it to encode project-specific norms.
 - `codex exec` can run non-interactively; GitHub Action can run it in CI.
+
+---
+
+## 12. Lightweight Execution Mode (for small low-risk tasks)
+
+Use this mode only when all conditions are true:
+- The request is narrowly scoped and can be completed in one short edit or one short verification pass.
+- No architectural decision, policy change, or safety-sensitive change is involved.
+- No unresolved unknowns require multi-round research.
+
+Minimum requirements in lightweight mode:
+- Still create or continue the session run and update `PLAN/TASKS/REPORT`.
+- Keep tasks minimal (typically 1-3 concrete checkboxes).
+- Record at least one evidence command and one progress line.
+- Keep safety constraints, approval boundaries, and non-destructive rules unchanged.
+
+Lightweight mode is not allowed when:
+- Changes touch `AGENTS.md`, safety harness, approval/sandbox behavior, or other L2/L3 areas.
+- The request requires web research rounds by rule.
+- The request has significant ambiguity, cross-file refactor risk, or external dependency uncertainty.
