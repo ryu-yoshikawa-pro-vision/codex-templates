@@ -103,6 +103,9 @@ Example (format only):
 - When you learn something new about the codebase (structure, gotchas, workflows, invariants):
   - Update `docs/PROJECT_CONTEXT.md` (add concise notes, keep it readable)
   - Keep `docs/PROJECT_CONTEXT.md` aligned to the real project state and continuously update it as development progresses.
+  - Do not store update history inside `docs/PROJECT_CONTEXT.md` itself.
+  - Store update history under `docs/history/` using: `YYYY-MM-DD_HHMMSS_<summary>.md` (JST).
+  - In the same session/conversation, keep appending to the same history file instead of creating multiple files.
 - When you make a significant architectural decision (interfaces, data model, dependency direction, build/deploy strategy):
   - Add/update an ADR under `docs/adr/` (keep it short and decision-focused)
 
@@ -155,6 +158,8 @@ Process requirements:
   - Include `Progress: <NN>% (<done>/<total>)` using AGENTS.md §3
 - If you discover new tasks, add them under `## Discovered` and continue.
 - Continuously update `docs/PROJECT_CONTEXT.md` with any new understanding.
+- When creating files in `docs/plans/` or `docs/reports/`, include date and time in JST in the filename.
+- When recording `docs/PROJECT_CONTEXT.md` update history, write/append under a same-session file in `docs/history/` using `YYYY-MM-DD_HHMMSS_<summary>.md`.
 - For significant architectural decisions, add/update an ADR under `docs/adr/`.
 - Run relevant checks (tests/formatter/lint/typecheck/build) before finishing.
 - If formatter/lint/typecheck are configured in the project, run them and verify there are no errors before sending a completion report.
@@ -170,9 +175,13 @@ PROMPT END
 
 ## 9. Plan document rule (when user asks for a plan)
 - If the user asks you to create a plan, you MUST create a plan document under `docs/plans/`.
-- File name format: `{yyyy-mm-dd}_{plan_name}.md` (example: `2026-02-19_release-plan.md`).
-- The date part must use JST (`Asia/Tokyo`) calendar date.
+- File name format: `{yyyy-mm-dd}_{HHMMSS}_{plan_name}.md` (example: `2026-02-19_153045_release-plan.md`).
+- The date/time part must use JST (`Asia/Tokyo`).
 - When creating the plan file, use `docs/plans/TEMPLATE.md` as the base template.
+
+## 9.1 Report document naming rule
+- When creating report/log documents under `docs/reports/`, use `{yyyy-mm-dd}_{HHMMSS}_{report_name}.md`.
+- The date/time part must use JST (`Asia/Tokyo`).
 
 ---
 
