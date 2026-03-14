@@ -16,6 +16,12 @@ Codex must follow this document before doing any work in this repository.
 > Record significant architecture decisions as ADRs.
 > In this repository, `docs/agent/overrides.md` is mandatory. If it is missing or unreadable, stop and report blocked status.
 
+## 0.1 Mode-specific entry files
+- For complex tasks, explicit planning requests, or Plan Mode, read `PLANS.md` after `docs/agent/overrides.md` and follow it before implementation.
+- For review requests or `/review`, read `CODE_REVIEW.md` after `docs/agent/overrides.md` and apply its findings-first process.
+- Repo-local repeatable workflows may live under `.agents/skills/`, but explicit `AGENTS.md` routing takes precedence over implicit skill triggering.
+- When moving from a completed plan to implementation, persist the agreed plan content to `docs/plans/` before making repo changes.
+
 ---
 
 ## 1. Run initialization (per request)
@@ -150,6 +156,9 @@ Goal: Implement the user request end-to-end.
 Process requirements:
 - If no active run exists, create `.codex/runs/<run_id>/` using `run_id = YYYYMMDD-HHMMSS-JST` and copy from `.codex/templates/{PLAN,TASKS,REPORT}.md`.
 - In a new/different conversation session, always start a new run folder by default; continue an old run folder only when the user explicitly specifies it.
+- For complex tasks, explicit planning requests, or Plan Mode, read `PLANS.md` before implementation.
+- Before implementing a plan that was produced in chat or Plan Mode, save that plan to `docs/plans/` using the repository naming rule.
+- For review requests or `/review`, read `CODE_REVIEW.md` and follow its findings-first review structure.
 - Fill `.codex/runs/<run_id>/PLAN.md` (Objective/Scope/Assumptions/DoD) and create an ordered checkbox list in `.codex/runs/<run_id>/TASKS.md`.
 - Write `PLAN.md`, `TASKS.md`, and `REPORT.md` entries in Japanese (while keeping `AGENTS.md` in English only).
 - Execute tasks top-to-bottom. After each completed task:
@@ -183,6 +192,11 @@ PROMPT END
 - When creating report/log documents under `docs/reports/`, use `{yyyy-mm-dd}_{HHMMSS}_{report_name}.md`.
 - The date/time part must use JST (`Asia/Tokyo`).
 
+## 9.2 Plan-to-Implementation handoff rule
+- If a plan was created in chat or Plan Mode and you are about to implement it, first persist the agreed plan under `docs/plans/`.
+- Use the same naming rule and template in §9 unless the user explicitly designates an existing plan file to update.
+- Do not start implementation until the plan handoff document exists.
+
 ---
 
 ## 10. Autonomous research loop (PLAN -> SEARCH -> TASKS -> EXECUTE -> REPORT)
@@ -198,7 +212,8 @@ PROMPT END
 
 ## 11. Skills and self-improvement governance
 - Skill discovery and installation must follow `docs/agent/skill-discovery-workflow.md`.
-- Role-oriented execution (Planner/Researcher/Executor/Reviewer) should follow `docs/agent/agent-role-design.md` and templates under `docs/agent/templates/`.
+- Role-oriented execution (Planner/Researcher/Executor/Reviewer) should follow `PLANS.md`, `CODE_REVIEW.md`, `docs/agent/agent-role-design.md`, and templates under `docs/agent/templates/`.
+- Repo-local repeatable workflows may be packaged under `.agents/skills/`; use them to reinforce planning/review flows, not to replace explicit routing from `AGENTS.md`.
 - Improvement proposals must follow `docs/agent/improvement-guardrails.md`.
 - `docs/agent/overrides.md` is project-common mandatory guidance and must be enforced for every request.
 - Approval boundary:

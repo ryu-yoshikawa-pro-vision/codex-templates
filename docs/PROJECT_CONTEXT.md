@@ -9,6 +9,9 @@
 - 反復的な仮説検証タスクでは、PLANに「仮説」「検索ラウンド」「終了条件」を明記し、検索結果の採否理由をREPORTへ記録してTASKSへ反映する。
 - 計画レビューでは、少なくとも「終了条件の明確性」「証跡フォーマット」「改善提案の承認フロー」を確認し、懸念があれば修正→再レビューを反復する。
 - 自律運用タスクでは、`PLAN -> Web検索 -> TASKS -> 実行 -> REPORT` を標準プロトコルとして運用し、Web検索はラウンド制で証跡を残す。
+- 複雑タスク、Plan Mode、または明示的な計画依頼では、repo ルートの `PLANS.md` を Codex の計画入口として参照する。
+- Plan Mode やチャットで合意した計画から実装へ移る場合は、最初に `docs/plans/` へ計画内容を保存してから実行する。
+- レビュー依頼または `/review` では、repo ルートの `CODE_REVIEW.md` を Codex のレビュー入口として参照する。
 - 自己改善提案は `docs/agent/improvement-guardrails.md` の L1/L2/L3 承認境界に従う（L2/L3 はユーザー承認必須）。
 - 並列マルチエージェントの追加要望は `docs/plans/*_parallel-multi-agent-orchestration-plan.md`（旧命名を含む既存計画）で別計画として管理し、必要時のみ段階的に実装する。
 - 低リスク・小規模タスクでは `AGENTS.md` の Lightweight Execution Mode を適用できる（ただし安全制約・承認境界・run更新は省略しない）。
@@ -30,7 +33,10 @@
 - `.codex/logs/`: Codex安全ハーネスの実行ログ（JSONL、通常は `.gitignore` で管理）
 - `.codex/config.toml`: Codex の project-scoped 設定プリセット（任意利用）
 - `.codex/requirements.toml`: Codex の要件ドキュメント（管理配布/機能有効時の補助用途）
+- `.agents/skills/`: repo ローカルの反復ワークフロー Skill 定義
 - `docs/adr/`: 運用や方針の意思決定記録
+- `PLANS.md`: Codex の計画系 mode 入口
+- `CODE_REVIEW.md`: Codex のレビュー系 mode 入口
 - `docs/plans/`: ユーザー向け計画書のテンプレートと成果物
 - `docs/plans/README.md`: 計画書の命名規則と運用手順のガイド
 - `docs/reports/`: 調査メモ、比較表、運用レポートなどの成果物（Markdown中心）
@@ -56,6 +62,9 @@
 ## AGENTS拡張運用の指針
 - プロジェクト固有のツール/スキル指示を分離したい場合は、ルート `AGENTS.md` に「追加指示ファイルの読込順」を明記し、詳細は別ファイル（例: `docs/agent/overrides.md`）に置く。
 - 本リポジトリでは `docs/agent/overrides.md` を必須ファイルとして扱い、作業開始前に必ず読み込んで適用する。
+- `docs/agent/` は役割設計・詳細手順の正本として維持し、`PLANS.md` / `CODE_REVIEW.md` は Codex が mode 別にたどる薄い入口として使う。
+- repo ローカルで繰り返す planning/review ワークフローは `.agents/skills/` に切り出し、暗黙起動に依存しすぎず `AGENTS.md` の明示ルーティングで補強する。
+- 計画から実装への handoff では、`docs/plans/` がユーザー合意済み計画の保存場所となる。
 - 上記の参照型は、共通ルール（AGENTS）と可変ルール（追加指示）を分離でき、更新差分を小さく保ちやすい。
 - ディレクトリ単位で強い上書きが必要な場合は、対象配下に別の `AGENTS.md` を置く階層型を使う。スコープ境界が明確になる一方で、複数ファイル間の整合管理コストが増える。
 - 運用推奨:

@@ -1,0 +1,165 @@
+# Report (append-only)
+- 行動のたびに追記する（調査/編集/判断も含む）
+- コマンドや確認結果は必ず記録する
+
+## Evidence Record (optional)
+- Record ID:
+- Round:
+- Query:
+- Source:
+- Supports/Refutes:
+- Confidence:
+- Decision:
+- Rationale:
+- Open Issues:
+- Next Action:
+
+## YYYY-MM-DD HH:MM (JST)
+- Summary:
+- Completed:
+- Changes:
+- Commands:
+  - `...` => result
+- Notes/Decisions:
+- New tasks:
+- Remaining:
+- Progress: NN% (done/total)
+
+## 2026-03-14 16:22 (JST)
+- Summary:
+  - run `20260314-162149-JST` を初期化した。
+  - 変更対象を `AGENTS.md`、mode 入口ファイル、repo local skill、living docs、ADR に確定した。
+- Completed:
+  - run フォルダ作成
+  - テンプレートコピー
+- Changes:
+  - `.codex/runs/20260314-162149-JST/PLAN.md`
+  - `.codex/runs/20260314-162149-JST/TASKS.md`
+  - `.codex/runs/20260314-162149-JST/REPORT.md`
+- Commands:
+  - `New-Item -ItemType Directory -Force .codex/runs/20260314-162149-JST; Copy-Item .codex/templates/* .codex/runs/20260314-162149-JST/` => run 初期化
+  - `Get-Date -Format "yyyy-MM-dd_HHmmss"` => `2026-03-14_162210`
+- Notes/Decisions:
+  - `.agent/` への全面移行は行わず、`docs/agent/` を正本に維持する。
+- New tasks:
+  - なし
+- Remaining:
+  - mode 入口ファイル追加
+  - AGENTS / context / ADR 整合
+  - 検証
+- Progress: 25% (1/4)
+
+## 2026-03-14 16:25 (JST)
+- Summary:
+  - `PLANS.md`、`CODE_REVIEW.md`、repo local skill、ADR、history を追加した。
+  - `AGENTS.md`、`docs/agent/overrides.md`、`docs/PROJECT_CONTEXT.md` を mode 入口構成に更新した。
+- Completed:
+  - mode 入口ファイル追加
+  - repo local skill 追加
+  - living docs / ADR 更新
+- Changes:
+  - `AGENTS.md`
+  - `PLANS.md`
+  - `CODE_REVIEW.md`
+  - `.agents/skills/feature-plan/SKILL.md`
+  - `.agents/skills/code-review/SKILL.md`
+  - `docs/agent/overrides.md`
+  - `docs/PROJECT_CONTEXT.md`
+  - `docs/adr/0004-mode-entrypoints-and-repo-local-skills.md`
+  - `docs/history/2026-03-14_162210_mode-entrypoints-update.md`
+- Commands:
+  - `git diff -- AGENTS.md PLANS.md CODE_REVIEW.md ...` => 追加・更新差分を確認
+- Notes/Decisions:
+  - 必須導線は `AGENTS.md` と mode 入口ファイルの明示参照で担保し、Skill は補助とする。
+- New tasks:
+  - なし
+- Remaining:
+  - 検証
+- Progress: 75% (3/4)
+
+## 2026-03-14 16:31 (JST)
+- Summary:
+  - 静的検証を実施し、参照整合に問題がないことを確認した。
+  - nested Codex の read-only 実行で planning request / review request の両方について入口ファイル適用を確認した。
+- Completed:
+  - 静的検証
+  - runtime 参照確認
+- Changes:
+  - `.codex/runs/20260314-162149-JST/plan-mode-check.txt`
+  - `.codex/runs/20260314-162149-JST/review-mode-check.txt`
+- Commands:
+  - `codex --version` => `codex-cli 0.115.0-alpha.11`
+  - `git diff --check` => 問題なし
+  - `rg -n "PLANS.md|code_review.md|\\.agents/skills" AGENTS.md docs PLANS.md code_review.md .agents` => 参照整合を確認
+  - `bash scripts/verify` => WSL/Bash 未導入環境のため失敗
+  - `powershell.exe -ExecutionPolicy Bypass -File scripts/codex-safe.ps1 -PreflightOnly` => PASS
+  - `powershell.exe -ExecutionPolicy Bypass -File scripts/tests/Test-CodexSafetyHarness.ps1` => PASS
+  - `codex --ask-for-approval untrusted exec --sandbox read-only ...planning request...` => `PLANS.md` と Planner テンプレート適用を確認
+  - `codex --ask-for-approval untrusted exec --sandbox read-only ...review request...` => `CODE_REVIEW.md` と Reviewer テンプレート適用を確認
+- Notes/Decisions:
+  - `scripts/verify` は bash / WSL 前提のため、この Windows 環境では代替として PowerShell 側の preflight と harness test を実施した。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (4/4)
+
+## 2026-03-14 16:36 (JST)
+- Summary:
+  - Plan Mode やチャットで合意した計画から実装へ移る場合、先に `docs/plans/` へ保存するルールを追加した。
+  - 今回の mode 入口構成の計画内容も `docs/plans/` に保存した。
+- Completed:
+  - plan-to-implementation handoff ルール追加
+  - 現在の合意済み計画の保存
+  - living docs / ADR / run ログ更新
+- Changes:
+  - `AGENTS.md`
+  - `PLANS.md`
+  - `docs/agent/overrides.md`
+  - `docs/PROJECT_CONTEXT.md`
+  - `.agents/skills/feature-plan/SKILL.md`
+  - `docs/plans/2026-03-14_163631_plan-review-routing.md`
+  - `docs/adr/0005-plan-handoff-before-implementation.md`
+  - `docs/history/2026-03-14_162210_mode-entrypoints-update.md`
+- Commands:
+  - `Get-Date -Format "yyyy-MM-dd_HHmmss"` => `2026-03-14_163631`
+  - `Get-Content -Raw AGENTS.md` => handoff ルール追記後の記述を確認
+  - `Get-Content -Raw PLANS.md` => `docs/plans/` 保存ルール追記を確認
+  - `Get-Content -Raw docs/plans/2026-03-14_163631_plan-review-routing.md` => plan document 作成内容を確認
+- Notes/Decisions:
+  - plan handoff は `AGENTS.md` だけでなく `PLANS.md`、`docs/agent/overrides.md`、planning skill、living docs に重ねて明記する。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (7/7)
+
+## 2026-03-14 17:08 (JST)
+- Summary:
+  - review 系入口のファイル名を `CODE_REVIEW.md` に統一した。
+  - 関連参照と review-mode 検証を大文字名へ更新した。
+- Completed:
+  - review 入口ファイルのリネーム
+  - 参照更新
+  - review 導線の再検証
+- Changes:
+  - `CODE_REVIEW.md`
+  - `AGENTS.md`
+  - `docs/agent/overrides.md`
+  - `docs/PROJECT_CONTEXT.md`
+  - `.agents/skills/code-review/SKILL.md`
+  - `docs/adr/0004-mode-entrypoints-and-repo-local-skills.md`
+  - `docs/plans/2026-03-14_163631_plan-review-routing.md`
+  - `docs/history/2026-03-14_162210_mode-entrypoints-update.md`
+  - `.codex/runs/20260314-162149-JST/review-mode-check.txt`
+- Commands:
+  - `rg -n "code_review\\.md|CODE_REVIEW\\.md" AGENTS.md PLANS.md docs .agents .codex README.md` => 更新対象参照を洗い出し
+  - `codex --ask-for-approval untrusted exec --sandbox read-only -o .codex/runs/20260314-162149-JST/review-mode-check.txt "... whether CODE_REVIEW.md ... apply"` => `CODE_REVIEW.md` と Reviewer テンプレート適用を再確認
+  - `git diff --check` => 問題なし
+- Notes/Decisions:
+  - planning 側の `PLANS.md` に合わせ、review 側も大文字命名へ揃える。
+- New tasks:
+  - なし
+- Remaining:
+  - なし
+- Progress: 100% (8/8)

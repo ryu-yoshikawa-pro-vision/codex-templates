@@ -7,8 +7,14 @@
 1. PLAN で仮説（H1..）と終了条件を明示する。
 2. Web検索はラウンド制で行い、各ラウンドで証跡（採否理由・信頼度）を残す。
 3. 調査結果は TASKS に具体タスクとして反映する。
-4. 実行中の判断はすべて REPORT に追記する。
-5. 未解決論点は `Next Action` 付きで残す。
+4. Plan Mode やチャットで固めた計画から実装へ移るときは、先に `docs/plans/` へ計画を保存する。
+5. 実行中の判断はすべて REPORT に追記する。
+6. 未解決論点は `Next Action` 付きで残す。
+
+## Mode別入口
+- Planning: `PLANS.md`
+- Review: `CODE_REVIEW.md`
+- Repo skills: `.agents/skills/`（明示ルーティングの補助として使う）
 
 ## 役割テンプレート
 - Planner: `docs/agent/templates/planner-template.md`

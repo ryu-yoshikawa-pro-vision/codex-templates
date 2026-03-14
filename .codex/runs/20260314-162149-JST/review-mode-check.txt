@@ -1,0 +1,11 @@
+- Summary:
+  - 今回はレビュー依頼として扱うため、[docs/PROJECT_CONTEXT.md](C:/Users/sella/Documents/codex-templates/docs/PROJECT_CONTEXT.md)、直近 ADR の [0005](C:/Users/sella/Documents/codex-templates/docs/adr/0005-plan-handoff-before-implementation.md) / [0004](C:/Users/sella/Documents/codex-templates/docs/adr/0004-mode-entrypoints-and-repo-local-skills.md)、最新 run の [PLAN.md](C:/Users/sella/Documents/codex-templates/.codex/runs/20260314-162149-JST/PLAN.md)、[AGENTS.md](C:/Users/sella/Documents/codex-templates/AGENTS.md)、[docs/agent/overrides.md](C:/Users/sella/Documents/codex-templates/docs/agent/overrides.md) を先に確認しました。
+  - レビュー入口として [CODE_REVIEW.md](C:/Users/sella/Documents/codex-templates/CODE_REVIEW.md) は適用されます。`AGENTS.md` 0.1 に「review requests では読む」と明記されています。
+  - [docs/agent/templates/reviewer-template.md](C:/Users/sella/Documents/codex-templates/docs/agent/templates/reviewer-template.md) も適用されます。`CODE_REVIEW.md` がベーステンプレートとして明示し、[.agents/skills/code-review/SKILL.md](C:/Users/sella/Documents/codex-templates/.agents/skills/code-review/SKILL.md) でも参照が要求されています。
+  - 補助的に、[docs/agent/agent-role-design.md](C:/Users/sella/Documents/codex-templates/docs/agent/agent-role-design.md) の Reviewer 定義と `code-review` skill も今回のレビュー手順に含めます。
+- Progress: 100% (1/1)
+- Evidence:
+  - `Get-Content AGENTS.md` => review request では `CODE_REVIEW.md` を読む規定を確認
+  - `Get-Content docs/agent/overrides.md` => Reviewer template 参照の共通規定を確認
+  - `Get-Content CODE_REVIEW.md` => `docs/agent/templates/reviewer-template.md` をベーステンプレートとして確認
+  - `Get-Content .agents/skills/code-review/SKILL.md` => review task で reviewer template を参照する skill 指示を確認
