@@ -1,0 +1,9 @@
+.vscode/
+.codex/logs/*.jsonl
+.codex/runs/*
+!.codex/runs/
+!.codex/runs/.gitkeep
+template/.codex/logs/*.jsonl
+template/.codex/runs/*
+!template/.codex/runs/
+!template/.codex/runs/.gitkeep

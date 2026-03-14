@@ -1,248 +1,82 @@
-# Codex Working Agreement
+# Source Repository 向け Codex Working Agreement
 
-Codex must follow this document before doing any work in this repository.
-(Reason: Codex reads AGENTS.md before starting tasks.) 
+Codex が `codex-templates` の source repository 自体を変更するときは、この文書に従うこと。
 
----
+## 0. 最初に必ず読むもの
+1) `maintainers/PROJECT_CONTEXT.md`
+2) `maintainers/adr/`（最近の ADR を確認する）
+3) `.codex/runs/`（最近の run があれば確認する）
+4) この `AGENTS.md`
 
-## 0. Always read first (in this order)
-1) docs/PROJECT_CONTEXT.md
-2) docs/adr/ (scan recent ADRs)
-3) .codex/runs/ (if any recent run exists)
-4) This AGENTS.md
-5) `docs/agent/overrides.md` (project-common mandatory policy file; always read and apply)
+> `maintainers/PROJECT_CONTEXT.md` は source repository の現状に合わせて保つこと。  
+> source repo の重要な設計判断は `maintainers/adr/` に記録すること。  
+> consumer-facing instruction を変更するときは `template/AGENTS.md` と `spec/` を整合させること。ただし consumer repo の運用ルールを source repo 作業へ誤適用しないこと。
 
-> Keep `docs/PROJECT_CONTEXT.md` as a living document by updating it when new understanding is gained.
-> Record significant architecture decisions as ADRs.
-> In this repository, `docs/agent/overrides.md` is mandatory. If it is missing or unreadable, stop and report blocked status.
+## 0.1 モード別の入口ファイル
+- 複雑なタスク、明示的な計画依頼、Plan Mode のときは `PLANS.md` を読む。
+- レビュー依頼または `/review` のときは `CODE_REVIEW.md` を読む。
+- チャットで合意した計画を実装に移す前に、`maintainers/plans/` 配下へ JST 命名で保存する。
 
-## 0.1 Mode-specific entry files
-- For complex tasks, explicit planning requests, or Plan Mode, read `PLANS.md` after `docs/agent/overrides.md` and follow it before implementation.
-- For review requests or `/review`, read `CODE_REVIEW.md` after `docs/agent/overrides.md` and apply its findings-first process.
-- Repo-local repeatable workflows may live under `.agents/skills/`, but explicit `AGENTS.md` routing takes precedence over implicit skill triggering.
-- When moving from a completed plan to implementation, persist the agreed plan content to `docs/plans/` before making repo changes.
+## 1. Run 初期化
+- `run_id = YYYYMMDD-HHMMSS-JST` を使う。
+- 現在の会話に active run がない場合は `.codex/runs/<run_id>/` を作る。
+- `template/.codex/templates/{PLAN,TASKS,REPORT}.md` を雛形としてコピーする。
+- run artifact は日本語で書く。
+- ユーザーが新しい run を明示しない限り、同じ会話では同じ run を使い続ける。
 
----
+## 2. 実行ループ
+1) `.codex/runs/<run_id>/TASKS.md` のタスクを上から順に実行する。  
+2) 各タスク完了後に次を行う。  
+   - `TASKS.md` のチェックを更新する  
+   - `REPORT.md` に JST 時刻の記録を追記する  
+   - `Progress: <NN>% (<done>/<total>)` を含める  
+3) 作業中に見つかったタスクは `## Discovered` に追加する。  
+4) 判断メモは `PLAN.md` に、行動ログは `REPORT.md` に追記する。
 
-## 1. Run initialization (per request)
-### Run ID
-- Use `run_id = YYYYMMDD-HHMMSS-JST` (e.g., `20260118-143012-JST`)
+## 3. Progress ルール
+- 分母は `## Now` + `## Discovered` の checkbox task
+- `## Blocked` は分母に含めない
+- 表記は `Progress: <NN>% (<done>/<total>)`
 
-### Create a new run folder
-If no active run folder is specified by the user **and** you have not already created a run folder earlier in the same conversation/session:
-1) Create: `.codex/runs/<run_id>/`
-2) Copy templates:
-   - `.codex/templates/PLAN.md`  -> `.codex/runs/<run_id>/PLAN.md`
-   - `.codex/templates/TASKS.md` -> `.codex/runs/<run_id>/TASKS.md`
-   - `.codex/templates/REPORT.md`-> `.codex/runs/<run_id>/REPORT.md`
-3) Write the user request into PLAN.md (Objective / Scope / DoD)
-4) Build TASKS.md as an executable checkbox list ordered top-to-bottom
-5) **Same-session rule**: In the same conversation/session, keep updating the same PLAN/TASKS/REPORT files. Do not create a new run folder per turn unless the user explicitly asks to start a new run.
-6) **Cross-session rule**: In a different/new conversation session, do **not** append to previous run folders by default. Create a new run folder unless the user explicitly designates an existing run folder to continue.
+## 4. ユーザー向けレポート
+すべての返答に以下を含めること。
+1) 5件以内の `Summary`
+2) `Progress: <NN>% (<done>/<total>)`
+3) 完了していない場合は `Next`
+4) 実行コマンド/結果と主要ファイルを含む `Evidence`
 
----
+## 5. Living Documentation
+- source repo の構造やワークフロー理解が変わったら `maintainers/PROJECT_CONTEXT.md` を更新する。
+- PROJECT_CONTEXT の履歴は `maintainers/history/YYYY-MM-DD_HHMMSS_<summary>.md` に残す。
+- 重要な設計判断は `maintainers/adr/` に記録する。
+- consumer-facing の文書は `template/`、source repo の文書は `maintainers/` に分離して保つ。
 
-## 2. Execution loop (do this until done or blocked)
-1) Execute tasks in `.codex/runs/<run_id>/TASKS.md` top-to-bottom
-2) After completing a task:
-   - Check the box in TASKS.md
-   - Append a new entry to REPORT.md (JST timestamp)
-   - Update progress percent (see §3) in the REPORT entry
-3) If new tasks are discovered:
-   - Add them under `## Discovered` in TASKS.md
-   - Note why they appeared in REPORT.md
-   - Continue execution
-4) Stop only when:
-   - All non-blocked tasks are done, or
-   - You are blocked (then write a “Blocked” entry with concrete next actions)
-5) Thinking/Logging rules:
-   - Always append thinking notes and decision reasons to the Thinking Log in `.codex/runs/<run_id>/PLAN.md`.
-   - Always append action logs (investigation/editing/decision/execution) to `.codex/runs/<run_id>/REPORT.md`.
-   - Always append newly discovered tasks to `## Discovered` in `.codex/runs/<run_id>/TASKS.md`.
+## 6. Plan と Report の保存先
+- Source-repo plans: `maintainers/plans/{yyyy-mm-dd}_{HHMMSS}_{plan_name}.md`
+- Source-repo reports: `maintainers/reports/{yyyy-mm-dd}_{HHMMSS}_{report_name}.md`
+- タイムスタンプは JST (`Asia/Tokyo`) を使う。
 
----
+## 7. 安全性 / スコープ
+- 関連のないファイルは変更しない。
+- consumer-facing のルールを root-level 文書へ戻し入れない。consumer-facing の内容は `template/` に置く。
+- wrapper の挙動を更新するときは、`template/scripts/codex-safe.ps1` または `template/scripts/codex-safe.sh` の方針を基準にする。
+- consumer-facing contract を変えたら、完了報告前に `spec/` と整合させる。
 
-## 3. Progress % definition (must be used in reporting)
-### How to calculate
-- Count tasks in `## Now` + `## Discovered` as the denominator
-- Exclude tasks under `## Blocked` from the denominator
-- Progress = round( done / total * 100 )
+## 8. 必須検証
+- 必要に応じて次の一部または全部を実行する。
+  - `tools/validate-spec.ps1`
+  - `bash tools/validate-spec.sh`
+  - `bash template/scripts/verify`
+  - `powershell.exe -ExecutionPolicy Bypass -File tests/integration/Test-CodexSafetyHarness.ps1`
+  - `bash tests/integration/test-codex-safety-harness.sh`
+- 実行できない検証があれば、run report とユーザー向けレポートの両方に明記する。
 
-Where:
-- total = number of checkboxes in Now + Discovered
-- done  = number of checked boxes in Now + Discovered
+## 9. 言語ポリシー
+- 内部思考: English
+- ユーザー向け出力と run artifact: 日本語
+- `AGENTS.md`: 日本語
 
-### Required progress line format
-- `Progress: <NN>% (<done>/<total>)`
-
----
-
-## 4. User-facing report (MANDATORY in every response to the user)
-Whenever you send a message to the user (chat reply / PR comment / final output), include:
-
-1) **Summary (<= 5 bullets)**: what you changed / verified / decided
-2) **Progress line** using §3 format
-3) **Next** (if not 100%): next 1–3 tasks or what is blocked
-4) **Evidence**: commands run + results, and/or key file paths changed
-
-Example (format only):
-- Summary:
-  - ...
-- Progress: 45% (5/11)
-- Next:
-  - ...
-- Evidence:
-  - `npm test` => PASS
-  - Changed: path/to/file.ts
-
-## Language policy (thinking in English, output in Japanese)
-- Internal thinking: English.
-- User-facing output: Japanese (summaries, progress reports, explanations, PR comments, and `.md` document updates).
-- All run artifacts and working documents (for example, `PLAN.md`, `TASKS.md`, and `REPORT.md`) must be written in Japanese.
-- `AGENTS.md` must be written in English only.
-- Do NOT reveal chain-of-thought / internal reasoning. Only provide concise conclusions and evidence.
-- Code: follow existing code style; do not translate identifiers unless the repo convention does.
-
----
-
-## 5. Living documentation rule (do not skip)
-- When you learn something new about the codebase (structure, gotchas, workflows, invariants):
-  - Update `docs/PROJECT_CONTEXT.md` (add concise notes, keep it readable)
-  - Keep `docs/PROJECT_CONTEXT.md` aligned to the real project state and continuously update it as development progresses.
-  - Do not store update history inside `docs/PROJECT_CONTEXT.md` itself.
-  - Store update history under `docs/history/` using: `YYYY-MM-DD_HHMMSS_<summary>.md` (JST).
-  - In the same session/conversation, keep appending to the same history file instead of creating multiple files.
-- When you make a significant architectural decision (interfaces, data model, dependency direction, build/deploy strategy):
-  - Add/update an ADR under `docs/adr/` (keep it short and decision-focused)
-
-(ADR practice reference: store decisions with context + consequences.) 
-
----
-
-## 6. Quality gates (before claiming done)
-- Run relevant checks depending on the change:
-  - unit/integration tests
-  - formatter
-  - lint
-  - typecheck
-  - build
-- If a project configures formatter/lint/typecheck, run those checks and confirm there are no errors before sending a completion report.
-- If tests are not available, state it explicitly in REPORT and in the user-facing report.
-
----
-
-## 7. Safety / scope constraints
-- Do not run destructive commands (delete/format disk, force push, etc.) unless explicitly requested
-- Do not modify unrelated files; keep changes scoped
-- Prefer small, reviewable commits (if committing)
-- If assumptions are required, write them into PLAN.md and REPORT.md
-
-## 7.1 Local Codex Safety Harness (repository-specific)
-- For manual or CI Codex runs in this repository, prefer `scripts/codex-safe.ps1` instead of invoking `codex` directly.
-- Do not use `--dangerously-bypass-approvals-and-sandbox` in this repository unless the user explicitly asks and the environment is externally sandboxed.
-- Keep repository execpolicy rules under `.codex/rules/*.rules` and validate changes with `codex execpolicy check` (or wrapper preflight) before reporting completion.
-- Treat user-provided `-c/--config` overrides, `--add-dir`, and unsafe sandbox/approval overrides as disallowed in the local safety wrapper.
-
----
-
-## 8. “One-shot to the end” instruction (copy/paste for `codex exec`)
-Use this prompt as-is when running Codex in non-interactive mode (or as the initial prompt).
-
-PROMPT START
-You are Codex working in this repository. Follow AGENTS.md strictly.
-
-Goal: Implement the user request end-to-end.
-
-Process requirements:
-- If no active run exists, create `.codex/runs/<run_id>/` using `run_id = YYYYMMDD-HHMMSS-JST` and copy from `.codex/templates/{PLAN,TASKS,REPORT}.md`.
-- In a new/different conversation session, always start a new run folder by default; continue an old run folder only when the user explicitly specifies it.
-- For complex tasks, explicit planning requests, or Plan Mode, read `PLANS.md` before implementation.
-- Before implementing a plan that was produced in chat or Plan Mode, save that plan to `docs/plans/` using the repository naming rule.
-- For review requests or `/review`, read `CODE_REVIEW.md` and follow its findings-first review structure.
-- Fill `.codex/runs/<run_id>/PLAN.md` (Objective/Scope/Assumptions/DoD) and create an ordered checkbox list in `.codex/runs/<run_id>/TASKS.md`.
-- Write `PLAN.md`, `TASKS.md`, and `REPORT.md` entries in Japanese (while keeping `AGENTS.md` in English only).
-- Execute tasks top-to-bottom. After each completed task:
-  - Check the box in TASKS.md
-  - Append an entry to REPORT.md with JST timestamp
-  - Include `Progress: <NN>% (<done>/<total>)` using AGENTS.md §3
-- If you discover new tasks, add them under `## Discovered` and continue.
-- Continuously update `docs/PROJECT_CONTEXT.md` with any new understanding.
-- When creating files in `docs/plans/` or `docs/reports/`, include date and time in JST in the filename.
-- When recording `docs/PROJECT_CONTEXT.md` update history, write/append under a same-session file in `docs/history/` using `YYYY-MM-DD_HHMMSS_<summary>.md`.
-- For significant architectural decisions, add/update an ADR under `docs/adr/`.
-- Run relevant checks (tests/formatter/lint/typecheck/build) before finishing.
-- If formatter/lint/typecheck are configured in the project, run them and verify there are no errors before sending a completion report.
-
-User-facing output requirement (every time you respond):
-- Provide <=5 bullet summary + progress percent + next steps (if not done) + evidence (commands/results and key file paths).
-
-Now perform the work.
-PROMPT END
-
----
-
-
-## 9. Plan document rule (when user asks for a plan)
-- If the user asks you to create a plan, you MUST create a plan document under `docs/plans/`.
-- File name format: `{yyyy-mm-dd}_{HHMMSS}_{plan_name}.md` (example: `2026-02-19_153045_release-plan.md`).
-- The date/time part must use JST (`Asia/Tokyo`).
-- When creating the plan file, use `docs/plans/TEMPLATE.md` as the base template.
-
-## 9.1 Report document naming rule
-- When creating report/log documents under `docs/reports/`, use `{yyyy-mm-dd}_{HHMMSS}_{report_name}.md`.
-- The date/time part must use JST (`Asia/Tokyo`).
-
-## 9.2 Plan-to-Implementation handoff rule
-- If a plan was created in chat or Plan Mode and you are about to implement it, first persist the agreed plan under `docs/plans/`.
-- Use the same naming rule and template in §9 unless the user explicitly designates an existing plan file to update.
-- Do not start implementation until the plan handoff document exists.
-
----
-
-## 10. Autonomous research loop (PLAN -> SEARCH -> TASKS -> EXECUTE -> REPORT)
-- For requests with unknowns, define hypotheses in PLAN before implementation.
-- Run web research in rounds and record evidence using:
-  - `Record ID`, `Round`, `Query`, `Source`, `Supports/Refutes`, `Confidence`, `Decision`, `Rationale`, `Open Issues`, `Next Action`
-- Use at least 2 rounds when uncertainty remains after the first pass.
-- Move actionable findings into `TASKS.md` (`Now` / `Discovered`) and execute top-to-bottom.
-- Treat REPORT as append-only execution trace; every major action must be logged with evidence.
-- Exit the loop only when major hypotheses have support/refute evidence and open issues have next actions.
-
----
-
-## 11. Skills and self-improvement governance
-- Skill discovery and installation must follow `docs/agent/skill-discovery-workflow.md`.
-- Role-oriented execution (Planner/Researcher/Executor/Reviewer) should follow `PLANS.md`, `CODE_REVIEW.md`, `docs/agent/agent-role-design.md`, and templates under `docs/agent/templates/`.
-- Repo-local repeatable workflows may be packaged under `.agents/skills/`; use them to reinforce planning/review flows, not to replace explicit routing from `AGENTS.md`.
-- Improvement proposals must follow `docs/agent/improvement-guardrails.md`.
-- `docs/agent/overrides.md` is project-common mandatory guidance and must be enforced for every request.
-- Approval boundary:
-  - L1 (low risk): self-approval allowed with REPORT log.
-  - L2/L3 (medium/high risk): explicit user approval required before execution.
-- Every improvement proposal must include rollback planning before applying changes.
-
----
-
-## Notes (source pointers)
-- Codex reads AGENTS.md before doing work; use it to encode project-specific norms.
-- `codex exec` can run non-interactively; GitHub Action can run it in CI.
-
----
-
-## 12. Lightweight Execution Mode (for small low-risk tasks)
-
-Use this mode only when all conditions are true:
-- The request is narrowly scoped and can be completed in one short edit or one short verification pass.
-- No architectural decision, policy change, or safety-sensitive change is involved.
-- No unresolved unknowns require multi-round research.
-
-Minimum requirements in lightweight mode:
-- Still create or continue the session run and update `PLAN/TASKS/REPORT`.
-- Keep tasks minimal (typically 1-3 concrete checkboxes).
-- Record at least one evidence command and one progress line.
-- Keep safety constraints, approval boundaries, and non-destructive rules unchanged.
-
-Lightweight mode is not allowed when:
-- Changes touch `AGENTS.md`, safety harness, approval/sandbox behavior, or other L2/L3 areas.
-- The request requires web research rounds by rule.
-- The request has significant ambiguity, cross-file refactor risk, or external dependency uncertainty.
+## 10. 境界の再確認
+- `template/` は consumer-facing distribution surface の唯一の正本。
+- `maintainers/` は source repo の文脈、plans、reports、ADR、architecture notes を置く場所。
+- `spec/` は docs / skills / wrappers が一致すべき contract の正本。

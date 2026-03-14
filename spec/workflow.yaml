@@ -1,0 +1,34 @@
+{
+  "run": {
+    "id_format": "YYYYMMDD-HHMMSS-JST",
+    "location": ".codex/runs/<run_id>/",
+    "template_sources": [
+      "template/.codex/templates/PLAN.md",
+      "template/.codex/templates/TASKS.md",
+      "template/.codex/templates/REPORT.md"
+    ]
+  },
+  "progress": {
+    "format": "Progress: <NN>% (<done>/<total>)",
+    "include_sections": ["Now", "Discovered"],
+    "exclude_sections": ["Blocked"]
+  },
+  "required_files": [
+    "template/AGENTS.md",
+    "template/PLANS.md",
+    "template/CODE_REVIEW.md",
+    "template/docs/PROJECT_CONTEXT.md",
+    "template/docs/reference/codex-safety-harness.md",
+    "template/docs/reference/codex-implementation-harness.md",
+    "template/.codex/templates/PLAN.md",
+    "template/.codex/templates/TASKS.md",
+    "template/.codex/templates/REPORT.md",
+    "template/scripts/codex-task.ps1",
+    "template/scripts/codex-task.sh",
+    "template/scripts/codex-sandbox.ps1",
+    "template/scripts/codex-sandbox.sh",
+    "template/scripts/validate-output-schema.py",
+    "template/.agents/skills/feature-plan/references/planning-workflow.md",
+    "template/.agents/skills/code-review/references/review-workflow.md"
+  ]
+}

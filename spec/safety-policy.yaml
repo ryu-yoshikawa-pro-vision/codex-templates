@@ -1,0 +1,30 @@
+{
+  "rules_dir": "template/.codex/rules",
+  "wrappers": [
+    "template/scripts/codex-safe.ps1",
+    "template/scripts/codex-safe.sh",
+    "template/scripts/codex-task.ps1",
+    "template/scripts/codex-task.sh"
+  ],
+  "delegating_wrappers": [
+    "template/scripts/codex-sandbox.ps1",
+    "template/scripts/codex-sandbox.sh"
+  ],
+  "verify": "template/scripts/verify",
+  "blocked_tokens": [
+    "--dangerously-bypass-approvals-and-sandbox",
+    "--add-dir",
+    "--config",
+    "--sandbox",
+    "--ask-for-approval",
+    "--profile",
+    "--cd",
+    "--enable",
+    "--disable",
+    "-c",
+    "-s",
+    "-a",
+    "-p",
+    "-C"
+  ]
+}

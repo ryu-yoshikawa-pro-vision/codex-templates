@@ -1,29 +1,27 @@
-# Codex Templates Repository
+# codex-templates v2 Source Repository
 
-このリポジトリは、Codexを使った作業を「計画 → タスク → 行動ログ」の順に整理し、再現性と追跡性を高めるためのテンプレート集です。
+このリポジトリは consumer repo へ配布する Codex 運用テンプレートの source repository です。利用者が直接読む面は [`template/`](template) に集約し、root は template 自体の保守・仕様・検証を担います。
 
-## 目的
-- セッション内の意思決定や作業履歴を一貫した形式で残す
-- 追加タスクや判断理由を追跡できるようにする
-- Codex運用に必要な最小限のルールを統一する
+## 使い分け
+- consumer-facing template: [`template/`](template)
+- source repo の運用記録と意思決定: [`maintainers/`](maintainers)
+- 単一正本の仕様: [`spec/`](spec)
+- source repo 向け補助ツール: [`tools/`](tools)
+- source repo 向け検証: [`tests/`](tests)
+- 例示資産: [`examples/`](examples)
 
-## 使い方（概要）
-1. `AGENTS.md` の手順に従い、`.codex/runs/<run_id>/` を作成する
-2. `.codex/templates/` から PLAN/TASKS/REPORT をコピーする
-3. 作業中は以下の運用ルールを守る
-   - 思考や判断理由は PLAN の Thinking Log に追記する
-   - 実行ログは REPORT に逐次追記する
-   - 追加タスクは TASKS の Discovered に追記する
+## Consumer への配布
+1. `template/` の内容を新規 repo のルートへ展開する。
+2. もしくは `tools/sync-template.*` で別ディレクトリへ同期する。
+3. consumer repo 側では `template/AGENTS.md` 相当の内容が repo ルートにある前提で運用する。
 
-## 重要な運用ルール
-- `docs/PROJECT_CONTEXT.md` は各プロジェクトの実態に合わせて調整し、開発の進行に伴って更新し続ける
-- 重要な意思決定は `docs/adr/` に ADR として記録する
+## Maintainer ワークフロー
+1. root [`AGENTS.md`](AGENTS.md) に従って source repo を更新する。
+2. consumer-facing ルールを変えるときは `spec/` を先に更新する。
+3. `tools/validate-spec.*` と `tests/` を通してから完了報告する。
 
-## ディレクトリ構成
-- `.codex/templates/`: PLAN/TASKS/REPORT のテンプレート
-- `.codex/runs/`: セッションごとの実行ログ
-- `docs/PROJECT_CONTEXT.md`: プロジェクトの状況や運用方針の記録
-- `docs/adr/`: アーキテクチャや運用方針の決定記録
-
-## 参考
-- 詳細な運用ルールは `AGENTS.md` を参照してください。
+## 関連文書
+- 移行案内: [`MIGRATION.md`](MIGRATION.md)
+- source repo 文脈: [`maintainers/PROJECT_CONTEXT.md`](maintainers/PROJECT_CONTEXT.md)
+- consumer 向け quickstart: [`template/docs/guides/quickstart.md`](template/docs/guides/quickstart.md)
+- consumer 向け safety harness: [`template/docs/reference/codex-safety-harness.md`](template/docs/reference/codex-safety-harness.md)

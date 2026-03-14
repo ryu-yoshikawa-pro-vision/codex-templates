@@ -1,0 +1,15 @@
+{
+  "timezone": "Asia/Tokyo",
+  "plan_docs": {
+    "directory": "docs/plans",
+    "pattern": "{yyyy-mm-dd}_{HHMMSS}_{plan_name}.md"
+  },
+  "report_docs": {
+    "directory": "docs/reports",
+    "pattern": "{yyyy-mm-dd}_{HHMMSS}_{report_name}.md"
+  },
+  "history_docs": {
+    "directory": "docs/history",
+    "pattern": "YYYY-MM-DD_HHMMSS_<summary>.md"
+  }
+}

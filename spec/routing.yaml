@@ -1,0 +1,35 @@
+{
+  "instructions": {
+    "file": "template/AGENTS.md",
+    "must_contain": [
+      "PLANS.md",
+      "CODE_REVIEW.md",
+      ".agents/skills/feature-plan/SKILL.md",
+      ".agents/skills/code-review/SKILL.md",
+      "docs/reference/codex-safety-harness.md",
+      "docs/reference/codex-implementation-harness.md"
+    ]
+  },
+  "planning": {
+    "file": "template/PLANS.md",
+    "must_contain": [
+      ".agents/skills/feature-plan/SKILL.md",
+      ".agents/skills/feature-plan/references/planning-workflow.md",
+      "docs/plans/TEMPLATE.md"
+    ]
+  },
+  "review": {
+    "file": "template/CODE_REVIEW.md",
+    "must_contain": [
+      ".agents/skills/code-review/SKILL.md",
+      ".agents/skills/code-review/references/review-workflow.md",
+      "findings-first"
+    ]
+  },
+  "skills": [
+    "template/.agents/skills/feature-plan/SKILL.md",
+    "template/.agents/skills/feature-plan/references/planning-workflow.md",
+    "template/.agents/skills/code-review/SKILL.md",
+    "template/.agents/skills/code-review/references/review-workflow.md"
+  ]
+}

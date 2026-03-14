@@ -1,0 +1,4 @@
+.codex/logs/*.jsonl
+.codex/runs/*
+!.codex/runs/
+!.codex/runs/.gitkeep
