@@ -6,6 +6,7 @@
 - 期待成果:
 
 ## 1. ゴール / 完了条件
+- `spec/` 影響:
 - ゴール:
 - 完了条件（DoD）:
 
@@ -13,10 +14,18 @@
 - In Scope:
 - Out of Scope:
 
+## 2.1 現状理解と前提
+- Current understanding:
+- Assumptions:
+
 ## 3. 実行タスク
 - [ ] 1.
 - [ ] 2.
 - [ ] 3.
+
+## 3.1 変更面の切り分け
+- Source-repo changes:
+- Consumer-facing changes:
 
 ## 4. マイルストーン
 - M1:
@@ -34,6 +43,10 @@
 ## 7. 成果物
 - 変更ファイル:
 - 付随ドキュメント:
+
+## 7.1 移行 / rollback
+- Migration:
+- Rollback:
 
 ## 8. 備考
 - 

@@ -45,6 +45,8 @@ for rel in workflow["required_files"]:
 assert_contains(routing["instructions"]["file"], routing["instructions"]["must_contain"])
 assert_contains(routing["planning"]["file"], routing["planning"]["must_contain"])
 assert_contains(routing["review"]["file"], routing["review"]["must_contain"])
+assert_contains(workflow["planning_reference"]["file"], workflow["planning_reference"]["must_contain"])
+assert_contains(workflow["review_reference"]["file"], workflow["review_reference"]["must_contain"])
 
 for rel in routing["skills"]:
     assert_exists(rel)

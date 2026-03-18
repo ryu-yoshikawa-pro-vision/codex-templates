@@ -47,6 +47,8 @@ foreach ($path in $workflow.required_files) {
 Assert-Contains -RelativePath $routing.instructions.file -Patterns $routing.instructions.must_contain
 Assert-Contains -RelativePath $routing.planning.file -Patterns $routing.planning.must_contain
 Assert-Contains -RelativePath $routing.review.file -Patterns $routing.review.must_contain
+Assert-Contains -RelativePath $workflow.planning_reference.file -Patterns $workflow.planning_reference.must_contain
+Assert-Contains -RelativePath $workflow.review_reference.file -Patterns $workflow.review_reference.must_contain
 
 foreach ($skillPath in $routing.skills) {
     Assert-Exists -RelativePath $skillPath

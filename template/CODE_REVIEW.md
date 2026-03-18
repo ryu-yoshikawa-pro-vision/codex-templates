@@ -10,8 +10,29 @@
 2. `.agents/skills/code-review/SKILL.md` を読む。
 3. 必要に応じて `.agents/skills/code-review/references/review-workflow.md` を読む。
 
-## 期待する出力
+## Review objective
+1. correctness
+2. security
+3. behavioral regression
+4. missing tests
+5. maintainability
+6. performance
+7. developer experience
+
+## What to report
+- 差分に起因する問題だけを報告する。
+- 根拠が弱い論点は finding にせず `Open questions` に回す。
+- 単なる好みや既存問題を差分起因として扱わない。
+
+## Required review format
 - findings-first
 - severity 順
-- 各 finding に根拠、影響、ファイル参照
-- 問題がない場合も残余リスクと未実施検証を明記
+- Severity
+- Title
+- Location
+- Why it matters
+- Evidence
+- Suggested fix
+- Open questions
+- Verdict
+- confidence

@@ -18,6 +18,10 @@
 - `maintainers/PROJECT_CONTEXT.md` を更新したら、更新履歴を `maintainers/history/` の同一セッションファイルへ追記する。
 - consumer-facing 契約変更では `spec/` を先に更新し、`tools/validate-spec.*` で整合を確認する。
 - consumer-facing 配布物に関する説明は root ではなく `template/` 配下の文書に置く。
+- root `PLANS.md` と `CODE_REVIEW.md` は source repo 用 contract を定義し、source/consumer 境界、validation、rollback、finding 形式を明示する。
+- consumer-facing `template/PLANS.md` と `template/CODE_REVIEW.md` は mode の索引を保ったまま、required output format を固定する。
+- consumer-facing planning/review skill は 2 本を維持し、reference で `repo mapping -> change planning` と `diff triage -> deep review` を扱う。
+- reference は `Use / Do not use`、出力セクション、観点チェック、failure modes を持ち、`SKILL.md` より具体的な task workflow を担う。
 
 ## ディレクトリ構成
 - `template/`: consumer repo の配布面
@@ -37,3 +41,4 @@
 - consumer repo 側の workflow 詳細は `template/.agents/skills/*/references/` に置き、`template/docs/agent/` は廃止した。
 - consumer repo 側の非対話実装では `template/scripts/codex-task.*` が `output/report` を成果物として残し、Docker runtime は `CODEX_DOCKER_IMAGE` 必須の experimental path とする。
 - source repo の historical documents は過去時点の path を含みうる。現在の正本は `spec/` と本ファイルで判断する。
+- template contract の検証は `spec/` と `template/scripts/verify*` / `tests/smoke/*` の両方で行う。

@@ -15,7 +15,17 @@
     "must_contain": [
       ".agents/skills/feature-plan/SKILL.md",
       ".agents/skills/feature-plan/references/planning-workflow.md",
-      "docs/plans/TEMPLATE.md"
+      "docs/plans/TEMPLATE.md",
+      "Goal",
+      "Current understanding",
+      "Assumptions",
+      "Non-goals",
+      "Impacted areas",
+      "Files to inspect",
+      "Change strategy",
+      "Validation plan",
+      "Risks",
+      "Open questions"
     ]
   },
   "review": {
@@ -23,7 +33,15 @@
     "must_contain": [
       ".agents/skills/code-review/SKILL.md",
       ".agents/skills/code-review/references/review-workflow.md",
-      "findings-first"
+      "findings-first",
+      "Severity",
+      "Location",
+      "Why it matters",
+      "Evidence",
+      "Suggested fix",
+      "Open questions",
+      "Verdict",
+      "confidence"
     ]
   },
   "skills": [

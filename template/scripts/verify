@@ -62,9 +62,32 @@ check_template_contract() {
   rg -q "docs/reference/codex-safety-harness.md" AGENTS.md || return 1
   rg -q "docs/reference/codex-implementation-harness.md" AGENTS.md || return 1
   rg -q ".agents/skills/feature-plan/SKILL.md" PLANS.md || return 1
+  rg -q ".agents/skills/feature-plan/references/planning-workflow.md" PLANS.md || return 1
   rg -q "docs/plans/TEMPLATE.md" PLANS.md || return 1
+  rg -q "Current understanding" PLANS.md || return 1
+  rg -q "Non-goals" PLANS.md || return 1
+  rg -q "Validation plan" PLANS.md || return 1
+  rg -q "Open questions" PLANS.md || return 1
   rg -q ".agents/skills/code-review/SKILL.md" CODE_REVIEW.md || return 1
+  rg -q ".agents/skills/code-review/references/review-workflow.md" CODE_REVIEW.md || return 1
   rg -q "findings-first" CODE_REVIEW.md || return 1
+  rg -q "Why it matters" CODE_REVIEW.md || return 1
+  rg -q "Suggested fix" CODE_REVIEW.md || return 1
+  rg -q "Verdict" CODE_REVIEW.md || return 1
+  rg -q "confidence" CODE_REVIEW.md || return 1
+  rg -q "repo mapping" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  rg -q "Do not use" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  rg -q "Main flow" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  rg -q "Key abstractions" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  rg -q "Safe change surface" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  rg -q "Validation candidates" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  rg -q "Failure modes" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  rg -q "diff triage" .agents/skills/code-review/references/review-workflow.md || return 1
+  rg -q "Diff classification" .agents/skills/code-review/references/review-workflow.md || return 1
+  rg -q "High-risk areas" .agents/skills/code-review/references/review-workflow.md || return 1
+  rg -q "Potential missing tests" .agents/skills/code-review/references/review-workflow.md || return 1
+  rg -q "Open questions" .agents/skills/code-review/references/review-workflow.md || return 1
+  rg -q "Failure modes" .agents/skills/code-review/references/review-workflow.md || return 1
 }
 
 check_execpolicy_baseline() {

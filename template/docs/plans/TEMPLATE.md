@@ -9,27 +9,29 @@
 - ゴール:
 - 完了条件（DoD）:
 
-## 2. スコープ
-- In Scope:
-- Out of Scope:
+## 2. 現状理解と前提
+- Current understanding:
+- Assumptions:
+- Non-goals:
 
-## 3. 実行タスク
-- [ ] 1.
-- [ ] 2.
-- [ ] 3.
+## 3. 影響範囲
+- Impacted areas:
+- Files to inspect:
 
-## 4. マイルストーン
-- M1:
-- M2:
-- M3:
+## 4. 変更方針
+- Change strategy:
+- 実行タスク:
+  - [ ] 1.
+  - [ ] 2.
+  - [ ] 3.
 
-## 5. リスクと対策
-- リスク:
-  - 対策:
-
-## 6. 検証方法
-- 実施する確認:
+## 5. 検証方法
+- Validation plan:
 - 成功判定:
+
+## 6. リスクと未解決論点
+- Risks:
+- Open questions:
 
 ## 7. 成果物
 - 変更ファイル:

@@ -30,5 +30,39 @@
     "template/scripts/validate-output-schema.py",
     "template/.agents/skills/feature-plan/references/planning-workflow.md",
     "template/.agents/skills/code-review/references/review-workflow.md"
-  ]
+  ],
+  "planning_reference": {
+    "file": "template/.agents/skills/feature-plan/references/planning-workflow.md",
+    "must_contain": [
+      "repo mapping",
+      "Do not use",
+      "change planning",
+      "Entry points",
+      "Main flow",
+      "Key abstractions",
+      "Existing tests",
+      "Safe change surface",
+      "Unknowns",
+      "Validation candidates",
+      "Failure modes"
+    ]
+  },
+  "review_reference": {
+    "file": "template/.agents/skills/code-review/references/review-workflow.md",
+    "must_contain": [
+      "diff triage",
+      "Do not use",
+      "deep review",
+      "Diff classification",
+      "High-risk areas",
+      "What needs deep review",
+      "Potential missing tests",
+      "correctness",
+      "security",
+      "behavioral regression",
+      "maintainability",
+      "Open questions",
+      "Failure modes"
+    ]
+  }
 }
