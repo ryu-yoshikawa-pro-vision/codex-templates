@@ -7,12 +7,6 @@ prefix_rule(
 )
 
 prefix_rule(
-  pattern = [["rm", "del", "erase", "Remove-Item"]],
-  decision = "prompt",
-  match = ["rm file.txt", "Remove-Item file.txt"],
-)
-
-prefix_rule(
   pattern = [["chmod", "chown", "chgrp", "icacls", "takeown"]],
   decision = "prompt",
   match = ["chmod 644 file.txt", "icacls file.txt /grant Everyone:F"],

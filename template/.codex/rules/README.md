@@ -18,4 +18,5 @@ Use `codex execpolicy check` or the wrapper preflight:
 ## Notes
 
 - Rules are prefix-based; they are not a full parser for every shell grammar edge case.
+- Command-based file deletion is forbidden here (`rm`, `del`, `erase`, `Remove-Item`, `rmdir`, `unlink`, normal `git rm`). Use intentional `apply_patch` diffs for file edits.
 - The wrapper and Codex approval/sandbox settings provide additional defense layers.

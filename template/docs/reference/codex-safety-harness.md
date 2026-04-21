@@ -10,16 +10,19 @@
   - 危険 CLI 引数（`--dangerously-bypass-approvals-and-sandbox`, `-c/--config`, `--add-dir` など）を拒否
   - 安全デフォルト（`--sandbox`, `--ask-for-approval`）を固定注入
   - 起動前に `codex execpolicy check` でルールのスモークテストを実施（preflight）
-  - JSONL ログ（既定: `.codex/logs/codex-safe-YYYYMMDD.jsonl`）に開始/ブロック/preflight/起動イベントを追記
+  - JSONL ログ（既定: `.codex/logs/codex-safe-YYYYMMDD.jsonl`、`--run-id` 指定時: `.codex/runs/<run_id>/logs/codex-safe-YYYYMMDD.jsonl`）に開始/ブロック/preflight/起動イベントを追記
 - `scripts/codex-safe.sh`
   - bash 向け Codex 起動 wrapper（PowerShell 版と同方針）
   - 危険 CLI 引数の拒否、`--sandbox` / `--ask-for-approval` 固定注入、preflight を実施
-  - `--print-command` / `--preflight-only` / `--allow-search` / `--log-path` をサポート
+  - `--print-command` / `--preflight-only` / `--allow-search` / `--run-id` / `--log-path` をサポート
 - `.codex/rules/*.rules`
   - `execpolicy` ルール
   - 読み取り系の allow、広い prompt、破壊系の forbidden を定義
 - `.codex/config.toml`
-  - 任意の project profile（`repo_safe`, `repo_readonly`）
+  - project-scoped default: `sandbox_mode = "workspace-write"`, `approval_policy = "untrusted"`, `web_search = "cached"`
+  - workspace-write sandbox は `network_access = false`, `writable_roots = []`
+  - login shell は `allow_login_shell = false`
+  - project profile: `repo_safe`, `repo_readonly`
 - `.codex/requirements.toml`
   - 管理配布/機能有効化時に使う補助的な最小要件定義
 - `scripts/verify`
@@ -71,8 +74,20 @@ bash scripts/codex-safe.sh
 - `-p` / `--profile`
 - `--enable` / `--disable`
 
+## 削除禁止
+- プロジェクト配下の読み取りとファイル作成・編集は、通常の作業では承認なしで行ってよい。
+- shell / PowerShell / git command による削除は禁止する。対象例は `rm`, `del`, `erase`, `Remove-Item`, `rmdir`, `unlink`, 通常の `git rm`。
+- 意図した差分としての `apply_patch` は許可する。削除を含む場合も diff 単位で確認できるため、command deletion とは別扱いにする。
+- 追跡済み runtime artifact を配布対象から外す migration では、明示された対象に限って `git rm --cached -- <path>` を使ってよい。物理ファイルは削除しない。
+
+## Report file generation policy
+- `docs/reports/` は durable な調査・監査・検証結果の置き場であり、通常のレビュー返答、進捗報告、軽い確認結果、run 内ログの既定保存先ではない。
+- Report file を生成してよいのは、ユーザーが保存を明示した場合、計画 DoD に report file がある場合、複数ソース調査・監査・検証結果を後で参照する必要がある場合のみ。
+- review-only、plan-only、status update、軽い確認、通常の evidence command 結果、run progress 記録、チャットで完結する評価では `docs/reports/` にファイルを作らない。
+- 判断に迷う場合は report file を作らず、チャット返答と `.codex/runs/<run_id>/REPORT.md` に留める。
+
 ## 運用メモ
 - ルール変更後は `-PreflightOnly` と `codex execpolicy check` で確認する。
-- 破壊系ルールの追加時は、`docs/reports/` に検証結果を残す。
+- 破壊系ルールの追加時は検証を行い、保存依頼または DoD がある場合だけ `docs/reports/` に durable report を残す。
 - consumer repo では `bash scripts/verify` を最初の確認コマンドとして使う。
-- 非対話実行では `codex-safe` ではなく `codex-task` を使い、`output/report` を成果物として残す。
+- 非対話実行では `codex-safe` ではなく `codex-task` を使い、`--run-id` で run-local artifact に集約する。

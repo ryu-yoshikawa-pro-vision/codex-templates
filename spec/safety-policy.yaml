@@ -11,6 +11,37 @@
     "template/scripts/codex-sandbox.sh"
   ],
   "verify": "template/scripts/verify",
+  "config": {
+    "file": "template/.codex/config.toml",
+    "must_contain": [
+      "sandbox_mode = \"workspace-write\"",
+      "approval_policy = \"untrusted\"",
+      "web_search = \"cached\"",
+      "network_access = false",
+      "writable_roots = []",
+      "allow_login_shell = false",
+      "[shell_environment_policy]",
+      "inherit = \"core\"",
+      "[profiles.repo_safe]",
+      "[profiles.repo_readonly]"
+    ]
+  },
+  "requirements": {
+    "file": "template/.codex/requirements.toml",
+    "must_contain": [
+      "docs/reference/codex-safety-harness.md",
+      "docs/reference/codex-implementation-harness.md"
+    ]
+  },
+  "forbidden_delete_commands": [
+    "rm",
+    "del",
+    "erase",
+    "Remove-Item",
+    "rmdir",
+    "unlink",
+    "git rm"
+  ],
   "blocked_tokens": [
     "--dangerously-bypass-approvals-and-sandbox",
     "--add-dir",

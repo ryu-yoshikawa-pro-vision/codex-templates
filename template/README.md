@@ -13,8 +13,10 @@
 - `.codex/rules/`: execpolicy ルール
 - `.agents/skills/`: repo-local の task-specific workflow と references
 - `docs/reference/`: 人間向けの補助ガイド
-- `docs/plans/`, `docs/reports/`: ユーザー向け成果物の保存先
+- `docs/plans/`: ユーザー向け計画書の保存先
+- `docs/reports/`: durable な調査・監査・検証レポートの保存先（review-only や run progress では作らない）
 - `scripts/`: manual / task / sandbox wrapper と consumer-facing verify
+- `codex-project.toml`, `scripts/init-project.*`: template 適用後の初期化補助
 
 ## 最初に読むもの
 - `AGENTS.md`

@@ -1,14 +1,31 @@
-# Project-scoped Codex config presets.
-# These profiles are convenience defaults. The safety wrapper (`scripts/codex-safe.ps1`)
-# still injects explicit sandbox/approval flags and validates arguments.
+# Project-scoped Codex config baseline.
+# Codex loads this file only after the project is trusted. The wrappers still pass
+# explicit sandbox/approval flags and block unsafe overrides.
+
+sandbox_mode = "workspace-write"
+approval_policy = "untrusted"
+web_search = "cached"
+allow_login_shell = false
+
+[sandbox_workspace_write]
+network_access = false
+writable_roots = []
+
+[shell_environment_policy]
+inherit = "core"
 
 [profiles.repo_safe]
 sandbox_mode = "workspace-write"
 approval_policy = "untrusted"
+web_search = "cached"
+allow_login_shell = false
+
+[profiles.repo_safe.sandbox_workspace_write]
+network_access = false
+writable_roots = []
 
 [profiles.repo_readonly]
 sandbox_mode = "read-only"
 approval_policy = "untrusted"
-
-# Optional (version/organization dependent):
-# experimental_use_repo_requirements = true
+web_search = "cached"
+allow_login_shell = false

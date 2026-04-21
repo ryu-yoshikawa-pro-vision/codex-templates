@@ -11,6 +11,7 @@
   - 非対話 `codex exec` 用 wrapper。
   - 実行順は `preflight -> codex exec -> output/schema check -> verify -> report`。
   - `output-last-message` と machine-readable report JSON を必ず残す。
+  - `--run-id` 指定時は `.codex/runs/<run_id>/artifacts|reports|logs` に既定出力を集約する。
 - `scripts/codex-sandbox.ps1|sh`
   - `codex-task --runtime docker-sandbox` の薄い互換 wrapper。
   - Docker image と認証が明示設定されている場合だけ使う experimental path。
@@ -22,6 +23,7 @@
 - `--output-file <path>`
 - `--output-schema <path>`
 - `--report-path <path>`
+- `--run-id <run_id>`
 - `--verify-command <cmd>`
 - `--allow-search`
 - `--skip-preflight`
@@ -37,10 +39,16 @@
 ## 成果物
 - output file:
   - `codex exec --output-last-message` の最終出力
+  - 既定: `.codex/artifacts/codex-task-YYYYMMDD-HHMMSS.json`
+  - `--run-id` 指定時: `.codex/runs/<run_id>/artifacts/codex-task-YYYYMMDD-HHMMSS.json`
 - report JSON:
-  - 必須キーは `runtime`, `preset`, `prompt_source`, `output_file`, `output_schema`, `log_path`, `codex_exit_code`, `verify_exit_code`, `status`
+  - 既定: `.codex/reports/codex-task-YYYYMMDD-HHMMSS.report.json`
+  - `--run-id` 指定時: `.codex/runs/<run_id>/reports/codex-task-YYYYMMDD-HHMMSS.report.json`
+  - 必須キーは `runtime`, `preset`, `prompt_source`, `output_file`, `output_schema`, `log_path`, `codex_exit_code`, `verify_exit_code`, `status`, `run_id`, `git_branch`, `git_dirty`, `cwd`, `mode`
 - JSONL log:
   - wrapper start、preflight、codex exec、schema check、verify のイベントを追記する
+  - 既定: `.codex/logs/codex-task-YYYYMMDD-HHMMSS.jsonl`
+  - `--run-id` 指定時: `.codex/runs/<run_id>/logs/codex-task-YYYYMMDD-HHMMSS.jsonl`
 
 ## `--output-schema` の対応範囲
 - repo-local validator が対応するのは、`type`, `enum`, `required`, `properties`, `items`, `additionalProperties` とメタデータ系キーのみ。
@@ -55,7 +63,7 @@
 - 手動で探索・相談しながら進める:
   - `codex-safe`
 - 生成物をファイルで残す自動実装・CI 補助:
-  - `codex-task`
+  - `codex-task --run-id <run_id>`
 - 外部隔離環境を明示的に用意できる:
   - `codex-sandbox`
 

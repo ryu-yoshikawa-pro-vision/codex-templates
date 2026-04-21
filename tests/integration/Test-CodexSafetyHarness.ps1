@@ -6,7 +6,9 @@ $ErrorActionPreference = "Stop"
 
 $sourceRepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\\..")).Path
 $repoRoot = Join-Path $sourceRepoRoot "template"
-$codexCmd = (Get-Command codex -ErrorAction Stop).Source
+$fakeCodex = Join-Path $sourceRepoRoot "tests\\fixtures\\fake-codex.ps1"
+$env:CODEX_BIN = $fakeCodex
+$codexCmd = $fakeCodex
 $ruleFiles = Get-ChildItem -Path (Join-Path $repoRoot ".codex\\rules") -Filter *.rules | Sort-Object Name
 
 if (-not $ruleFiles) {
@@ -95,7 +97,7 @@ function Assert-WrapperCommandBlocked {
     param([string[]]$WrapperArgs)
 
     $scriptPath = Join-Path $repoRoot "scripts\\codex-safe.ps1"
-    $invokeArgs = @('-PrintCommand') + $WrapperArgs
+    $invokeArgs = @('-NoLog', '-PrintCommand') + $WrapperArgs
     $result = Invoke-WindowsPowerShellFile -ScriptPath $scriptPath -Arguments $invokeArgs
     $output = $result.Combined
     $code = $result.ExitCode
@@ -107,11 +109,28 @@ function Assert-WrapperCommandBlocked {
     }
 }
 
+function Assert-WrapperCommandFailed {
+    param(
+        [string[]]$WrapperArgs,
+        [string]$ExpectedPattern
+    )
+
+    $scriptPath = Join-Path $repoRoot "scripts\\codex-safe.ps1"
+    $result = Invoke-WindowsPowerShellFile -ScriptPath $scriptPath -Arguments (@('-NoLog') + $WrapperArgs)
+    if ($result.ExitCode -eq 0) {
+        throw "Wrapper unexpectedly allowed args: $($WrapperArgs -join ' ')"
+    }
+    if ($result.Combined -notmatch [regex]::Escape($ExpectedPattern)) {
+        throw "Wrapper failed without expected message '$ExpectedPattern': $($result.Combined)"
+    }
+}
+
 function Assert-WrapperCommandAllowedPreview {
     param([string[]]$WrapperArgs)
 
     $scriptPath = Join-Path $repoRoot "scripts\\codex-safe.ps1"
-    $result = Invoke-WindowsPowerShellFile -ScriptPath $scriptPath -Arguments $WrapperArgs
+    $invokeArgs = if (($WrapperArgs -contains '-LogPath') -or ($WrapperArgs -contains '-RunId')) { $WrapperArgs } else { @('-NoLog') + $WrapperArgs }
+    $result = Invoke-WindowsPowerShellFile -ScriptPath $scriptPath -Arguments $invokeArgs
     $output = $result.Combined
     $code = $result.ExitCode
     if ($code -ne 0) {
@@ -153,6 +172,9 @@ Assert-Decision -Tokens @('git', 'add', '.') -Expected 'prompt'
 Assert-Decision -Tokens @('git', 'reset', '--hard', 'HEAD~1') -Expected 'forbidden'
 Assert-Decision -Tokens @('docker', 'ps') -Expected 'prompt'
 Assert-Decision -Tokens @('terraform', 'destroy', '-auto-approve') -Expected 'forbidden'
+Assert-Decision -Tokens @('rm', 'file.txt') -Expected 'forbidden'
+Assert-Decision -Tokens @('Remove-Item', 'file.txt') -Expected 'forbidden'
+Assert-Decision -Tokens @('git', 'rm', 'file.txt') -Expected 'forbidden'
 
 Assert-WrapperCommandAllowedPreview -WrapperArgs @('-PreflightOnly')
 Assert-WrapperCommandAllowedPreview -WrapperArgs @('-PrintCommand', '-Preset', 'readonly', 'exec', '--help')
@@ -170,6 +192,22 @@ $specialPrompt = ('special ; | && backtick ' + [char]96 + ' test')
 $wildcardEnvPrompt = 'wildcard *.md and envvar $env:USERPROFILE text'
 Assert-WrapperCommandAllowedPreview -WrapperArgs @('-PrintCommand', 'exec', $specialPrompt)
 Assert-WrapperCommandAllowedPreview -WrapperArgs @('-PrintCommand', 'exec', $wildcardEnvPrompt)
+
+$safeRunId = '20260420-010102-JST'
+$runIdResult = Assert-WrapperCommandAllowedPreview -WrapperArgs @('-RunId', $safeRunId, '-PrintCommand', 'exec', '--help')
+$jsonStart = $runIdResult.StdOut.IndexOf('{')
+$jsonEnd = $runIdResult.StdOut.LastIndexOf('}')
+if ($jsonStart -lt 0 -or $jsonEnd -lt $jsonStart) {
+    throw "Preview JSON not found in stdout: $($runIdResult.StdOut)"
+}
+$jsonText = $runIdResult.StdOut.Substring($jsonStart, $jsonEnd - $jsonStart + 1)
+$runIdPreview = $jsonText | ConvertFrom-Json
+if ($runIdPreview.run_id -ne $safeRunId) { throw "Missing run_id in preview output" }
+$normalizedRunLog = ($runIdPreview.log_path -replace '\\', '/') -replace '/+', '/'
+if ($normalizedRunLog -notmatch [regex]::Escape(".codex/runs/$safeRunId/logs")) {
+    throw "Run-id log path not under .codex/runs: $($runIdPreview.log_path)"
+}
+Assert-WrapperCommandFailed -WrapperArgs @('-RunId', '..\escape', '-PrintCommand', 'exec', '--help') -ExpectedPattern 'Invalid -RunId'
 
 $logPath = Join-Path $env:TEMP ("codex-safe-wrapper-test-" + [guid]::NewGuid().ToString() + ".jsonl")
 try {

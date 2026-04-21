@@ -8,4 +8,5 @@ description: Use when reviewing changes, handling /review, or doing self-review 
 3. まず diff triage を行い、深掘りすべき変更領域を絞る。
 4. 次に deep review を行い、correctness、security、behavioral regression、missing tests を優先して確認する。
 5. 各 finding に severity、根拠、影響、ファイル参照を添える。
-6. 問題がない場合も、その旨と残余リスクや未実施検証を明示する。
+6. review-only では `docs/reports/` に report file を作らず、チャット返答と run-local `REPORT.md` に留める。
+7. 問題がない場合も、その旨と残余リスクや未実施検証を明示する。

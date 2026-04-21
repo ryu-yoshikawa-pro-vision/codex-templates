@@ -10,6 +10,11 @@
 ## Assumptions
 - （不明点があれば明示）
 
+## Questions / Ambiguity
+- 必ず質問する不透明点:
+- 仮定してよい細部:
+- 未回答の重要質問:
+
 ## Hypotheses
 - H1:
 - H2:

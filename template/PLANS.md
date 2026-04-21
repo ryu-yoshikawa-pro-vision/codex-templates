@@ -22,6 +22,16 @@
 - `Validation plan` が書けない変更は完成した計画とみなさない。
 - 保存用計画書は `docs/plans/TEMPLATE.md` に落とし込む。
 
+## Ambiguity handling
+- Contract marker: `mandatory-question`
+- Plan Mode では、AI が判断し切れない不透明点を推測で埋めてはいけない。
+- 目的、成功条件、非目標、変更スコープ、対象ユーザー、DoD、検証方法、完了判定が曖昧な場合は必ず質問する。
+- 破壊的変更、移行、削除、セキュリティ、外部連携、費用、運用負荷に影響する不透明点は必ず質問する。
+- ユーザーの好みや優先順位で結論が変わる場合は必ず質問する。
+- 既存 repo の明確な convention に従える局所実装、後から容易に修正できる細部、成果物の方向性を変えない安全側 default は、仮定として記録してよい。
+- 質問は重要度順にまとめ、なぜ必要かと回答により何が変わるかを添える。
+- 未回答の重要質問が残る場合、実装には進まず `Open questions` に残す。ユーザーが「仮定して進めてよい」と明示した場合のみ、仮定を計画に記録して進める。
+
 ## Required plan output format
 1. Goal
 2. Current understanding

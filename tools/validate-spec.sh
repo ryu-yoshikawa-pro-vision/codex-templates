@@ -55,6 +55,13 @@ for rel in safety["wrappers"]:
     assert_exists(rel)
     assert_contains(rel, safety["blocked_tokens"])
 
+assert_contains(safety["config"]["file"], safety["config"]["must_contain"])
+assert_contains(safety["requirements"]["file"], safety["requirements"]["must_contain"])
+assert_contains(
+    f'{safety["rules_dir"]}/30-destructive-forbidden.rules',
+    safety["forbidden_delete_commands"],
+)
+
 for rel in safety.get("delegating_wrappers", []):
     assert_exists(rel)
 

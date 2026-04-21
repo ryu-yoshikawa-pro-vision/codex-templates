@@ -55,9 +55,16 @@ Codex が `codex-templates` の source repository 自体を変更するときは
 - Source-repo plans: `maintainers/plans/{yyyy-mm-dd}_{HHMMSS}_{plan_name}.md`
 - Source-repo reports: `maintainers/reports/{yyyy-mm-dd}_{HHMMSS}_{report_name}.md`
 - タイムスタンプは JST (`Asia/Tokyo`) を使う。
+- `maintainers/reports/` は durable な調査・監査・検証結果の置き場であり、通常のレビュー返答、進捗報告、軽い確認結果、run 内ログの既定保存先ではない。
+- Report file を生成してよいのは、ユーザーが保存を明示した場合、計画 DoD に report file がある場合、複数ソース調査・監査・検証結果を後で参照する必要がある場合のみ。
+- review-only、plan-only、status update、軽い確認、通常の evidence command 結果、run progress 記録、チャットで完結する評価では `maintainers/reports/` にファイルを作らない。
+- 判断に迷う場合は report file を作らず、チャット返答と `.codex/runs/<run_id>/REPORT.md` に留める。
 
 ## 7. 安全性 / スコープ
 - 関連のないファイルは変更しない。
+- source repo 配下の読み書きは許可するが、shell / PowerShell / git などの command によるファイル削除、履歴破壊、配布対象除去は明示承認なしに行わない。command-based deletion is forbidden.
+- command-based deletion is forbidden.
+- `apply_patch` は差分単位で意図を確認できる通常の編集手段として許可する。
 - consumer-facing のルールを root-level 文書へ戻し入れない。consumer-facing の内容は `template/` に置く。
 - wrapper の挙動を更新するときは、`template/scripts/codex-safe.ps1` または `template/scripts/codex-safe.sh` の方針を基準にする。
 - consumer-facing contract を変えたら、完了報告前に `spec/` と整合させる。

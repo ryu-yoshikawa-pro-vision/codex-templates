@@ -56,23 +56,57 @@ function Convert-ToContainerPath {
 }
 
 function Get-DefaultLogPath {
-    param([string]$RepoRoot)
+    param(
+        [string]$RepoRoot,
+        [string]$Timestamp,
+        [string]$RunId
+    )
 
     $logsDir = Join-Path $RepoRoot ".codex\\logs"
+    if (-not [string]::IsNullOrWhiteSpace($RunId)) {
+        $logsDir = Join-Path $RepoRoot (Join-Path ".codex\\runs" (Join-Path $RunId "logs"))
+    }
     if (-not (Test-Path $logsDir)) {
         New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
     }
-    return (Join-Path $logsDir ("codex-task-" + (Get-Date).ToString("yyyyMMdd") + ".jsonl"))
+    return (Join-Path $logsDir ("codex-task-" + $Timestamp + ".jsonl"))
 }
 
 function Get-PythonCommand {
-    foreach ($candidate in @("python", "python3")) {
+    foreach ($candidate in @("python", "python3", "py")) {
         $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
-        if ($cmd) {
-            return $cmd.Source
+        if (-not $cmd) {
+            continue
+        }
+
+        $prevNativeErr = $null
+        $hasNativeErrPref = $null -ne (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue)
+        if ($hasNativeErrPref) {
+            $prevNativeErr = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+
+        try {
+            & $cmd.Source --version *> $null
+            if ($LASTEXITCODE -eq 0) {
+                return $cmd.Source
+            }
+        }
+        catch {
+        }
+        finally {
+            if ($hasNativeErrPref) {
+                $PSNativeCommandUseErrorActionPreference = $prevNativeErr
+            }
         }
     }
     return $null
+}
+
+function Test-RunId {
+    param([string]$RunId)
+
+    return [string]::IsNullOrWhiteSpace($RunId) -or $RunId -match '^\d{8}-\d{6}-JST$'
 }
 
 function Get-CodexCommand {
@@ -93,6 +127,39 @@ function Get-DockerCommand {
         return (Get-Command $env:CODEX_DOCKER_BIN -ErrorAction Stop).Source
     }
     return (Get-Command docker -ErrorAction Stop).Source
+}
+
+function Get-GitBranch {
+    param([string]$RepoRoot)
+
+    try {
+        $branch = (& git -C $RepoRoot branch --show-current 2>$null | Select-Object -First 1)
+        if ([string]::IsNullOrWhiteSpace($branch)) {
+            return $null
+        }
+        return $branch.Trim()
+    }
+    catch {
+        return $null
+    }
+}
+
+function Get-GitDirty {
+    param([string]$RepoRoot)
+
+    try {
+        & git -C $RepoRoot rev-parse --is-inside-work-tree *> $null
+        if ($LASTEXITCODE -ne 0) { return $false }
+        & git -C $RepoRoot diff --quiet --ignore-submodules -- *> $null
+        if ($LASTEXITCODE -ne 0) { return $true }
+        & git -C $RepoRoot diff --cached --quiet --ignore-submodules -- *> $null
+        if ($LASTEXITCODE -ne 0) { return $true }
+        $untracked = (& git -C $RepoRoot ls-files --others --exclude-standard 2>$null)
+        return ($null -ne $untracked -and @($untracked).Count -gt 0)
+    }
+    catch {
+        return $false
+    }
 }
 
 function Invoke-VerifyCommand {
@@ -219,6 +286,7 @@ foreach ($dir in @($artifactsDir, $reportsDir)) {
 $state = [ordered]@{
     preset = "safe"
     runtime = "host"
+    run_id = $null
     prompt_file = $null
     prompt = $null
     output_file = Join-Path $artifactsDir ("codex-task-" + $timestamp + ".json")
@@ -228,12 +296,20 @@ $state = [ordered]@{
     allow_search = $false
     skip_preflight = $false
     skip_verify = $false
-    log_path = Get-DefaultLogPath -RepoRoot $repoRoot
+    log_path = Get-DefaultLogPath -RepoRoot $repoRoot -Timestamp $timestamp -RunId $null
+    explicit_output_file = $false
+    explicit_report_path = $false
+    explicit_log_path = $false
 }
 
 $report = [ordered]@{
     runtime = $state.runtime
     preset = $state.preset
+    mode = $state.preset
+    run_id = $state.run_id
+    cwd = $repoRoot
+    git_branch = Get-GitBranch -RepoRoot $repoRoot
+    git_dirty = Get-GitDirty -RepoRoot $repoRoot
     prompt_source = ""
     output_file = $state.output_file
     output_schema = $null
@@ -267,6 +343,7 @@ while ($i -lt $Arguments.Count) {
             $i++
             if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--output-file requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
             $state.output_file = Resolve-RepoPath -RepoRoot $repoRoot -Path $Arguments[$i]
+            $state.explicit_output_file = $true
         }
         '--output-schema' {
             $i++
@@ -277,6 +354,7 @@ while ($i -lt $Arguments.Count) {
             $i++
             if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--report-path requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
             $state.report_path = Resolve-RepoPath -RepoRoot $repoRoot -Path $Arguments[$i]
+            $state.explicit_report_path = $true
         }
         '--verify-command' {
             $i++
@@ -290,6 +368,12 @@ while ($i -lt $Arguments.Count) {
             $i++
             if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--log-path requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
             $state.log_path = Resolve-RepoPath -RepoRoot $repoRoot -Path $Arguments[$i]
+            $state.explicit_log_path = $true
+        }
+        '--run-id' {
+            $i++
+            if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--run-id requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
+            $state.run_id = $Arguments[$i]
         }
         '--dangerously-bypass-approvals-and-sandbox' { Block-UnsafeArgument -Token $token -Reason "dangerous bypass is prohibited" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
         { $_ -like '--config*' -or $_ -like '-c*' } { Block-UnsafeArgument -Token $token -Reason "user config overrides are blocked; wrapper injects fixed safety settings" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
@@ -310,17 +394,41 @@ while ($i -lt $Arguments.Count) {
     $i++
 }
 
+if (-not [string]::IsNullOrWhiteSpace($state.run_id)) {
+    if (-not (Test-RunId -RunId $state.run_id)) {
+        Fail-Task -Status "invalid_args" -Message "Invalid --run-id: expected YYYYMMDD-HHMMSS-JST" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+    }
+    $runRoot = Join-Path $repoRoot (Join-Path ".codex\\runs" $state.run_id)
+    $runsRoot = Join-Path $repoRoot ".codex\\runs"
+    if (-not (Test-IsPathUnderRoot -Path $runRoot -Root $runsRoot)) {
+        Fail-Task -Status "invalid_args" -Message "Invalid --run-id path: resolved run path escapes .codex/runs" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+    }
+    if (-not $state.explicit_output_file) {
+        $state.output_file = Join-Path (Join-Path $runRoot "artifacts") ("codex-task-" + $timestamp + ".json")
+    }
+    if (-not $state.explicit_report_path) {
+        $state.report_path = Join-Path (Join-Path $runRoot "reports") ("codex-task-" + $timestamp + ".report.json")
+    }
+    if (-not $state.explicit_log_path) {
+        $state.log_path = Get-DefaultLogPath -RepoRoot $repoRoot -Timestamp $timestamp -RunId $state.run_id
+    }
+}
+
 $report.runtime = $state.runtime
 $report.preset = $state.preset
+$report.mode = $state.preset
+$report.run_id = $state.run_id
 $report.output_file = $state.output_file
 $report.output_schema = $state.output_schema
 $report.log_path = $state.log_path
+$report.git_branch = Get-GitBranch -RepoRoot $repoRoot
+$report.git_dirty = Get-GitDirty -RepoRoot $repoRoot
 
 $logParent = Split-Path -Parent $state.log_path
 if (-not (Test-Path $logParent)) {
     New-Item -ItemType Directory -Path $logParent -Force | Out-Null
 }
-Write-TaskLog -Path $state.log_path -Event "wrapper_start" -Data @{ runtime = $state.runtime; preset = $state.preset }
+Write-TaskLog -Path $state.log_path -Event "wrapper_start" -Data @{ runtime = $state.runtime; preset = $state.preset; run_id = $state.run_id }
 
 if ($state.preset -notin @("safe", "readonly")) {
     Fail-Task -Status "invalid_args" -Message "Unsupported preset: $($state.preset)" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
@@ -361,11 +469,16 @@ $cwd = (Get-Location).Path
 if (-not (Test-IsPathUnderRoot -Path $cwd -Root $repoRoot)) {
     $cwd = $repoRoot
 }
+$report.cwd = $cwd
 
 if (-not $state.skip_preflight) {
     Write-TaskLog -Path $state.log_path -Event "preflight_start" -Data @{}
     try {
-        & powershell.exe -ExecutionPolicy Bypass -File (Join-Path $repoRoot "scripts\\codex-safe.ps1") -PreflightOnly | Out-Null
+        $preflightArgs = @("-ExecutionPolicy", "Bypass", "-File", (Join-Path $repoRoot "scripts\\codex-safe.ps1"), "-PreflightOnly")
+        if (-not [string]::IsNullOrWhiteSpace($state.run_id)) {
+            $preflightArgs += @("-RunId", $state.run_id)
+        }
+        & powershell.exe @preflightArgs | Out-Null
         Write-TaskLog -Path $state.log_path -Event "preflight_ok" -Data @{}
     }
     catch {
@@ -380,10 +493,11 @@ if (-not $codexCmd) {
 }
 
 Write-TaskLog -Path $state.log_path -Event "codex_exec_start" -Data @{ runtime = $state.runtime; output_file = $state.output_file }
-$execArgs = @("exec", "-C", $cwd, "--sandbox", $sandboxMode, "--ask-for-approval", "never", "--output-last-message", $state.output_file)
+$codexArgs = @("--ask-for-approval", "never")
 if ($state.allow_search) {
-    $execArgs += "--search"
+    $codexArgs += "--search"
 }
+$execArgs = @("exec", "-C", $cwd, "--sandbox", $sandboxMode, "--output-last-message", $state.output_file)
 if ($state.output_schema) {
     $execArgs += @("--output-schema", $state.output_schema)
 }
@@ -413,7 +527,7 @@ function Invoke-NativeCommand {
 }
 
 if ($state.runtime -eq "host") {
-    $report.codex_exit_code = Invoke-NativeCommand -Command $codexCmd -CommandArgs ($execArgs + $prompt)
+    $report.codex_exit_code = Invoke-NativeCommand -Command $codexCmd -CommandArgs ($codexArgs + $execArgs + $prompt)
 }
 else {
     $dockerCmd = try { Get-DockerCommand } catch { $null }
@@ -442,16 +556,16 @@ else {
         $dockerArgs += @("-e", "OPENAI_API_KEY")
     }
 
-    $containerArgs = @(
-        "codex", "exec",
-        "-C", (Convert-ToContainerPath -RepoRoot $repoRoot -Path $cwd),
-        "--sandbox", $sandboxMode,
-        "--ask-for-approval", "never",
-        "--output-last-message", (Convert-ToContainerPath -RepoRoot $repoRoot -Path $state.output_file)
-    )
+    $containerArgs = @("codex", "--ask-for-approval", "never")
     if ($state.allow_search) {
         $containerArgs += "--search"
     }
+    $containerArgs += @(
+        "exec",
+        "-C", (Convert-ToContainerPath -RepoRoot $repoRoot -Path $cwd),
+        "--sandbox", $sandboxMode,
+        "--output-last-message", (Convert-ToContainerPath -RepoRoot $repoRoot -Path $state.output_file)
+    )
     if ($state.output_schema) {
         $containerArgs += @("--output-schema", (Convert-ToContainerPath -RepoRoot $repoRoot -Path $state.output_schema))
     }

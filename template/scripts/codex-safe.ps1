@@ -15,6 +15,8 @@ param(
 
     [string]$LogPath,
 
+    [string]$RunId,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$PassthroughArgs
 )
@@ -42,10 +44,27 @@ function Test-IsPathUnderRoot {
         ($fullPath.TrimEnd([System.IO.Path]::DirectorySeparatorChar) -eq $fullRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar))
 }
 
+function Assert-RunId {
+    param([string]$RunId)
+
+    if ([string]::IsNullOrWhiteSpace($RunId)) {
+        return
+    }
+    if ($RunId -notmatch '^\d{8}-\d{6}-JST$') {
+        throw "Invalid -RunId: expected YYYYMMDD-HHMMSS-JST"
+    }
+}
+
 function Get-DefaultLogPath {
-    param([string]$RepoRoot)
+    param(
+        [string]$RepoRoot,
+        [string]$RunId
+    )
 
     $logsDir = Join-Path $RepoRoot ".codex\\logs"
+    if (-not [string]::IsNullOrWhiteSpace($RunId)) {
+        $logsDir = Join-Path $RepoRoot (Join-Path ".codex\\runs" (Join-Path $RunId "logs"))
+    }
     if (-not (Test-Path $logsDir)) {
         New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
     }
@@ -57,7 +76,8 @@ function Get-LogPathResolved {
     param(
         [string]$RepoRoot,
         [bool]$DisableLogging,
-        [string]$ExplicitPath
+        [string]$ExplicitPath,
+        [string]$RunId
     )
 
     if ($DisableLogging) {
@@ -72,7 +92,7 @@ function Get-LogPathResolved {
         return $ExplicitPath
     }
 
-    return (Get-DefaultLogPath -RepoRoot $RepoRoot)
+    return (Get-DefaultLogPath -RepoRoot $RepoRoot -RunId $RunId)
 }
 
 function Get-ArgsSummary {
@@ -248,7 +268,9 @@ function Invoke-Preflight {
         @{ Tokens = @('git', 'reset', '--hard', 'HEAD~1'); Decisions = @('forbidden') },
         @{ Tokens = @('terraform', 'destroy', '-auto-approve'); Decisions = @('forbidden') },
         @{ Tokens = @('docker', 'ps'); Decisions = @('prompt') },
-        @{ Tokens = @('Remove-Item', '-Recurse', 'tmp'); Decisions = @('forbidden') }
+        @{ Tokens = @('rm', 'file.txt'); Decisions = @('forbidden') },
+        @{ Tokens = @('Remove-Item', 'file.txt'); Decisions = @('forbidden') },
+        @{ Tokens = @('git', 'rm', 'file.txt'); Decisions = @('forbidden') }
     )
 
     foreach ($test in $tests) {
@@ -283,6 +305,7 @@ function Get-PresetConfig {
 }
 
 $repoRoot = Get-RepoRoot -ScriptDir $PSScriptRoot
+Assert-RunId -RunId $RunId
 $codexCmd = if (-not [string]::IsNullOrWhiteSpace($env:CODEX_BIN)) {
     $candidate = $env:CODEX_BIN
     if (Test-Path $candidate) {
@@ -297,10 +320,11 @@ else {
 }
 $rules = Get-RuleFiles -RepoRoot $repoRoot
 $presetConfig = Get-PresetConfig -PresetName $Preset
-$resolvedLogPath = Get-LogPathResolved -RepoRoot $repoRoot -DisableLogging:$NoLog.IsPresent -ExplicitPath $LogPath
+$resolvedLogPath = Get-LogPathResolved -RepoRoot $repoRoot -DisableLogging:$NoLog.IsPresent -ExplicitPath $LogPath -RunId $RunId
 
 Write-HarnessLog -Path $resolvedLogPath -Event 'wrapper_start' -Data @{
     preset = $Preset
+    run_id = $RunId
     allow_search = $AllowSearch.IsPresent
     skip_preflight = $SkipPreflight.IsPresent
     preflight_only = $PreflightOnly.IsPresent
@@ -374,6 +398,7 @@ if ($PrintCommand) {
         rules = ($rules | ForEach-Object { $_.Name })
         preflight = (-not $SkipPreflight.IsPresent)
         preset = $Preset
+        run_id = $RunId
         profile_hint = $presetConfig.Profile
         log_path = $resolvedLogPath
     } | ConvertTo-Json -Depth 4

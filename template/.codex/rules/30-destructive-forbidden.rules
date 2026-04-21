@@ -19,15 +19,22 @@ prefix_rule(
 )
 
 prefix_rule(
-  pattern = ["rm", ["-rf", "-fr", "-r", "-R", "-f"]],
+  pattern = [["rm", "del", "erase", "Remove-Item", "rmdir", "unlink"]],
   decision = "forbidden",
-  match = ["rm -rf tmp", "rm -r tmp"],
+  match = [
+    "rm file.txt",
+    "del file.txt",
+    "erase file.txt",
+    "Remove-Item file.txt",
+    "rmdir tmp",
+    "unlink file.txt",
+  ],
 )
 
 prefix_rule(
-  pattern = ["Remove-Item", ["-Recurse", "-Force", "-Recurse:$true", "-Force:$true"]],
+  pattern = ["git", "rm"],
   decision = "forbidden",
-  match = ["Remove-Item -Recurse path", "Remove-Item -Force file.txt"],
+  match = ["git rm file.txt"],
 )
 
 prefix_rule(

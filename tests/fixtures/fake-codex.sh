@@ -10,7 +10,9 @@ decision_for() {
     "git reset --hard HEAD~1") echo forbidden ;;
     "terraform destroy -auto-approve") echo forbidden ;;
     "docker ps") echo prompt ;;
-    "Remove-Item -Recurse tmp") echo forbidden ;;
+    "rm file.txt") echo forbidden ;;
+    "Remove-Item file.txt") echo forbidden ;;
+    "git rm file.txt") echo forbidden ;;
     *) echo allow ;;
   esac
 }
@@ -28,6 +30,20 @@ if [[ $# -ge 2 && "$1" == "execpolicy" && "$2" == "check" ]]; then
   exit 0
 fi
 
+while (($#)); do
+  case "$1" in
+    -C|--sandbox|--ask-for-approval)
+      shift 2
+      ;;
+    --search|--json)
+      shift
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
 if [[ $# -ge 1 && "$1" == "exec" ]]; then
   shift
   output_path=""
@@ -44,10 +60,19 @@ if [[ $# -ge 1 && "$1" == "exec" ]]; then
         shift 2
         ;;
       -C|--sandbox|--ask-for-approval)
+        if [[ "$1" == "--ask-for-approval" ]]; then
+          exit 2
+        fi
         shift 2
         ;;
       --search|--json)
+        if [[ "$1" == "--search" ]]; then
+          exit 2
+        fi
         shift
+        ;;
+      --definitely-invalid-flag)
+        exit 2
         ;;
       *)
         if [[ "$1" != -* ]]; then

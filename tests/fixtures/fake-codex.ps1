@@ -18,7 +18,9 @@ function Get-Decision {
         '^git reset --hard HEAD~1$' { return 'forbidden' }
         '^terraform destroy -auto-approve$' { return 'forbidden' }
         '^docker ps$' { return 'prompt' }
-        '^Remove-Item -Recurse tmp$' { return 'forbidden' }
+        '^rm file.txt$' { return 'forbidden' }
+        '^Remove-Item file.txt$' { return 'forbidden' }
+        '^git rm file.txt$' { return 'forbidden' }
         default { return 'allow' }
     }
 }
@@ -43,9 +45,10 @@ function Invoke-FakeExec {
             }
             '-C' { $i++ }
             '--sandbox' { $i++ }
-            '--ask-for-approval' { $i++ }
-            '--search' { }
+            '--ask-for-approval' { exit 2 }
+            '--search' { exit 2 }
             '--json' { }
+            '--definitely-invalid-flag' { exit 2 }
             default {
                 if (-not $token.StartsWith('-')) {
                     $prompt = $token
@@ -86,8 +89,23 @@ if ($Args.Count -ge 2 -and $Args[0] -eq 'execpolicy' -and $Args[1] -eq 'check') 
     exit 0
 }
 
-if ($Args.Count -ge 1 -and $Args[0] -eq 'exec') {
-    Invoke-FakeExec -ExecArgs $Args[1..($Args.Count - 1)]
+$start = 0
+while ($start -lt $Args.Count) {
+    $token = $Args[$start]
+    if ($token -in @('-C', '--sandbox', '--ask-for-approval')) {
+        $start += 2
+        continue
+    }
+    if ($token -in @('--search', '--json')) {
+        $start++
+        continue
+    }
+    break
+}
+
+if ($start -lt $Args.Count -and $Args[$start] -eq 'exec') {
+    $execArgs = if (($start + 1) -lt $Args.Count) { $Args[($start + 1)..($Args.Count - 1)] } else { @() }
+    Invoke-FakeExec -ExecArgs $execArgs
 }
 
 if ($Args.Count -ge 1 -and $Args[0] -eq '--help') {

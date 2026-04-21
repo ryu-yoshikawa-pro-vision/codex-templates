@@ -17,12 +17,17 @@
     "template/AGENTS.md",
     "template/PLANS.md",
     "template/CODE_REVIEW.md",
+    "template/codex-project.toml",
+    "template/.codex/config.toml",
+    "template/.codex/requirements.toml",
     "template/docs/PROJECT_CONTEXT.md",
     "template/docs/reference/codex-safety-harness.md",
     "template/docs/reference/codex-implementation-harness.md",
     "template/.codex/templates/PLAN.md",
     "template/.codex/templates/TASKS.md",
     "template/.codex/templates/REPORT.md",
+    "template/scripts/init-project.ps1",
+    "template/scripts/init-project.sh",
     "template/scripts/codex-task.ps1",
     "template/scripts/codex-task.sh",
     "template/scripts/codex-sandbox.ps1",
@@ -44,7 +49,11 @@
       "Safe change surface",
       "Unknowns",
       "Validation candidates",
-      "Failure modes"
+      "Ambiguity handling",
+      "mandatory-question",
+      "Failure modes",
+      "Report file generation policy",
+      "review-only"
     ]
   },
   "review_reference": {
@@ -62,7 +71,9 @@
       "behavioral regression",
       "maintainability",
       "Open questions",
-      "Failure modes"
+      "Failure modes",
+      "Report file generation policy",
+      "review-only"
     ]
   }
 }

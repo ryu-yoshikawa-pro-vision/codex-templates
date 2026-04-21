@@ -16,12 +16,16 @@ allow_search=0
 skip_preflight=0
 skip_verify=0
 explicit_log_path=""
+explicit_output_file=0
+explicit_report_path=0
+run_id=""
+cwd_for_report="$repo_root"
 declare -a prompt_parts=()
 
 timestamp="$(date +%Y%m%d-%H%M%S)"
 output_file="$artifacts_dir/codex-task-${timestamp}.json"
 report_path="$reports_dir/codex-task-${timestamp}.report.json"
-log_path="$logs_dir/codex-task-$(date +%Y%m%d).jsonl"
+log_path="$logs_dir/codex-task-${timestamp}.jsonl"
 
 report_status="pending"
 prompt_source=""
@@ -64,6 +68,13 @@ python_cmd() {
   printf ''
 }
 
+validate_run_id() {
+  [[ -z "$run_id" ]] && return 0
+  if [[ ! "$run_id" =~ ^[0-9]{8}-[0-9]{6}-JST$ ]]; then
+    fail_with_status "invalid_args" "Invalid --run-id: expected YYYYMMDD-HHMMSS-JST"
+  fi
+}
+
 normalized_path() {
   local py
   py="$(python_cmd)"
@@ -72,6 +83,30 @@ normalized_path() {
     return
   fi
   "$py" -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1"
+}
+
+git_branch() {
+  git -C "$repo_root" branch --show-current 2>/dev/null || true
+}
+
+git_dirty() {
+  if ! git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    printf 'false'
+    return
+  fi
+  if ! git -C "$repo_root" diff --quiet --ignore-submodules -- 2>/dev/null; then
+    printf 'true'
+    return
+  fi
+  if ! git -C "$repo_root" diff --cached --quiet --ignore-submodules -- 2>/dev/null; then
+    printf 'true'
+    return
+  fi
+  if [[ -n "$(git -C "$repo_root" ls-files --others --exclude-standard 2>/dev/null)" ]]; then
+    printf 'true'
+    return
+  fi
+  printf 'false'
 }
 
 path_under_root() {
@@ -108,6 +143,11 @@ write_report() {
 {
   "runtime": "$(json_escape "$runtime")",
   "preset": "$(json_escape "$preset")",
+  "mode": "$(json_escape "$preset")",
+  "run_id": $(if [[ -n "$run_id" ]]; then printf '"%s"' "$(json_escape "$run_id")"; else printf 'null'; fi),
+  "cwd": "$(json_escape "$cwd_for_report")",
+  "git_branch": $(branch="$(git_branch)"; if [[ -n "$branch" ]]; then printf '"%s"' "$(json_escape "$branch")"; else printf 'null'; fi),
+  "git_dirty": $(git_dirty),
   "prompt_source": "$(json_escape "$prompt_source")",
   "output_file": "$(json_escape "$output_file")",
   "output_schema": $(if [[ -n "$output_schema" ]]; then printf '"%s"' "$(json_escape "$output_schema")"; else printf 'null'; fi),
@@ -156,6 +196,7 @@ parse_args() {
       --output-file)
         [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--output-file requires a value"
         output_file="$(resolve_path "$2")"
+        explicit_output_file=1
         shift 2
         ;;
       --output-schema)
@@ -166,6 +207,7 @@ parse_args() {
       --report-path)
         [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--report-path requires a value"
         report_path="$(resolve_path "$2")"
+        explicit_report_path=1
         shift 2
         ;;
       --verify-command)
@@ -188,6 +230,11 @@ parse_args() {
       --log-path)
         [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--log-path requires a value"
         explicit_log_path="$(resolve_path "$2")"
+        shift 2
+        ;;
+      --run-id)
+        [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--run-id requires a value"
+        run_id="$2"
         shift 2
         ;;
       --dangerously-bypass-approvals-and-sandbox)
@@ -228,6 +275,32 @@ parse_args() {
   done
 }
 
+apply_run_paths() {
+  if [[ -n "$run_id" ]]; then
+    validate_run_id
+    local run_root="$repo_root/.codex/runs/$run_id"
+    local normalized_runs_root normalized_run_root
+    normalized_runs_root="$(normalized_path "$repo_root/.codex/runs")"
+    normalized_run_root="$(normalized_path "$run_root")"
+    if [[ "$normalized_run_root" != "$normalized_runs_root/"* ]]; then
+      fail_with_status "invalid_args" "Invalid --run-id path: resolved run path escapes .codex/runs"
+    fi
+    if (( ! explicit_output_file )); then
+      output_file="$run_root/artifacts/codex-task-${timestamp}.json"
+    fi
+    if (( ! explicit_report_path )); then
+      report_path="$run_root/reports/codex-task-${timestamp}.report.json"
+    fi
+    if [[ -z "$explicit_log_path" ]]; then
+      log_path="$run_root/logs/codex-task-${timestamp}.jsonl"
+    fi
+  fi
+
+  if [[ -n "$explicit_log_path" ]]; then
+    log_path="$explicit_log_path"
+  fi
+}
+
 default_verify_command() {
   if [[ -f "$repo_root/scripts/verify" ]]; then
     printf 'bash scripts/verify'
@@ -241,7 +314,11 @@ default_verify_command() {
 }
 
 run_preflight() {
-  bash "$repo_root/scripts/codex-safe.sh" --preflight-only >/dev/null
+  if [[ -n "$run_id" ]]; then
+    bash "$repo_root/scripts/codex-safe.sh" --run-id "$run_id" --preflight-only >/dev/null
+  else
+    bash "$repo_root/scripts/codex-safe.sh" --preflight-only >/dev/null
+  fi
 }
 
 append_command() {
@@ -262,11 +339,7 @@ run_schema_check() {
 }
 
 main() {
-  if [[ -n "$explicit_log_path" ]]; then
-    log_path="$explicit_log_path"
-  fi
-
-  write_log "wrapper_start" ",\"runtime\":\"$(json_escape "$runtime")\",\"preset\":\"$(json_escape "$preset")\""
+  write_log "wrapper_start" ",\"runtime\":\"$(json_escape "$runtime")\",\"preset\":\"$(json_escape "$preset")\",\"run_id\":\"$(json_escape "$run_id")\""
 
   case "$preset" in
     safe|readonly) ;;
@@ -300,6 +373,7 @@ main() {
   if [[ "$cwd" != "$repo_root" && "$cwd" != "$repo_root/"* ]]; then
     cwd="$repo_root"
   fi
+  cwd_for_report="$cwd"
 
   if (( ! skip_preflight )); then
     write_log "preflight_start"
@@ -331,10 +405,11 @@ main() {
   if [[ "$runtime" == "host" ]]; then
     cmd=()
     append_command cmd "$codex_bin"
-    cmd+=(exec -C "$cwd" --sandbox "$sandbox_mode" --ask-for-approval never --output-last-message "$output_file")
+    cmd+=(--ask-for-approval never)
     if (( allow_search )); then
       cmd+=(--search)
     fi
+    cmd+=(exec -C "$cwd" --sandbox "$sandbox_mode" --output-last-message "$output_file")
     if [[ -n "$output_schema" ]]; then
       cmd+=(--output-schema "$output_schema")
     fi
@@ -370,10 +445,11 @@ main() {
     if [[ -n "${OPENAI_API_KEY:-}" ]]; then
       docker_cmd+=(-e OPENAI_API_KEY)
     fi
-    docker_cmd+=("${CODEX_DOCKER_IMAGE}" codex exec -C "$container_cwd" --sandbox "$sandbox_mode" --ask-for-approval never --output-last-message "$container_output")
+    docker_cmd+=("${CODEX_DOCKER_IMAGE}" codex --ask-for-approval never)
     if (( allow_search )); then
       docker_cmd+=(--search)
     fi
+    docker_cmd+=(exec -C "$container_cwd" --sandbox "$sandbox_mode" --output-last-message "$container_output")
     if [[ -n "$output_schema" ]]; then
       container_schema="$(to_container_path "$output_schema")"
       docker_cmd+=(--output-schema "$container_schema")
@@ -440,4 +516,5 @@ main() {
 }
 
 parse_args "$@"
+apply_run_paths
 main

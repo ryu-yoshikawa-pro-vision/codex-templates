@@ -59,6 +59,10 @@ foreach ($wrapperPath in $safety.wrappers) {
     Assert-Contains -RelativePath $wrapperPath -Patterns $safety.blocked_tokens
 }
 
+Assert-Contains -RelativePath $safety.config.file -Patterns $safety.config.must_contain
+Assert-Contains -RelativePath $safety.requirements.file -Patterns $safety.requirements.must_contain
+Assert-Contains -RelativePath (Join-Path $safety.rules_dir "30-destructive-forbidden.rules") -Patterns $safety.forbidden_delete_commands
+
 foreach ($wrapperPath in $safety.delegating_wrappers) {
     Assert-Exists -RelativePath $wrapperPath
 }

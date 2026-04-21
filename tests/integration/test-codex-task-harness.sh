@@ -7,14 +7,21 @@ wrapper="$template_root/scripts/codex-task.sh"
 sandbox_wrapper="$template_root/scripts/codex-sandbox.sh"
 fake_codex="$source_repo_root/tests/fixtures/fake-codex.sh"
 fake_docker="$source_repo_root/tests/fixtures/fake-docker.sh"
-temp_root="$(mktemp -d)"
+temp_root="$(mktemp -d "${TMPDIR:-/tmp}/codex-task-test.XXXXXX")"
 python_cmd="python3"
 if ! command -v python3 >/dev/null 2>&1; then
   python_cmd="python"
 fi
 
 cleanup() {
-  rm -rf "$temp_root"
+  case "$temp_root" in
+    "${TMPDIR:-/tmp}"/codex-task-test.*)
+      rm -rf -- "$temp_root"
+      ;;
+    *)
+      echo "Refusing to clean unexpected temp root: $temp_root" >&2
+      ;;
+  esac
 }
 trap cleanup EXIT
 
@@ -26,7 +33,7 @@ import json
 import sys
 path, expected = sys.argv[1:3]
 data = json.load(open(path, encoding="utf-8"))
-required = ["runtime", "preset", "prompt_source", "output_file", "output_schema", "log_path", "codex_exit_code", "verify_exit_code", "status"]
+required = ["runtime", "preset", "mode", "run_id", "cwd", "git_branch", "git_dirty", "prompt_source", "output_file", "output_schema", "log_path", "codex_exit_code", "verify_exit_code", "status"]
 missing = [key for key in required if key not in data]
 if missing:
     raise SystemExit(f"missing report keys: {missing}")
@@ -40,70 +47,89 @@ cd "$template_root"
 printf '{"type":"object","required":["status"],"properties":{"status":{"type":"string"}},"additionalProperties":false}\n' > "$temp_root/schema.json"
 printf '{"oneOf":[{"type":"object"}]}\n' > "$temp_root/unsupported-schema.json"
 
-bash "$wrapper" --output-file "$temp_root/ok.json" --output-schema "$temp_root/schema.json" --report-path "$temp_root/ok.report.json" --verify-command "true" "SCHEMA_OK"
+bash "$wrapper" --output-file "$temp_root/ok.json" --output-schema "$temp_root/schema.json" --report-path "$temp_root/ok.report.json" --log-path "$temp_root/ok.jsonl" --verify-command "true" "SCHEMA_OK"
 assert_status "$temp_root/ok.report.json" ok
 
-bash "$wrapper" --preset readonly --output-file "$temp_root/readonly.json" --report-path "$temp_root/readonly.report.json" --skip-verify "READONLY_OK"
+bash "$wrapper" --preset readonly --output-file "$temp_root/readonly.json" --report-path "$temp_root/readonly.report.json" --log-path "$temp_root/readonly.jsonl" --skip-verify "READONLY_OK"
 assert_status "$temp_root/readonly.report.json" verify_skipped
 
+run_id="20260420-020201-JST"
+bash "$wrapper" --run-id "$run_id" --skip-verify "RUN_ID_OK"
+run_report="$(find "$template_root/.codex/runs/$run_id/reports" -type f -name 'codex-task-*.report.json' | sort | tail -n 1)"
+assert_status "$run_report" verify_skipped
+"$python_cmd" - "$run_report" "$run_id" <<'PY'
+import json
+import sys
+path, expected_run_id = sys.argv[1:3]
+data = json.load(open(path, encoding="utf-8"))
+if data["run_id"] != expected_run_id:
+    raise SystemExit(f"expected run_id {expected_run_id}, got {data['run_id']}")
+for key in ("output_file", "log_path"):
+    if f".codex/runs/{expected_run_id}/" not in data[key].replace("\\", "/"):
+        raise SystemExit(f"{key} is not run-local: {data[key]}")
+PY
+
 set +e
-bash "$wrapper" --report-path "$temp_root/blocked.report.json" --dangerously-bypass-approvals-and-sandbox >/tmp/codex-task-blocked.out 2>&1
+bash "$wrapper" --report-path "$temp_root/invalid-run.report.json" --log-path "$temp_root/invalid-run.jsonl" --run-id "../escape" --skip-verify "RUN_ID_BAD" >"$temp_root/invalid-run.out" 2>&1
 code=$?
 set -e
 [[ $code -ne 0 ]]
-grep -q "Unsafe Codex argument blocked" /tmp/codex-task-blocked.out
-assert_status "$temp_root/blocked.report.json" blocked_args
-rm -f /tmp/codex-task-blocked.out
+grep -q "Invalid --run-id" "$temp_root/invalid-run.out"
+assert_status "$temp_root/invalid-run.report.json" invalid_args
 
 set +e
-bash "$wrapper" --report-path "$temp_root/fail.report.json" --skip-verify "FAIL_CODEX" >/tmp/codex-task-fail.out 2>&1
+bash "$wrapper" --report-path "$temp_root/blocked.report.json" --log-path "$temp_root/blocked.jsonl" --dangerously-bypass-approvals-and-sandbox >"$temp_root/blocked.out" 2>&1
+code=$?
+set -e
+[[ $code -ne 0 ]]
+grep -q "Unsafe Codex argument blocked" "$temp_root/blocked.out"
+assert_status "$temp_root/blocked.report.json" blocked_args
+
+set +e
+bash "$wrapper" --report-path "$temp_root/fail.report.json" --log-path "$temp_root/fail.jsonl" --skip-verify "FAIL_CODEX" >"$temp_root/fail.out" 2>&1
 code=$?
 set -e
 [[ $code -eq 9 ]]
 assert_status "$temp_root/fail.report.json" codex_failed
-rm -f /tmp/codex-task-fail.out
 
 set +e
-bash "$wrapper" --report-path "$temp_root/verify-fail.report.json" --verify-command "sh -lc 'exit 7'" "VERIFY_FAIL" >/tmp/codex-task-verify.out 2>&1
+bash "$wrapper" --report-path "$temp_root/verify-fail.report.json" --log-path "$temp_root/verify-fail.jsonl" --verify-command "sh -lc 'exit 7'" "VERIFY_FAIL" >"$temp_root/verify-fail.out" 2>&1
 code=$?
 set -e
 [[ $code -eq 7 ]]
 assert_status "$temp_root/verify-fail.report.json" verify_failed
-rm -f /tmp/codex-task-verify.out
 
-bash "$wrapper" --report-path "$temp_root/verify-bash.report.json" --verify-command "printf 'verify-ok\n'" "VERIFY_BASH"
+bash "$wrapper" --report-path "$temp_root/verify-bash.report.json" --log-path "$temp_root/verify-bash.jsonl" --verify-command "printf 'verify-ok\n'" "VERIFY_BASH"
 assert_status "$temp_root/verify-bash.report.json" ok
 
 set +e
-bash "$wrapper" --output-file "$temp_root/schema-fail.json" --output-schema "$temp_root/schema.json" --report-path "$temp_root/schema-fail.report.json" --skip-verify "BAD_SCHEMA" >/tmp/codex-task-schema.out 2>&1
+bash "$wrapper" --output-file "$temp_root/schema-fail.json" --output-schema "$temp_root/schema.json" --report-path "$temp_root/schema-fail.report.json" --log-path "$temp_root/schema-fail.jsonl" --skip-verify "BAD_SCHEMA" >"$temp_root/schema-fail.out" 2>&1
 code=$?
 set -e
 [[ $code -ne 0 ]]
 assert_status "$temp_root/schema-fail.report.json" invalid_output
-rm -f /tmp/codex-task-schema.out
 
 set +e
-bash "$wrapper" --output-file "$temp_root/unsupported-out.json" --output-schema "$temp_root/unsupported-schema.json" --report-path "$temp_root/unsupported.report.json" --skip-verify "SCHEMA_OK" >/tmp/codex-task-unsupported-schema.out 2>&1
+bash "$wrapper" --output-file "$temp_root/unsupported-out.json" --output-schema "$temp_root/unsupported-schema.json" --report-path "$temp_root/unsupported.report.json" --log-path "$temp_root/unsupported.jsonl" --skip-verify "SCHEMA_OK" >"$temp_root/unsupported-schema.out" 2>&1
 code=$?
 set -e
 [[ $code -ne 0 ]]
 assert_status "$temp_root/unsupported.report.json" invalid_output
-rm -f /tmp/codex-task-unsupported-schema.out
 
 set +e
-bash "$wrapper" --runtime docker-sandbox --report-path "$temp_root/docker-missing.report.json" --skip-verify "DOCKER_MISSING" >/tmp/codex-task-docker-missing.out 2>&1
+bash "$wrapper" --runtime docker-sandbox --report-path "$temp_root/docker-missing.report.json" --log-path "$temp_root/docker-missing.jsonl" --skip-verify "DOCKER_MISSING" >"$temp_root/docker-missing.out" 2>&1
 code=$?
 set -e
 [[ $code -ne 0 ]]
 assert_status "$temp_root/docker-missing.report.json" docker_unavailable
-rm -f /tmp/codex-task-docker-missing.out
 
 if [[ "${CODEX_ENABLE_DOCKER_SANDBOX_TEST:-0}" == "1" ]]; then
   export CODEX_DOCKER_BIN="$fake_docker"
   export CODEX_DOCKER_IMAGE="fake-image"
-  bash "$sandbox_wrapper" --output-file ".codex/artifacts/docker-test-output.json" --output-schema "$temp_root/schema.json" --report-path ".codex/reports/docker-test-report.json" --verify-command "true" "DOCKER_OK"
-  assert_status "$template_root/.codex/reports/docker-test-report.json" ok
-  rm -f "$template_root/.codex/artifacts/docker-test-output.json" "$template_root/.codex/reports/docker-test-report.json"
+  docker_run_id="20260420-020202-JST"
+  bash "$sandbox_wrapper" --run-id "$docker_run_id" --output-schema "$temp_root/schema.json" --verify-command "true" "DOCKER_OK"
+  docker_report="$(find "$template_root/.codex/runs/$docker_run_id/reports" -type f -name 'codex-task-*.report.json' | sort | tail -n 1)"
+  assert_status "$docker_report" ok
 else
   echo "SKIP: docker sandbox smoke (set CODEX_ENABLE_DOCKER_SANDBOX_TEST=1 to enable)"
 fi

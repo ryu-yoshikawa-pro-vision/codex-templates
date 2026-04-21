@@ -6,7 +6,14 @@
   },
   "report_docs": {
     "directory": "docs/reports",
-    "pattern": "{yyyy-mm-dd}_{HHMMSS}_{report_name}.md"
+    "pattern": "{yyyy-mm-dd}_{HHMMSS}_{report_name}.md",
+    "policy": "Only durable investigation, audit, or verification reports. Do not create report files for review-only, plan-only, status updates, routine evidence, or run progress."
+  },
+  "run_artifacts": {
+    "directory": ".codex/runs/<run_id>",
+    "artifacts": ".codex/runs/<run_id>/artifacts",
+    "reports": ".codex/runs/<run_id>/reports",
+    "logs": ".codex/runs/<run_id>/logs"
   },
   "history_docs": {
     "directory": "docs/history",

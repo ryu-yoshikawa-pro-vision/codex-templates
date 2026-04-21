@@ -12,6 +12,31 @@ $fakeCodex = Join-Path $sourceRepoRoot "tests\\fixtures\\fake-codex.ps1"
 $fakeDocker = Join-Path $sourceRepoRoot "tests\\fixtures\\fake-docker.ps1"
 $tempRoot = Join-Path $env:TEMP ("codex-task-test-" + [guid]::NewGuid().ToString())
 
+function Test-PythonAvailable {
+    foreach ($candidate in @("python", "python3", "py")) {
+        $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
+        if (-not $cmd) { continue }
+        $prevNativeErr = $null
+        $hasNativeErrPref = $null -ne (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue)
+        if ($hasNativeErrPref) {
+            $prevNativeErr = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+        try {
+            & $cmd.Source --version *> $null
+            if ($LASTEXITCODE -eq 0) { return $true }
+        }
+        catch {
+        }
+        finally {
+            if ($hasNativeErrPref) {
+                $PSNativeCommandUseErrorActionPreference = $prevNativeErr
+            }
+        }
+    }
+    return $false
+}
+
 function Invoke-WindowsPowerShellFile {
     param(
         [Parameter(Mandatory = $true)][string]$ScriptPath,
@@ -64,7 +89,7 @@ function Assert-ReportStatus {
     if ($report.status -ne $ExpectedStatus) {
         throw "Expected report status '$ExpectedStatus', got '$($report.status)'"
     }
-    foreach ($key in @('runtime', 'preset', 'prompt_source', 'output_file', 'output_schema', 'log_path', 'codex_exit_code', 'verify_exit_code', 'status')) {
+    foreach ($key in @('runtime', 'preset', 'mode', 'run_id', 'cwd', 'git_branch', 'git_dirty', 'prompt_source', 'output_file', 'output_schema', 'log_path', 'codex_exit_code', 'verify_exit_code', 'status')) {
         if (-not ($report.PSObject.Properties.Name -contains $key)) {
             throw "Missing report key: $key"
         }
@@ -87,16 +112,28 @@ try {
     $envMap = @{
         CODEX_BIN = $fakeCodex
     }
+    $pythonAvailable = Test-PythonAvailable
 
     $outputOk = Join-Path $tempRoot "ok.json"
     $reportOk = Join-Path $tempRoot "ok.report.json"
-    $resultOk = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+    $okArgs = @(
         '--output-file', $outputOk,
-        '--output-schema', $schemaPath,
         '--report-path', $reportOk,
+        '--log-path', (Join-Path $tempRoot "ok.jsonl"),
         '--verify-command', $verifyOkCmd,
         'SCHEMA_OK'
-    ) -ExtraEnv $envMap
+    )
+    if ($pythonAvailable) {
+        $okArgs = @(
+            '--output-file', $outputOk,
+            '--output-schema', $schemaPath,
+            '--report-path', $reportOk,
+            '--log-path', (Join-Path $tempRoot "ok.jsonl"),
+            '--verify-command', $verifyOkCmd,
+            'SCHEMA_OK'
+        )
+    }
+    $resultOk = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments $okArgs -ExtraEnv $envMap
     if ($resultOk.ExitCode -ne 0) { throw "Expected success, got exit=$($resultOk.ExitCode): $($resultOk.Combined)" }
     if (-not (Test-Path $outputOk)) { throw "Missing output file for success case" }
     $okReport = Assert-ReportStatus -Path $reportOk -ExpectedStatus 'ok'
@@ -108,15 +145,47 @@ try {
         '--preset', 'readonly',
         '--output-file', $readonlyOut,
         '--report-path', $readonlyReport,
+        '--log-path', (Join-Path $tempRoot "readonly.jsonl"),
         '--skip-verify',
         'READONLY_OK'
     ) -ExtraEnv $envMap
     if ($readonly.ExitCode -ne 0) { throw "Readonly case failed unexpectedly: $($readonly.Combined)" }
     Assert-ReportStatus -Path $readonlyReport -ExpectedStatus 'verify_skipped' | Out-Null
 
+    $runId = "20260420-020301-JST"
+    $runIdCase = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $runId,
+        '--skip-verify',
+        'RUN_ID_OK'
+    ) -ExtraEnv $envMap
+    if ($runIdCase.ExitCode -ne 0) { throw "Run-id case failed unexpectedly: $($runIdCase.Combined)" }
+    $runReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $runId "reports"))
+    $runReportPath = (Get-ChildItem -Path $runReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    $runReport = Assert-ReportStatus -Path $runReportPath -ExpectedStatus 'verify_skipped'
+    if ($runReport.run_id -ne $runId) { throw "Expected run_id $runId, got $($runReport.run_id)" }
+    foreach ($value in @($runReport.output_file, $runReport.log_path)) {
+        $normalized = ($value -replace '\\', '/') -replace '/+', '/'
+        if ($normalized -notmatch [regex]::Escape(".codex/runs/$runId/")) {
+            throw "Run-local path expected, got: $value"
+        }
+    }
+
+    $invalidRunReport = Join-Path $tempRoot "invalid-run.report.json"
+    $invalidRun = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--report-path', $invalidRunReport,
+        '--log-path', (Join-Path $tempRoot "invalid-run.jsonl"),
+        '--run-id', '..\escape',
+        '--skip-verify',
+        'RUN_ID_BAD'
+    ) -ExtraEnv $envMap
+    if ($invalidRun.ExitCode -eq 0) { throw "Invalid run-id case unexpectedly succeeded" }
+    if ($invalidRun.Combined -notmatch 'Invalid --run-id') { throw "Invalid run-id message missing: $($invalidRun.Combined)" }
+    Assert-ReportStatus -Path $invalidRunReport -ExpectedStatus 'invalid_args' | Out-Null
+
     $blockedReport = Join-Path $tempRoot "blocked.report.json"
     $blocked = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
         '--report-path', $blockedReport,
+        '--log-path', (Join-Path $tempRoot "blocked.jsonl"),
         '--dangerously-bypass-approvals-and-sandbox'
     ) -ExtraEnv $envMap
     if ($blocked.ExitCode -eq 0) { throw "Blocked args case unexpectedly succeeded" }
@@ -126,6 +195,7 @@ try {
     $failReport = Join-Path $tempRoot "fail.report.json"
     $fail = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
         '--report-path', $failReport,
+        '--log-path', (Join-Path $tempRoot "fail.jsonl"),
         '--skip-verify',
         'FAIL_CODEX'
     ) -ExtraEnv $envMap
@@ -136,6 +206,7 @@ try {
     $verifyFailReport = Join-Path $tempRoot "verify-fail.report.json"
     $verifyFail = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
         '--report-path', $verifyFailReport,
+        '--log-path', (Join-Path $tempRoot "verify-fail.jsonl"),
         '--verify-command', $verifyFailCmd,
         'VERIFY_FAIL'
     ) -ExtraEnv $envMap
@@ -146,39 +217,62 @@ try {
     $verifyPsExprReport = Join-Path $tempRoot "verify-ps.report.json"
     $verifyPsExpr = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
         '--report-path', $verifyPsExprReport,
+        '--log-path', (Join-Path $tempRoot "verify-ps.jsonl"),
         '--verify-command', 'Write-Host verify-ok; exit 0',
         'VERIFY_PS'
     ) -ExtraEnv $envMap
     if ($verifyPsExpr.ExitCode -ne 0) { throw "PowerShell verify expression failed unexpectedly: $($verifyPsExpr.Combined)" }
     Assert-ReportStatus -Path $verifyPsExprReport -ExpectedStatus 'ok' | Out-Null
 
-    $schemaFailOut = Join-Path $tempRoot "schema-fail.json"
-    $schemaFailReport = Join-Path $tempRoot "schema-fail.report.json"
-    $schemaFail = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
-        '--output-file', $schemaFailOut,
-        '--output-schema', $schemaPath,
-        '--report-path', $schemaFailReport,
-        '--skip-verify',
-        'BAD_SCHEMA'
-    ) -ExtraEnv $envMap
-    if ($schemaFail.ExitCode -eq 0) { throw "schema failure case unexpectedly succeeded" }
-    Assert-ReportStatus -Path $schemaFailReport -ExpectedStatus 'invalid_output' | Out-Null
+    if ($pythonAvailable) {
+        $schemaFailOut = Join-Path $tempRoot "schema-fail.json"
+        $schemaFailReport = Join-Path $tempRoot "schema-fail.report.json"
+        $schemaFail = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+            '--output-file', $schemaFailOut,
+            '--output-schema', $schemaPath,
+            '--report-path', $schemaFailReport,
+            '--log-path', (Join-Path $tempRoot "schema-fail.jsonl"),
+            '--skip-verify',
+            'BAD_SCHEMA'
+        ) -ExtraEnv $envMap
+        if ($schemaFail.ExitCode -eq 0) { throw "schema failure case unexpectedly succeeded" }
+        Assert-ReportStatus -Path $schemaFailReport -ExpectedStatus 'invalid_output' | Out-Null
 
-    $unsupportedSchemaReport = Join-Path $tempRoot "unsupported-schema.report.json"
-    $unsupportedSchema = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
-        '--output-file', (Join-Path $tempRoot "unsupported-schema.json.out"),
-        '--output-schema', $unsupportedSchemaPath,
-        '--report-path', $unsupportedSchemaReport,
-        '--skip-verify',
-        'SCHEMA_OK'
-    ) -ExtraEnv $envMap
-    if ($unsupportedSchema.ExitCode -eq 0) { throw "unsupported schema case unexpectedly succeeded" }
-    Assert-ReportStatus -Path $unsupportedSchemaReport -ExpectedStatus 'invalid_output' | Out-Null
+        $unsupportedSchemaReport = Join-Path $tempRoot "unsupported-schema.report.json"
+        $unsupportedSchema = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+            '--output-file', (Join-Path $tempRoot "unsupported-schema.json.out"),
+            '--output-schema', $unsupportedSchemaPath,
+            '--report-path', $unsupportedSchemaReport,
+            '--log-path', (Join-Path $tempRoot "unsupported-schema.jsonl"),
+            '--skip-verify',
+            'SCHEMA_OK'
+        ) -ExtraEnv $envMap
+        if ($unsupportedSchema.ExitCode -eq 0) { throw "unsupported schema case unexpectedly succeeded" }
+        Assert-ReportStatus -Path $unsupportedSchemaReport -ExpectedStatus 'invalid_output' | Out-Null
+    }
+    else {
+        Write-Host "SKIP: PowerShell schema validation cases (Windows Python not available)"
+        $schemaNoPythonReport = Join-Path $tempRoot "schema-no-python.report.json"
+        $schemaNoPython = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+            '--output-file', (Join-Path $tempRoot "schema-no-python.json"),
+            '--output-schema', $schemaPath,
+            '--report-path', $schemaNoPythonReport,
+            '--log-path', (Join-Path $tempRoot "schema-no-python.jsonl"),
+            '--skip-verify',
+            'SCHEMA_OK'
+        ) -ExtraEnv $envMap
+        if ($schemaNoPython.ExitCode -eq 0) { throw "schema validation unexpectedly succeeded without Windows Python" }
+        if ($schemaNoPython.Combined -notmatch 'Python is required to validate output schema') {
+            throw "Expected Python required message, got: $($schemaNoPython.Combined)"
+        }
+        Assert-ReportStatus -Path $schemaNoPythonReport -ExpectedStatus 'invalid_output' | Out-Null
+    }
 
     $dockerMissingReport = Join-Path $tempRoot "docker-missing.report.json"
     $dockerMissing = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
         '--runtime', 'docker-sandbox',
         '--report-path', $dockerMissingReport,
+        '--log-path', (Join-Path $tempRoot "docker-missing.jsonl"),
         '--skip-verify',
         'DOCKER_MISSING'
     ) -ExtraEnv $envMap
@@ -186,23 +280,22 @@ try {
     Assert-ReportStatus -Path $dockerMissingReport -ExpectedStatus 'docker_unavailable' | Out-Null
 
     if ($env:CODEX_ENABLE_DOCKER_SANDBOX_TEST -eq '1') {
-        $dockerOut = Join-Path $templateRoot ".codex\\artifacts\\docker-test-output.json"
-        $dockerReport = Join-Path $templateRoot ".codex\\reports\\docker-test-report.json"
+        $dockerRunId = "20260420-020302-JST"
         $dockerEnv = @{
             CODEX_BIN = $fakeCodex
             CODEX_DOCKER_BIN = $fakeDocker
             CODEX_DOCKER_IMAGE = 'fake-image'
         }
         $dockerOk = Invoke-WindowsPowerShellFile -ScriptPath $sandboxPath -Arguments @(
-            '--output-file', $dockerOut,
+            '--run-id', $dockerRunId,
             '--output-schema', $schemaPath,
-            '--report-path', $dockerReport,
             '--verify-command', $verifyOkCmd,
             'DOCKER_OK'
         ) -ExtraEnv $dockerEnv
         if ($dockerOk.ExitCode -ne 0) { throw "docker sandbox smoke failed: $($dockerOk.Combined)" }
+        $dockerReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $dockerRunId "reports"))
+        $dockerReport = (Get-ChildItem -Path $dockerReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
         Assert-ReportStatus -Path $dockerReport -ExpectedStatus 'ok' | Out-Null
-        Remove-Item -Force $dockerOut, $dockerReport -ErrorAction SilentlyContinue
     }
     else {
         Write-Host "SKIP: docker sandbox smoke (set CODEX_ENABLE_DOCKER_SANDBOX_TEST=1 to enable)"

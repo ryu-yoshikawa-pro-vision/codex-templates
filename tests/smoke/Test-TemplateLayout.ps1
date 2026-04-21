@@ -11,11 +11,16 @@ $required = @(
     "template/AGENTS.md",
     "template/PLANS.md",
     "template/CODE_REVIEW.md",
+    "template/codex-project.toml",
+    "template/.codex/config.toml",
+    "template/.codex/requirements.toml",
     "template/docs/PROJECT_CONTEXT.md",
     "template/docs/plans/TEMPLATE.md",
     "template/docs/reports/README.md",
     "template/docs/reference/codex-safety-harness.md",
     "template/docs/reference/codex-implementation-harness.md",
+    "template/scripts/init-project.ps1",
+    "template/scripts/init-project.sh",
     "template/scripts/codex-task.ps1",
     "template/scripts/codex-task.sh",
     "template/scripts/codex-sandbox.ps1",
@@ -45,6 +50,8 @@ if ($agents -notmatch [regex]::Escape(".agents/skills/feature-plan/SKILL.md")) {
 if ($agents -notmatch [regex]::Escape(".agents/skills/code-review/SKILL.md")) { throw "template/AGENTS.md missing code-review skill reference" }
 if ($agents -notmatch [regex]::Escape("docs/reference/codex-safety-harness.md")) { throw "template/AGENTS.md missing safety harness reference" }
 if ($agents -notmatch [regex]::Escape("docs/reference/codex-implementation-harness.md")) { throw "template/AGENTS.md missing implementation harness reference" }
+if ($agents -notmatch [regex]::Escape("Report file")) { throw "template/AGENTS.md missing report policy" }
+if ($agents -notmatch [regex]::Escape("command-based deletion")) { throw "template/AGENTS.md missing deletion policy" }
 if ($plans -notmatch [regex]::Escape(".agents/skills/feature-plan/SKILL.md")) { throw "template/PLANS.md missing feature-plan skill reference" }
 if ($plans -notmatch [regex]::Escape(".agents/skills/feature-plan/references/planning-workflow.md")) { throw "template/PLANS.md missing planning reference" }
 if ($plans -notmatch [regex]::Escape("docs/plans/TEMPLATE.md")) { throw "template/PLANS.md missing plan template reference" }
@@ -52,6 +59,8 @@ if ($plans -notmatch [regex]::Escape("Current understanding")) { throw "template
 if ($plans -notmatch [regex]::Escape("Non-goals")) { throw "template/PLANS.md missing Non-goals heading" }
 if ($plans -notmatch [regex]::Escape("Validation plan")) { throw "template/PLANS.md missing Validation plan heading" }
 if ($plans -notmatch [regex]::Escape("Open questions")) { throw "template/PLANS.md missing Open questions heading" }
+if ($plans -notmatch [regex]::Escape("Ambiguity handling")) { throw "template/PLANS.md missing ambiguity handling guidance" }
+if ($plans -notmatch [regex]::Escape("mandatory-question")) { throw "template/PLANS.md missing mandatory question guidance" }
 if ($review -notmatch [regex]::Escape(".agents/skills/code-review/SKILL.md")) { throw "template/CODE_REVIEW.md missing code-review skill reference" }
 if ($review -notmatch [regex]::Escape(".agents/skills/code-review/references/review-workflow.md")) { throw "template/CODE_REVIEW.md missing review reference" }
 if ($review -notmatch [regex]::Escape("findings-first")) { throw "template/CODE_REVIEW.md missing findings-first guidance" }
@@ -59,6 +68,7 @@ if ($review -notmatch [regex]::Escape("Why it matters")) { throw "template/CODE_
 if ($review -notmatch [regex]::Escape("Suggested fix")) { throw "template/CODE_REVIEW.md missing Suggested fix field" }
 if ($review -notmatch [regex]::Escape("Verdict")) { throw "template/CODE_REVIEW.md missing Verdict field" }
 if ($review -notmatch [regex]::Escape("confidence")) { throw "template/CODE_REVIEW.md missing confidence field" }
+if ($review -notmatch [regex]::Escape("review-only")) { throw "template/CODE_REVIEW.md missing report suppression policy" }
 $planningRef = Get-Content -Raw template/.agents/skills/feature-plan/references/planning-workflow.md
 $reviewRef = Get-Content -Raw template/.agents/skills/code-review/references/review-workflow.md
 if ($planningRef -notmatch [regex]::Escape("repo mapping")) { throw "planning workflow missing repo mapping phase" }
@@ -68,11 +78,20 @@ if ($planningRef -notmatch [regex]::Escape("Key abstractions")) { throw "plannin
 if ($planningRef -notmatch [regex]::Escape("Safe change surface")) { throw "planning workflow missing Safe change surface" }
 if ($planningRef -notmatch [regex]::Escape("Validation candidates")) { throw "planning workflow missing validation candidates" }
 if ($planningRef -notmatch [regex]::Escape("Failure modes")) { throw "planning workflow missing Failure modes" }
+if ($planningRef -notmatch [regex]::Escape("Ambiguity handling")) { throw "planning workflow missing ambiguity handling guidance" }
+if ($planningRef -notmatch [regex]::Escape("mandatory-question")) { throw "planning workflow missing mandatory question guidance" }
+if ($planningRef -notmatch [regex]::Escape("Report file generation policy")) { throw "planning workflow missing report file generation policy" }
 if ($reviewRef -notmatch [regex]::Escape("diff triage")) { throw "review workflow missing diff triage phase" }
 if ($reviewRef -notmatch [regex]::Escape("Diff classification")) { throw "review workflow missing Diff classification" }
 if ($reviewRef -notmatch [regex]::Escape("High-risk areas")) { throw "review workflow missing High-risk areas" }
 if ($reviewRef -notmatch [regex]::Escape("Potential missing tests")) { throw "review workflow missing Potential missing tests" }
 if ($reviewRef -notmatch [regex]::Escape("Open questions")) { throw "review workflow missing Open questions guidance" }
 if ($reviewRef -notmatch [regex]::Escape("Failure modes")) { throw "review workflow missing Failure modes" }
+if ($reviewRef -notmatch [regex]::Escape("Report file generation policy")) { throw "review workflow missing report file generation policy" }
+
+$config = Get-Content -Raw template/.codex/config.toml
+if ($config -notmatch [regex]::Escape('sandbox_mode = "workspace-write"')) { throw "config missing workspace-write sandbox" }
+if ($config -notmatch [regex]::Escape('approval_policy = "untrusted"')) { throw "config missing untrusted approval policy" }
+if ($config -notmatch [regex]::Escape('web_search = "cached"')) { throw "config missing cached web_search" }
 
 Write-Host "PASS: template layout smoke test"

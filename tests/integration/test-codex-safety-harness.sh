@@ -4,6 +4,12 @@ set -euo pipefail
 source_repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 repo_root="$source_repo_root/template"
 wrapper="$repo_root/scripts/codex-safe.sh"
+fake_codex="$source_repo_root/tests/fixtures/fake-codex.sh"
+export CODEX_BIN="$fake_codex"
+python_cmd="python3"
+if ! command -v python3 >/dev/null 2>&1; then
+  python_cmd="python"
+fi
 
 rule_args=(
   --rules "$repo_root/.codex/rules/10-readonly-allow.rules"
@@ -27,7 +33,7 @@ assert_decision() {
   local expected="$1"
   shift
   local output
-  output="$(codex execpolicy check "${rule_args[@]}" -- "$@")"
+  output="$("$CODEX_BIN" execpolicy check "${rule_args[@]}" -- "$@")"
   local actual
   actual="$(decision_from_json "$output")"
   if [[ "$actual" != "$expected" ]]; then
@@ -39,7 +45,7 @@ assert_decision() {
 assert_wrapper_blocked() {
   local out
   set +e
-  out="$($wrapper --print-command "$@" 2>&1)"
+  out="$($wrapper --no-log --print-command "$@" 2>&1)"
   local code=$?
   set -e
   if [[ $code -eq 0 ]]; then
@@ -52,8 +58,26 @@ assert_wrapper_blocked() {
   fi
 }
 
+assert_wrapper_failed() {
+  local expected="$1"
+  shift
+  local out
+  set +e
+  out="$($wrapper --no-log "$@" 2>&1)"
+  local code=$?
+  set -e
+  if [[ $code -eq 0 ]]; then
+    echo "Wrapper unexpectedly allowed args: $*" >&2
+    exit 1
+  fi
+  if [[ "$out" != *"$expected"* ]]; then
+    echo "Wrapper failed without expected message '$expected': $out" >&2
+    exit 1
+  fi
+}
+
 assert_wrapper_preview_ok() {
-  "$wrapper" --print-command "$@" >/tmp/codex-safe-preview.json
+  "$wrapper" --no-log --print-command "$@" >/tmp/codex-safe-preview.json
   rm -f /tmp/codex-safe-preview.json
 }
 
@@ -62,8 +86,11 @@ assert_decision prompt git add .
 assert_decision forbidden git reset --hard HEAD~1
 assert_decision prompt docker ps
 assert_decision forbidden terraform destroy -auto-approve
+assert_decision forbidden rm file.txt
+assert_decision forbidden Remove-Item file.txt
+assert_decision forbidden git rm file.txt
 
-"$wrapper" --preflight-only >/tmp/codex-safe-preflight.log
+"$wrapper" --no-log --preflight-only >/tmp/codex-safe-preflight.log
 rm -f /tmp/codex-safe-preflight.log
 
 assert_wrapper_preview_ok exec --help
@@ -78,6 +105,22 @@ assert_wrapper_blocked --search
 assert_wrapper_blocked -a never
 assert_wrapper_blocked -s danger-full-access
 assert_wrapper_preview_ok --allow-search exec --help
+
+run_id="20260420-010101-JST"
+"$wrapper" --run-id "$run_id" --print-command exec --help >/tmp/codex-safe-run-id-preview.json
+"$python_cmd" - "$run_id" /tmp/codex-safe-run-id-preview.json <<'PY'
+import json
+import sys
+run_id, path = sys.argv[1:3]
+with open(path, encoding="utf-8") as fh:
+    data = json.load(fh)
+if data.get("run_id") != run_id:
+    raise SystemExit("Missing run_id in preview output")
+if f".codex/runs/{run_id}/logs" not in data.get("log_path", "").replace("\\", "/"):
+    raise SystemExit(f"Run-id log path not under .codex/runs: {data.get('log_path')}")
+PY
+rm -f /tmp/codex-safe-run-id-preview.json
+assert_wrapper_failed "Invalid --run-id" --run-id "../escape" --print-command exec --help
 
 log_path="$(mktemp)"
 "$wrapper" --print-command --log-path "$log_path" exec --help >/tmp/codex-safe-log-preview.json

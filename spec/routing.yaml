@@ -7,7 +7,9 @@
       ".agents/skills/feature-plan/SKILL.md",
       ".agents/skills/code-review/SKILL.md",
       "docs/reference/codex-safety-harness.md",
-      "docs/reference/codex-implementation-harness.md"
+      "docs/reference/codex-implementation-harness.md",
+      "Report file",
+      "command-based deletion"
     ]
   },
   "planning": {
@@ -25,7 +27,9 @@
       "Change strategy",
       "Validation plan",
       "Risks",
-      "Open questions"
+      "Open questions",
+      "Ambiguity handling",
+      "mandatory-question"
     ]
   },
   "review": {
@@ -41,7 +45,9 @@
       "Suggested fix",
       "Open questions",
       "Verdict",
-      "confidence"
+      "confidence",
+      "review-only",
+      "report file"
     ]
   },
   "skills": [

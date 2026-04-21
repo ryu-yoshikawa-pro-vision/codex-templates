@@ -8,6 +8,7 @@ print_command=0
 allow_search=0
 no_log=0
 explicit_log_path=""
+run_id=""
 declare -a passthrough_args=()
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -24,6 +25,9 @@ json_escape() {
 
 default_log_path() {
   local logs_dir="$repo_root/.codex/logs"
+  if [[ -n "$run_id" ]]; then
+    logs_dir="$repo_root/.codex/runs/$run_id/logs"
+  fi
   mkdir -p "$logs_dir"
   printf '%s/codex-safe-%s.jsonl' "$logs_dir" "$(date +%Y%m%d)"
 }
@@ -97,6 +101,11 @@ parse_args() {
         explicit_log_path="$2"
         shift 2
         ;;
+      --run-id)
+        [[ $# -ge 2 ]] || { echo "--run-id requires a value" >&2; exit 1; }
+        run_id="$2"
+        shift 2
+        ;;
       --)
         shift
         passthrough_args+=("$@")
@@ -118,6 +127,14 @@ validate_preset() {
       exit 1
       ;;
   esac
+}
+
+validate_run_id() {
+  [[ -z "$run_id" ]] && return 0
+  if [[ ! "$run_id" =~ ^[0-9]{8}-[0-9]{6}-JST$ ]]; then
+    echo "Invalid --run-id: expected YYYYMMDD-HHMMSS-JST" >&2
+    exit 1
+  fi
 }
 
 append_command() {
@@ -249,11 +266,14 @@ run_preflight() {
   assert_decision forbidden git reset --hard HEAD~1
   assert_decision forbidden terraform destroy -auto-approve
   assert_decision prompt docker ps
-  assert_decision forbidden Remove-Item -Recurse tmp
+  assert_decision forbidden rm file.txt
+  assert_decision forbidden Remove-Item file.txt
+  assert_decision forbidden git rm file.txt
 }
 
 parse_args "$@"
 validate_preset
+validate_run_id
 
 if [[ -n "${CODEX_BIN:-}" ]]; then
   if [[ -x "$CODEX_BIN" || -f "$CODEX_BIN" ]]; then
@@ -269,7 +289,7 @@ fi
 log_path="$(resolved_log_path || true)"
 collect_rule_args
 
-write_log "$log_path" "wrapper_start" ",\"preset\":\"$(json_escape "$preset")\",\"allow_search\":$allow_search,\"skip_preflight\":$skip_preflight,\"preflight_only\":$preflight_only,\"print_command\":$print_command"
+write_log "$log_path" "wrapper_start" ",\"preset\":\"$(json_escape "$preset")\",\"run_id\":\"$(json_escape "$run_id")\",\"allow_search\":$allow_search,\"skip_preflight\":$skip_preflight,\"preflight_only\":$preflight_only,\"print_command\":$print_command"
 
 check_unsafe_passthrough "$log_path"
 
@@ -311,21 +331,23 @@ fi
 if (( print_command )); then
   write_log "$log_path" "print_command" ",\"cwd\":\"$(json_escape "$cwd")\""
   if command -v python3 >/dev/null 2>&1; then
-    python3 - "$codex_cmd" "$preset" "$log_path" "$cwd" "${final_args[@]}" <<'PY'
+    python3 - "$codex_cmd" "$preset" "$run_id" "$log_path" "$cwd" "${final_args[@]}" <<'PY'
 import json
 import sys
 
 codex = sys.argv[1]
 preset = sys.argv[2]
-log_path = sys.argv[3]
-cwd = sys.argv[4]
-args = sys.argv[5:]
+run_id = sys.argv[3]
+log_path = sys.argv[4]
+cwd = sys.argv[5]
+args = sys.argv[6:]
 
 print(json.dumps({
     "codex": codex,
     "args": args,
     "preflight": True,
     "preset": preset,
+    "run_id": run_id,
     "log_path": log_path,
     "cwd": cwd,
 }, ensure_ascii=False))

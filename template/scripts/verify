@@ -42,52 +42,80 @@ decision_from_json() {
   printf '%s' "$decision"
 }
 
+contains() {
+  local pattern="$1"
+  local path="$2"
+  if command -v rg >/dev/null 2>&1; then
+    rg -q "$pattern" "$path"
+  else
+    grep -Fq "$pattern" "$path"
+  fi
+}
+
 check_template_contract() {
   [[ -f AGENTS.md ]] || return 1
   [[ -f PLANS.md ]] || return 1
   [[ -f CODE_REVIEW.md ]] || return 1
+  [[ -f codex-project.toml ]] || return 1
+  [[ -f .codex/config.toml ]] || return 1
+  [[ -f .codex/requirements.toml ]] || return 1
   [[ -f .codex/templates/PLAN.md ]] || return 1
   [[ -f .codex/rules/10-readonly-allow.rules ]] || return 1
   [[ -f scripts/codex-task.ps1 ]] || return 1
   [[ -f scripts/codex-task.sh ]] || return 1
   [[ -f scripts/codex-sandbox.ps1 ]] || return 1
   [[ -f scripts/codex-sandbox.sh ]] || return 1
+  [[ -f scripts/init-project.ps1 ]] || return 1
+  [[ -f scripts/init-project.sh ]] || return 1
   [[ -f scripts/validate-output-schema.py ]] || return 1
   [[ -f .agents/skills/feature-plan/references/planning-workflow.md ]] || return 1
   [[ -f .agents/skills/code-review/references/review-workflow.md ]] || return 1
   [[ -f docs/reference/codex-safety-harness.md ]] || return 1
   [[ -f docs/reference/codex-implementation-harness.md ]] || return 1
-  rg -q ".agents/skills/feature-plan/SKILL.md" AGENTS.md || return 1
-  rg -q ".agents/skills/code-review/SKILL.md" AGENTS.md || return 1
-  rg -q "docs/reference/codex-safety-harness.md" AGENTS.md || return 1
-  rg -q "docs/reference/codex-implementation-harness.md" AGENTS.md || return 1
-  rg -q ".agents/skills/feature-plan/SKILL.md" PLANS.md || return 1
-  rg -q ".agents/skills/feature-plan/references/planning-workflow.md" PLANS.md || return 1
-  rg -q "docs/plans/TEMPLATE.md" PLANS.md || return 1
-  rg -q "Current understanding" PLANS.md || return 1
-  rg -q "Non-goals" PLANS.md || return 1
-  rg -q "Validation plan" PLANS.md || return 1
-  rg -q "Open questions" PLANS.md || return 1
-  rg -q ".agents/skills/code-review/SKILL.md" CODE_REVIEW.md || return 1
-  rg -q ".agents/skills/code-review/references/review-workflow.md" CODE_REVIEW.md || return 1
-  rg -q "findings-first" CODE_REVIEW.md || return 1
-  rg -q "Why it matters" CODE_REVIEW.md || return 1
-  rg -q "Suggested fix" CODE_REVIEW.md || return 1
-  rg -q "Verdict" CODE_REVIEW.md || return 1
-  rg -q "confidence" CODE_REVIEW.md || return 1
-  rg -q "repo mapping" .agents/skills/feature-plan/references/planning-workflow.md || return 1
-  rg -q "Do not use" .agents/skills/feature-plan/references/planning-workflow.md || return 1
-  rg -q "Main flow" .agents/skills/feature-plan/references/planning-workflow.md || return 1
-  rg -q "Key abstractions" .agents/skills/feature-plan/references/planning-workflow.md || return 1
-  rg -q "Safe change surface" .agents/skills/feature-plan/references/planning-workflow.md || return 1
-  rg -q "Validation candidates" .agents/skills/feature-plan/references/planning-workflow.md || return 1
-  rg -q "Failure modes" .agents/skills/feature-plan/references/planning-workflow.md || return 1
-  rg -q "diff triage" .agents/skills/code-review/references/review-workflow.md || return 1
-  rg -q "Diff classification" .agents/skills/code-review/references/review-workflow.md || return 1
-  rg -q "High-risk areas" .agents/skills/code-review/references/review-workflow.md || return 1
-  rg -q "Potential missing tests" .agents/skills/code-review/references/review-workflow.md || return 1
-  rg -q "Open questions" .agents/skills/code-review/references/review-workflow.md || return 1
-  rg -q "Failure modes" .agents/skills/code-review/references/review-workflow.md || return 1
+  contains ".agents/skills/feature-plan/SKILL.md" AGENTS.md || return 1
+  contains ".agents/skills/code-review/SKILL.md" AGENTS.md || return 1
+  contains "docs/reference/codex-safety-harness.md" AGENTS.md || return 1
+  contains "docs/reference/codex-implementation-harness.md" AGENTS.md || return 1
+  contains "Report file" AGENTS.md || return 1
+  contains "command-based deletion" AGENTS.md || return 1
+  contains ".agents/skills/feature-plan/SKILL.md" PLANS.md || return 1
+  contains ".agents/skills/feature-plan/references/planning-workflow.md" PLANS.md || return 1
+  contains "docs/plans/TEMPLATE.md" PLANS.md || return 1
+  contains "Current understanding" PLANS.md || return 1
+  contains "Non-goals" PLANS.md || return 1
+  contains "Validation plan" PLANS.md || return 1
+  contains "Open questions" PLANS.md || return 1
+  contains "Ambiguity handling" PLANS.md || return 1
+  contains "mandatory-question" PLANS.md || return 1
+  contains ".agents/skills/code-review/SKILL.md" CODE_REVIEW.md || return 1
+  contains ".agents/skills/code-review/references/review-workflow.md" CODE_REVIEW.md || return 1
+  contains "findings-first" CODE_REVIEW.md || return 1
+  contains "Why it matters" CODE_REVIEW.md || return 1
+  contains "Suggested fix" CODE_REVIEW.md || return 1
+  contains "Verdict" CODE_REVIEW.md || return 1
+  contains "confidence" CODE_REVIEW.md || return 1
+  contains "review-only" CODE_REVIEW.md || return 1
+  contains "repo mapping" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  contains "Do not use" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  contains "Main flow" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  contains "Key abstractions" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  contains "Safe change surface" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  contains "Validation candidates" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  contains "Failure modes" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  contains "Ambiguity handling" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  contains "mandatory-question" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  contains "Report file generation policy" .agents/skills/feature-plan/references/planning-workflow.md || return 1
+  contains "diff triage" .agents/skills/code-review/references/review-workflow.md || return 1
+  contains "Diff classification" .agents/skills/code-review/references/review-workflow.md || return 1
+  contains "High-risk areas" .agents/skills/code-review/references/review-workflow.md || return 1
+  contains "Potential missing tests" .agents/skills/code-review/references/review-workflow.md || return 1
+  contains "Open questions" .agents/skills/code-review/references/review-workflow.md || return 1
+  contains "Failure modes" .agents/skills/code-review/references/review-workflow.md || return 1
+  contains "Report file generation policy" .agents/skills/code-review/references/review-workflow.md || return 1
+  contains "sandbox_mode = \"workspace-write\"" .codex/config.toml || return 1
+  contains "approval_policy = \"untrusted\"" .codex/config.toml || return 1
+  contains "web_search = \"cached\"" .codex/config.toml || return 1
+  contains "network_access = false" .codex/config.toml || return 1
 }
 
 check_execpolicy_baseline() {
@@ -111,7 +139,19 @@ check_execpolicy_baseline() {
   decision="$(decision_from_json "$out")" || return 1
   [[ "$decision" == "forbidden" ]] || return 1
 
+  out="$(codex execpolicy check "${rule_args[@]}" -- rm file.txt)" || return 1
+  decision="$(decision_from_json "$out")" || return 1
+  [[ "$decision" == "forbidden" ]] || return 1
+
+  out="$(codex execpolicy check "${rule_args[@]}" -- git rm file.txt)" || return 1
+  decision="$(decision_from_json "$out")" || return 1
+  [[ "$decision" == "forbidden" ]] || return 1
+
   return 0
+}
+
+check_codex_available() {
+  command -v codex >/dev/null 2>&1 && codex --version >/dev/null 2>&1
 }
 
 check_bash_wrapper_preflight() {
@@ -128,16 +168,16 @@ check_powershell_wrapper_preflight() {
 
 run_check "template contract files" check_template_contract
 
-if ! command -v codex >/dev/null 2>&1; then
-  log_skip "execpolicy checks (codex command not found)"
+if ! check_codex_available; then
+  log_skip "execpolicy checks (codex command not executable)"
 else
   run_check "execpolicy baseline decisions" check_execpolicy_baseline
 fi
 
-if [[ -x scripts/codex-safe.sh ]]; then
+if [[ -f scripts/codex-safe.sh ]] && check_codex_available; then
   run_check "bash wrapper preflight" check_bash_wrapper_preflight
 else
-  log_skip "bash wrapper preflight (scripts/codex-safe.sh not found)"
+  log_skip "bash wrapper preflight (codex command not executable or wrapper not found)"
 fi
 
 if command -v powershell.exe >/dev/null 2>&1; then
