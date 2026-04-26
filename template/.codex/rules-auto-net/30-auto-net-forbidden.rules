@@ -1,0 +1,30 @@
+# auto-net keeps shell wrappers and remote script execution blocked until hook
+# behavior is validated for the installed Codex CLI version.
+
+prefix_rule(
+  pattern = [["bash", "sh"], ["-c", "-lc"]],
+  decision = "forbidden",
+  match = ["bash -lc npm test", "sh -c pwd"],
+)
+
+prefix_rule(
+  pattern = [["pwsh", "pwsh.exe", "powershell", "powershell.exe"], ["-Command", "-c"]],
+  decision = "forbidden",
+  match = ["pwsh -Command npm test", "powershell -Command Get-Date"],
+)
+
+prefix_rule(
+  pattern = ["cmd", ["/c", "/k"]],
+  decision = "forbidden",
+  match = ["cmd /c dir"],
+)
+
+prefix_rule(
+  pattern = [["pnpm", "yarn"], ["publish", "npm", "dlx", "create"]],
+  decision = "forbidden",
+  match = ["pnpm publish", "yarn npm publish", "pnpm dlx create-app"],
+)
+
+# Remote script piping such as `curl ... | bash` and `iwr ... | iex` is
+# enforced by `.codex/hooks/pre_tool_use_policy.py`; prefix rules cannot safely
+# express pipe-position checks.

@@ -315,9 +315,9 @@ default_verify_command() {
 
 run_preflight() {
   if [[ -n "$run_id" ]]; then
-    bash "$repo_root/scripts/codex-safe.sh" --run-id "$run_id" --preflight-only >/dev/null
+    bash "$repo_root/scripts/codex-safe.sh" --preset "$preset" --run-id "$run_id" --preflight-only >/dev/null
   else
-    bash "$repo_root/scripts/codex-safe.sh" --preflight-only >/dev/null
+    bash "$repo_root/scripts/codex-safe.sh" --preset "$preset" --preflight-only >/dev/null
   fi
 }
 
@@ -342,7 +342,7 @@ main() {
   write_log "wrapper_start" ",\"runtime\":\"$(json_escape "$runtime")\",\"preset\":\"$(json_escape "$preset")\",\"run_id\":\"$(json_escape "$run_id")\""
 
   case "$preset" in
-    safe|readonly) ;;
+    safe|readonly|auto-net) ;;
     *) fail_with_status "invalid_args" "Unsupported preset: $preset" ;;
   esac
 
@@ -385,8 +385,13 @@ main() {
   fi
 
   sandbox_mode="workspace-write"
+  approval_policy="never"
+  profile_name="repo_safe"
   if [[ "$preset" == "readonly" ]]; then
     sandbox_mode="read-only"
+    profile_name="repo_readonly"
+  elif [[ "$preset" == "auto-net" ]]; then
+    profile_name="repo_auto_net"
   fi
 
   if [[ -n "${CODEX_BIN:-}" ]]; then
@@ -405,7 +410,7 @@ main() {
   if [[ "$runtime" == "host" ]]; then
     cmd=()
     append_command cmd "$codex_bin"
-    cmd+=(--ask-for-approval never)
+    cmd+=(--profile "$profile_name" --ask-for-approval "$approval_policy")
     if (( allow_search )); then
       cmd+=(--search)
     fi
@@ -445,7 +450,7 @@ main() {
     if [[ -n "${OPENAI_API_KEY:-}" ]]; then
       docker_cmd+=(-e OPENAI_API_KEY)
     fi
-    docker_cmd+=("${CODEX_DOCKER_IMAGE}" codex --ask-for-approval never)
+    docker_cmd+=("${CODEX_DOCKER_IMAGE}" codex --profile "$profile_name" --ask-for-approval "$approval_policy")
     if (( allow_search )); then
       docker_cmd+=(--search)
     fi

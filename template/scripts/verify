@@ -56,11 +56,17 @@ check_template_contract() {
   [[ -f AGENTS.md ]] || return 1
   [[ -f PLANS.md ]] || return 1
   [[ -f CODE_REVIEW.md ]] || return 1
+  [[ -f MIGRATION.md ]] || return 1
   [[ -f codex-project.toml ]] || return 1
   [[ -f .codex/config.toml ]] || return 1
   [[ -f .codex/requirements.toml ]] || return 1
+  [[ -f .codex/hooks/pre_tool_use_policy.py ]] || return 1
+  [[ -f .codex/hooks/pre_tool_use_policy.ps1 ]] || return 1
   [[ -f .codex/templates/PLAN.md ]] || return 1
   [[ -f .codex/rules/10-readonly-allow.rules ]] || return 1
+  [[ -f .codex/rules-auto-net/10-auto-net-allow.rules ]] || return 1
+  [[ -f .codex/rules-auto-net/20-auto-net-risky-forbidden.rules ]] || return 1
+  [[ -f .codex/rules-auto-net/30-auto-net-forbidden.rules ]] || return 1
   [[ -f scripts/codex-task.ps1 ]] || return 1
   [[ -f scripts/codex-task.sh ]] || return 1
   [[ -f scripts/codex-sandbox.ps1 ]] || return 1
@@ -116,6 +122,10 @@ check_template_contract() {
   contains "approval_policy = \"untrusted\"" .codex/config.toml || return 1
   contains "web_search = \"cached\"" .codex/config.toml || return 1
   contains "network_access = false" .codex/config.toml || return 1
+  contains "[profiles.repo_auto_net]" .codex/config.toml || return 1
+  contains "network_access = true" .codex/config.toml || return 1
+  contains "codex_hooks = true" .codex/config.toml || return 1
+  contains "pre_tool_use_policy.ps1" .codex/config.toml || return 1
 }
 
 check_execpolicy_baseline() {
@@ -133,7 +143,7 @@ check_execpolicy_baseline() {
 
   out="$(codex execpolicy check "${rule_args[@]}" -- git add .)" || return 1
   decision="$(decision_from_json "$out")" || return 1
-  [[ "$decision" == "prompt" ]] || return 1
+  [[ "$decision" == "forbidden" ]] || return 1
 
   out="$(codex execpolicy check "${rule_args[@]}" -- git reset --hard HEAD~1)" || return 1
   decision="$(decision_from_json "$out")" || return 1

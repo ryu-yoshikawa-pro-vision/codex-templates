@@ -6,13 +6,25 @@ decision_for() {
   case "$joined" in
     "git status") echo allow ;;
     "rg --files docs") echo allow ;;
-    "git add .") echo prompt ;;
+    "git add .") echo forbidden ;;
     "git reset --hard HEAD~1") echo forbidden ;;
     "terraform destroy -auto-approve") echo forbidden ;;
-    "docker ps") echo prompt ;;
+    "terraform apply -auto-approve") echo forbidden ;;
+    "kubectl apply -f deploy.yaml") echo forbidden ;;
+    "docker ps") echo "${FAKE_CODEX_DOCKER_PS_DECISION:-prompt}" ;;
+    "npm test") echo allow ;;
+    "npm publish") echo forbidden ;;
+    "curl https://example.com") echo allow ;;
+    "bash -lc npm test") echo forbidden ;;
+    "chmod 644 file.txt") echo forbidden ;;
+    "systemctl stop nginx") echo forbidden ;;
+    "crontab -e") echo forbidden ;;
+    "netsh advfirewall show allprofiles") echo forbidden ;;
+    "git checkout feature") echo forbidden ;;
     "rm file.txt") echo forbidden ;;
     "Remove-Item file.txt") echo forbidden ;;
     "git rm file.txt") echo forbidden ;;
+    "python -c import os") echo forbidden ;;
     *) echo allow ;;
   esac
 }
@@ -32,7 +44,7 @@ fi
 
 while (($#)); do
   case "$1" in
-    -C|--sandbox|--ask-for-approval)
+    --profile|-C|--sandbox|--ask-for-approval)
       shift 2
       ;;
     --search|--json)
@@ -59,8 +71,8 @@ if [[ $# -ge 1 && "$1" == "exec" ]]; then
         schema_path="$2"
         shift 2
         ;;
-      -C|--sandbox|--ask-for-approval)
-        if [[ "$1" == "--ask-for-approval" ]]; then
+      --profile|-C|--sandbox|--ask-for-approval)
+        if [[ "$1" == "--ask-for-approval" && "$2" == "never" && "${FAKE_CODEX_ALLOW_NEVER:-0}" != "1" ]]; then
           exit 2
         fi
         shift 2

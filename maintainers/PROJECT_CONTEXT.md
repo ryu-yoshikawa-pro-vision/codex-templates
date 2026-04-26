@@ -12,8 +12,11 @@
 - consumer-facing template では `AGENTS.md` が常設 instruction surface、`.agents/skills/` が task-scoped workflow の正本、`.codex/` が config/runtime、`docs/reference/` が人間向け補助資料。
 - consumer-facing `scripts/` は `codex-safe`（手動対話）、`codex-task`（非対話実装）、`codex-sandbox`（Docker 実験）の 3 層ハーネスを持つ。
 - consumer-facing `.codex/config.toml` は `workspace-write` + `untrusted` + cached web search + workspace network disabled を標準 baseline とする。
+- consumer-facing `.codex/config.toml` は明示指定専用の `repo_auto_net` profile を持ち、wrapper の `--preset auto-net` でのみ approval never + workspace network enabled を使う。wrapper default は `safe` のまま維持する。
+- consumer-facing execpolicy は global rules を safe baseline とし、auto-net 専用 rules を `template/.codex/rules-auto-net/` に分離する。
 - consumer-facing wrapper は `--run-id` / `-RunId` を受け取り、run がある作業では `.codex/runs/<run_id>/artifacts|reports|logs` に出力を集約する。
 - command-based deletion は禁止する。`apply_patch` は差分単位で確認できる通常の編集手段として許可し、tracked runtime artifact の配布除外は明示された `git rm --cached -- <path>` の index-only migration に限定する。
+- auto-net でも削除、git add/commit/push/rm/reset/clean、remote script piping、外部 resource deletion は禁止する。PreToolUse hook は補助防御として扱い、唯一の安全境界にはしない。
 
 ## 運用の要点
 - 計画依頼または計画 handoff は `maintainers/plans/{yyyy-mm-dd}_{HHMMSS}_{plan_name}.md` に保存する。
@@ -49,3 +52,4 @@
 - runtime artifact の既定保存先は Git 追跡対象外。`template/.codex/artifacts/`, `template/.codex/reports/`, `template/.codex/logs/*.jsonl`, `template/.codex/runs/` は配布対象外にする。
 - source repo の historical documents は過去時点の path を含みうる。現在の正本は `spec/` と本ファイルで判断する。
 - template contract の検証は `spec/` と `template/scripts/verify*` / `tests/smoke/*` の両方で行う。
+- auto-net contract の検証は safe default、明示 preset、profile、rules-auto-net、削除禁止を合わせて確認する。

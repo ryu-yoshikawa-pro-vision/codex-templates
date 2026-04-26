@@ -11,9 +11,15 @@ $required = @(
     "template/AGENTS.md",
     "template/PLANS.md",
     "template/CODE_REVIEW.md",
+    "template/MIGRATION.md",
     "template/codex-project.toml",
     "template/.codex/config.toml",
     "template/.codex/requirements.toml",
+    "template/.codex/hooks/pre_tool_use_policy.py",
+    "template/.codex/hooks/pre_tool_use_policy.ps1",
+    "template/.codex/rules-auto-net/10-auto-net-allow.rules",
+    "template/.codex/rules-auto-net/20-auto-net-risky-forbidden.rules",
+    "template/.codex/rules-auto-net/30-auto-net-forbidden.rules",
     "template/docs/PROJECT_CONTEXT.md",
     "template/docs/plans/TEMPLATE.md",
     "template/docs/reports/README.md",
@@ -93,5 +99,9 @@ $config = Get-Content -Raw template/.codex/config.toml
 if ($config -notmatch [regex]::Escape('sandbox_mode = "workspace-write"')) { throw "config missing workspace-write sandbox" }
 if ($config -notmatch [regex]::Escape('approval_policy = "untrusted"')) { throw "config missing untrusted approval policy" }
 if ($config -notmatch [regex]::Escape('web_search = "cached"')) { throw "config missing cached web_search" }
+if ($config -notmatch [regex]::Escape('[profiles.repo_auto_net]')) { throw "config missing repo_auto_net profile" }
+if ($config -notmatch [regex]::Escape('network_access = true')) { throw "config missing auto-net network access" }
+if ($config -notmatch [regex]::Escape('codex_hooks = true')) { throw "config missing hook feature flag" }
+if ($config -notmatch [regex]::Escape('pre_tool_use_policy.ps1')) { throw "config missing pre-tool hook command" }
 
 Write-Host "PASS: template layout smoke test"

@@ -54,11 +54,17 @@ function Test-TemplateContract {
         "AGENTS.md",
         "PLANS.md",
         "CODE_REVIEW.md",
+        "MIGRATION.md",
         "codex-project.toml",
         ".codex/config.toml",
         ".codex/requirements.toml",
+        ".codex/hooks/pre_tool_use_policy.py",
+        ".codex/hooks/pre_tool_use_policy.ps1",
         ".codex/templates/PLAN.md",
         ".codex/rules/10-readonly-allow.rules",
+        ".codex/rules-auto-net/10-auto-net-allow.rules",
+        ".codex/rules-auto-net/20-auto-net-risky-forbidden.rules",
+        ".codex/rules-auto-net/30-auto-net-forbidden.rules",
         "scripts/codex-task.ps1",
         "scripts/codex-task.sh",
         "scripts/codex-sandbox.ps1",
@@ -128,6 +134,10 @@ function Test-TemplateContract {
     if ($config -notmatch [regex]::Escape('approval_policy = "untrusted"')) { throw "config missing untrusted approval policy" }
     if ($config -notmatch [regex]::Escape('web_search = "cached"')) { throw "config missing cached web_search" }
     if ($config -notmatch [regex]::Escape('network_access = false')) { throw "config missing disabled workspace-write network" }
+    if ($config -notmatch [regex]::Escape('[profiles.repo_auto_net]')) { throw "config missing repo_auto_net profile" }
+    if ($config -notmatch [regex]::Escape('network_access = true')) { throw "config missing auto-net network" }
+    if ($config -notmatch [regex]::Escape('codex_hooks = true')) { throw "config missing hook feature flag" }
+    if ($config -notmatch [regex]::Escape('pre_tool_use_policy.ps1')) { throw "config missing pre-tool hook command" }
 }
 
 function Test-ExecpolicyBaseline {
@@ -141,8 +151,8 @@ function Test-ExecpolicyBaseline {
     $allow = & $codex execpolicy check @ruleArgs -- git status 2>&1
     if ((Get-Decision ($allow | Out-String)) -ne 'allow') { throw "git status should be allow" }
 
-    $prompt = & $codex execpolicy check @ruleArgs -- git add . 2>&1
-    if ((Get-Decision ($prompt | Out-String)) -ne 'prompt') { throw "git add . should be prompt" }
+    $gitAdd = & $codex execpolicy check @ruleArgs -- git add . 2>&1
+    if ((Get-Decision ($gitAdd | Out-String)) -ne 'forbidden') { throw "git add . should be forbidden" }
 
     $forbidden = & $codex execpolicy check @ruleArgs -- git reset --hard HEAD~1 2>&1
     if ((Get-Decision ($forbidden | Out-String)) -ne 'forbidden') { throw "git reset should be forbidden" }

@@ -1,9 +1,9 @@
 # Broad prompts for mutating or high-impact commands.
 
 prefix_rule(
-  pattern = ["git", ["add", "commit", "push", "checkout", "switch", "merge", "rebase", "tag"]],
+  pattern = ["git", ["checkout", "switch", "merge", "rebase", "tag"]],
   decision = "prompt",
-  match = ["git add .", "git commit -m test", "git push origin main"],
+  match = ["git checkout feature", "git merge main"],
 )
 
 prefix_rule(

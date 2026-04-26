@@ -14,6 +14,18 @@ writable_roots = []
 [shell_environment_policy]
 inherit = "core"
 
+[features]
+codex_hooks = true
+
+[[hooks.PreToolUse]]
+matcher = "Bash|Shell|PowerShell|apply_patch|Edit|Write"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "pwsh -NoProfile -ExecutionPolicy Bypass -File .codex/hooks/pre_tool_use_policy.ps1"
+timeout = 30
+statusMessage = "Checking destructive command policy"
+
 [profiles.repo_safe]
 sandbox_mode = "workspace-write"
 approval_policy = "untrusted"
@@ -22,6 +34,16 @@ allow_login_shell = false
 
 [profiles.repo_safe.sandbox_workspace_write]
 network_access = false
+writable_roots = []
+
+[profiles.repo_auto_net]
+sandbox_mode = "workspace-write"
+approval_policy = "never"
+web_search = "cached"
+allow_login_shell = false
+
+[profiles.repo_auto_net.sandbox_workspace_write]
+network_access = true
 writable_roots = []
 
 [profiles.repo_readonly]

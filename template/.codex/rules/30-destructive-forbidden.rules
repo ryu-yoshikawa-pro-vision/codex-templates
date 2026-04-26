@@ -19,6 +19,30 @@ prefix_rule(
 )
 
 prefix_rule(
+  pattern = ["git", ["add", "commit", "push"]],
+  decision = "forbidden",
+  match = ["git add .", "git commit -m test", "git push origin main"],
+)
+
+prefix_rule(
+  pattern = ["npm", ["publish", "unpublish", "version"]],
+  decision = "forbidden",
+  match = ["npm publish", "npm unpublish package", "npm version patch"],
+)
+
+prefix_rule(
+  pattern = [["pip", "pip3"], ["uninstall"]],
+  decision = "forbidden",
+  match = ["pip uninstall package"],
+)
+
+prefix_rule(
+  pattern = [["python", "python3", "py"], ["-c", "-"]],
+  decision = "forbidden",
+  match = ["python -c 'import os'", "python -"],
+)
+
+prefix_rule(
   pattern = [["rm", "del", "erase", "Remove-Item", "rmdir", "unlink"]],
   decision = "forbidden",
   match = [
@@ -36,6 +60,12 @@ prefix_rule(
   decision = "forbidden",
   match = ["git rm file.txt"],
 )
+
+# Additional destructive patterns are covered by the PreToolUse hook because
+# prefix rules cannot safely express contains-style checks:
+# find ... -delete, rsync --delete, robocopy /MIR, mv -f,
+# Move-Item -Force, Rename-Item -Force.
+
 
 prefix_rule(
   pattern = [["dd", "mkfs", "fdisk", "parted", "diskpart", "format", "Format-Volume"]],
@@ -74,6 +104,12 @@ prefix_rule(
 )
 
 prefix_rule(
+  pattern = ["kubectl", "apply"],
+  decision = "forbidden",
+  match = ["kubectl apply -f deploy.yaml"],
+)
+
+prefix_rule(
   pattern = ["helm", "uninstall"],
   decision = "forbidden",
   match = ["helm uninstall app"],
@@ -83,6 +119,12 @@ prefix_rule(
   pattern = ["terraform", "destroy"],
   decision = "forbidden",
   match = ["terraform destroy -auto-approve"],
+)
+
+prefix_rule(
+  pattern = ["terraform", "apply"],
+  decision = "forbidden",
+  match = ["terraform apply -auto-approve"],
 )
 
 prefix_rule(

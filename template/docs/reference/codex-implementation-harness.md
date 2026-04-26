@@ -17,7 +17,7 @@
   - Docker image と認証が明示設定されている場合だけ使う experimental path。
 
 ## `codex-task` の主な引数
-- `--preset safe|readonly`
+- `--preset safe|readonly|auto-net`
 - `--runtime host|docker-sandbox`
 - `--prompt-file <path>` または末尾 prompt
 - `--output-file <path>`
@@ -66,6 +66,14 @@
   - `codex-task --run-id <run_id>`
 - 外部隔離環境を明示的に用意できる:
   - `codex-sandbox`
+
+## auto-net preset
+- `codex-safe` と `codex-task` の既定 preset は `safe` のままです。
+- network access つきで workspace 内の自律実装が必要なときだけ `--preset auto-net` を明示する。
+- `auto-net` は `repo_auto_net` profile、`workspace-write` sandbox、`approval_policy = "never"`、workspace network enabled を使う。
+- `codex-task` は非対話 harness なので、safe / readonly / auto-net のいずれでも Codex CLI には `--ask-for-approval never` を渡す。preset は profile、sandbox、preflight rules の選択に使う。
+- raw `--full-auto`、`danger-full-access`、`--dangerously-bypass-approvals-and-sandbox` は使わない。
+- `codex-task` の preflight は指定 preset を `codex-safe` に渡すため、safe と auto-net の期待値は分離される。
 
 ## 関連資料
 - `docs/reference/codex-safety-harness.md`

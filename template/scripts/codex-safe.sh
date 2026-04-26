@@ -121,7 +121,7 @@ parse_args() {
 
 validate_preset() {
   case "$preset" in
-    safe|readonly) ;;
+    safe|readonly|auto-net) ;;
     *)
       echo "Unsupported preset: $preset" >&2
       exit 1
@@ -213,10 +213,22 @@ check_unsafe_passthrough() {
 
 collect_rule_args() {
   local rules_dir="$repo_root/.codex/rules"
+  local auto_net_rules_dir="$repo_root/.codex/rules-auto-net"
   [[ -d "$rules_dir" ]] || { echo "Rules directory not found: $rules_dir" >&2; exit 1; }
 
-  mapfile -t rule_files < <(find "$rules_dir" -maxdepth 1 -type f -name '*.rules' | sort)
+  if [[ "$preset" == "auto-net" ]]; then
+    mapfile -t rule_files < <(find "$rules_dir" -maxdepth 1 -type f -name '*.rules' ! -name '20-risky-prompt.rules' | sort)
+  else
+    mapfile -t rule_files < <(find "$rules_dir" -maxdepth 1 -type f -name '*.rules' | sort)
+  fi
   ((${#rule_files[@]} > 0)) || { echo "No .rules files found in $rules_dir" >&2; exit 1; }
+
+  if [[ "$preset" == "auto-net" ]]; then
+    [[ -d "$auto_net_rules_dir" ]] || { echo "Rules directory not found: $auto_net_rules_dir" >&2; exit 1; }
+    mapfile -t auto_net_rule_files < <(find "$auto_net_rules_dir" -maxdepth 1 -type f -name '*.rules' | sort)
+    ((${#auto_net_rule_files[@]} > 0)) || { echo "No .rules files found in $auto_net_rules_dir" >&2; exit 1; }
+    rule_files+=("${auto_net_rule_files[@]}")
+  fi
 
   rule_args=()
   local rule
@@ -262,13 +274,51 @@ assert_decision() {
 run_preflight() {
   assert_decision allow git status
   assert_decision allow rg --files docs
-  assert_decision prompt git add .
+  assert_decision forbidden git add .
   assert_decision forbidden git reset --hard HEAD~1
   assert_decision forbidden terraform destroy -auto-approve
-  assert_decision prompt docker ps
+  if [[ "$preset" == "auto-net" ]]; then
+    assert_decision allow docker ps
+    assert_decision allow npm test
+    assert_decision allow curl https://example.com
+    assert_decision forbidden bash -lc "npm test"
+    assert_decision forbidden chmod 644 file.txt
+    assert_decision forbidden systemctl stop nginx
+    assert_decision forbidden crontab -e
+    assert_decision forbidden netsh advfirewall show allprofiles
+    assert_decision forbidden git checkout feature
+    assert_decision forbidden terraform apply -auto-approve
+    assert_decision forbidden kubectl apply -f deploy.yaml
+  else
+    assert_decision prompt docker ps
+  fi
   assert_decision forbidden rm file.txt
   assert_decision forbidden Remove-Item file.txt
   assert_decision forbidden git rm file.txt
+}
+
+preset_config() {
+  case "$preset" in
+    safe)
+      sandbox_mode="workspace-write"
+      approval_policy="untrusted"
+      profile_name="repo_safe"
+      ;;
+    readonly)
+      sandbox_mode="read-only"
+      approval_policy="untrusted"
+      profile_name="repo_readonly"
+      ;;
+    auto-net)
+      sandbox_mode="workspace-write"
+      approval_policy="never"
+      profile_name="repo_auto_net"
+      ;;
+    *)
+      echo "Unsupported preset: $preset" >&2
+      exit 1
+      ;;
+  esac
 }
 
 parse_args "$@"
@@ -315,12 +365,9 @@ if (( preflight_only )); then
   exit 0
 fi
 
-sandbox_mode="workspace-write"
-if [[ "$preset" == "readonly" ]]; then
-  sandbox_mode="read-only"
-fi
+preset_config
 
-final_args=(-C "$cwd" --sandbox "$sandbox_mode" --ask-for-approval untrusted)
+final_args=(--profile "$profile_name" -C "$cwd" --sandbox "$sandbox_mode" --ask-for-approval "$approval_policy")
 if (( allow_search )); then
   final_args+=(--search)
 fi
@@ -331,7 +378,7 @@ fi
 if (( print_command )); then
   write_log "$log_path" "print_command" ",\"cwd\":\"$(json_escape "$cwd")\""
   if command -v python3 >/dev/null 2>&1; then
-    python3 - "$codex_cmd" "$preset" "$run_id" "$log_path" "$cwd" "${final_args[@]}" <<'PY'
+    python3 - "$codex_cmd" "$preset" "$run_id" "$log_path" "$cwd" "$profile_name" "${final_args[@]}" <<'PY'
 import json
 import sys
 
@@ -340,13 +387,15 @@ preset = sys.argv[2]
 run_id = sys.argv[3]
 log_path = sys.argv[4]
 cwd = sys.argv[5]
-args = sys.argv[6:]
+profile = sys.argv[6]
+args = sys.argv[7:]
 
 print(json.dumps({
     "codex": codex,
     "args": args,
     "preflight": True,
     "preset": preset,
+    "profile": profile,
     "run_id": run_id,
     "log_path": log_path,
     "cwd": cwd,

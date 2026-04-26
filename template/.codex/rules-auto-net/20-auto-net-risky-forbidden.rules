@@ -1,0 +1,33 @@
+# auto-net must stay non-interactive, so prompt-class high-impact operations are
+# explicitly forbidden instead of falling through to allow when
+# `20-risky-prompt.rules` is excluded.
+
+prefix_rule(
+  pattern = [["chmod", "chown", "chgrp", "icacls", "takeown"]],
+  decision = "forbidden",
+  match = ["chmod 644 file.txt", "icacls C:\\Temp /grant Everyone:F"],
+)
+
+prefix_rule(
+  pattern = [["kill", "pkill", "taskkill", "Stop-Service", "Restart-Service", "systemctl", "service"]],
+  decision = "forbidden",
+  match = ["kill 1234", "systemctl stop nginx"],
+)
+
+prefix_rule(
+  pattern = [["crontab", "schtasks", "reg"]],
+  decision = "forbidden",
+  match = ["crontab -e", "reg add HKCU\\Software\\Example"],
+)
+
+prefix_rule(
+  pattern = [["iptables", "nft", "ufw", "netsh", "route", "ip"]],
+  decision = "forbidden",
+  match = ["iptables -L", "netsh advfirewall show allprofiles"],
+)
+
+prefix_rule(
+  pattern = ["git", ["checkout", "switch", "merge", "rebase", "tag"]],
+  decision = "forbidden",
+  match = ["git checkout feature", "git rebase main"],
+)

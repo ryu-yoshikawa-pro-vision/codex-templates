@@ -8,9 +8,15 @@ required=(
   template/AGENTS.md
   template/PLANS.md
   template/CODE_REVIEW.md
+  template/MIGRATION.md
   template/codex-project.toml
   template/.codex/config.toml
   template/.codex/requirements.toml
+  template/.codex/hooks/pre_tool_use_policy.py
+  template/.codex/hooks/pre_tool_use_policy.ps1
+  template/.codex/rules-auto-net/10-auto-net-allow.rules
+  template/.codex/rules-auto-net/20-auto-net-risky-forbidden.rules
+  template/.codex/rules-auto-net/30-auto-net-forbidden.rules
   template/docs/PROJECT_CONTEXT.md
   template/docs/plans/TEMPLATE.md
   template/docs/reports/README.md
@@ -94,5 +100,9 @@ contains "Report file generation policy" template/.agents/skills/code-review/ref
 contains "sandbox_mode = \"workspace-write\"" template/.codex/config.toml
 contains "approval_policy = \"untrusted\"" template/.codex/config.toml
 contains "web_search = \"cached\"" template/.codex/config.toml
+contains "[profiles.repo_auto_net]" template/.codex/config.toml
+contains "network_access = true" template/.codex/config.toml
+contains "codex_hooks = true" template/.codex/config.toml
+contains "pre_tool_use_policy.ps1" template/.codex/config.toml
 
 echo "PASS: template layout smoke test"

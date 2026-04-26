@@ -14,13 +14,30 @@ function Get-Decision {
     switch -Regex ($joined) {
         '^git status$' { return 'allow' }
         '^rg --files docs$' { return 'allow' }
-        '^git add \.$' { return 'prompt' }
+        '^git add \.$' { return 'forbidden' }
         '^git reset --hard HEAD~1$' { return 'forbidden' }
         '^terraform destroy -auto-approve$' { return 'forbidden' }
-        '^docker ps$' { return 'prompt' }
+        '^terraform apply -auto-approve$' { return 'forbidden' }
+        '^kubectl apply -f deploy.yaml$' { return 'forbidden' }
+        '^docker ps$' {
+            if (-not [string]::IsNullOrWhiteSpace($env:FAKE_CODEX_DOCKER_PS_DECISION)) {
+                return $env:FAKE_CODEX_DOCKER_PS_DECISION
+            }
+            return 'prompt'
+        }
+        '^npm test$' { return 'allow' }
+        '^npm publish$' { return 'forbidden' }
+        '^curl https://example.com$' { return 'allow' }
+        '^bash -lc npm test$' { return 'forbidden' }
+        '^chmod 644 file.txt$' { return 'forbidden' }
+        '^systemctl stop nginx$' { return 'forbidden' }
+        '^crontab -e$' { return 'forbidden' }
+        '^netsh advfirewall show allprofiles$' { return 'forbidden' }
+        '^git checkout feature$' { return 'forbidden' }
         '^rm file.txt$' { return 'forbidden' }
         '^Remove-Item file.txt$' { return 'forbidden' }
         '^git rm file.txt$' { return 'forbidden' }
+        '^python -c import os$' { return 'forbidden' }
         default { return 'allow' }
     }
 }
@@ -43,9 +60,13 @@ function Invoke-FakeExec {
                 $i++
                 $schemaPath = $ExecArgs[$i]
             }
+            '--profile' { $i++ }
             '-C' { $i++ }
             '--sandbox' { $i++ }
-            '--ask-for-approval' { exit 2 }
+            '--ask-for-approval' {
+                $i++
+                if ($ExecArgs[$i] -eq 'never' -and $env:FAKE_CODEX_ALLOW_NEVER -ne '1') { exit 2 }
+            }
             '--search' { exit 2 }
             '--json' { }
             '--definitely-invalid-flag' { exit 2 }
@@ -92,7 +113,7 @@ if ($Args.Count -ge 2 -and $Args[0] -eq 'execpolicy' -and $Args[1] -eq 'check') 
 $start = 0
 while ($start -lt $Args.Count) {
     $token = $Args[$start]
-    if ($token -in @('-C', '--sandbox', '--ask-for-approval')) {
+    if ($token -in @('--profile', '-C', '--sandbox', '--ask-for-approval')) {
         $start += 2
         continue
     }

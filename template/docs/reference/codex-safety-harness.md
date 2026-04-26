@@ -18,11 +18,15 @@
 - `.codex/rules/*.rules`
   - `execpolicy` ルール
   - 読み取り系の allow、広い prompt、破壊系の forbidden を定義
+- `.codex/rules-auto-net/*.rules`
+  - `--preset auto-net` 指定時だけ追加で読み込む execpolicy ルール
+  - network / package manager / build / test 系を allow に寄せ、shell wrapper 系は hook 検証後まで forbidden にする
 - `.codex/config.toml`
   - project-scoped default: `sandbox_mode = "workspace-write"`, `approval_policy = "untrusted"`, `web_search = "cached"`
   - workspace-write sandbox は `network_access = false`, `writable_roots = []`
   - login shell は `allow_login_shell = false`
-  - project profile: `repo_safe`, `repo_readonly`
+  - project profile: `repo_safe`, `repo_auto_net`, `repo_readonly`
+  - PreToolUse hook: `.codex/hooks/pre_tool_use_policy.ps1`
 - `.codex/requirements.toml`
   - 管理配布/機能有効化時に使う補助的な最小要件定義
 - `scripts/verify`
@@ -52,6 +56,12 @@ read-only preset:
 powershell -ExecutionPolicy Bypass -File scripts/codex-safe.ps1 -Preset readonly
 ```
 
+auto-net preset:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/codex-safe.ps1 -Preset auto-net
+```
+
 preflight のみ:
 
 ```powershell
@@ -64,6 +74,14 @@ bash から実行:
 bash scripts/codex-safe.sh
 ```
 
+auto-net preset:
+
+```bash
+bash scripts/codex-safe.sh --preset auto-net
+```
+
+`auto-net` は明示指定時だけ有効です。wrapper default は `safe` のままです。
+
 ## 何をブロックするか（例）
 - `--dangerously-bypass-approvals-and-sandbox`
 - `-c` / `--config`
@@ -73,12 +91,20 @@ bash scripts/codex-safe.sh
 - `-a` / `--ask-for-approval`
 - `-p` / `--profile`
 - `--enable` / `--disable`
+- raw `--full-auto`
 
 ## 削除禁止
 - プロジェクト配下の読み取りとファイル作成・編集は、通常の作業では承認なしで行ってよい。
 - shell / PowerShell / git command による削除は禁止する。対象例は `rm`, `del`, `erase`, `Remove-Item`, `rmdir`, `unlink`, 通常の `git rm`。
-- 意図した差分としての `apply_patch` は許可する。削除を含む場合も diff 単位で確認できるため、command deletion とは別扱いにする。
+- `auto-net` では `git add`, `git commit`, `git push`, `git rm`, `git reset`, `git clean` も forbidden にする。
+- `auto-net` では delete / rename を含む patch operation も禁止する。不要に見えるファイルは削除候補として `REPORT.md` に記録する。
 - 追跡済み runtime artifact を配布対象から外す migration では、明示された対象に限って `git rm --cached -- <path>` を使ってよい。物理ファイルは削除しない。
+
+## Hook guard
+- `.codex/hooks/pre_tool_use_policy.ps1` は destructive command、remote script piping、delete / rename patch を補助的に検出する。
+- `.codex/hooks/pre_tool_use_policy.py` は Python が標準化された環境向けの同等 hook 実装として残す。
+- `.codex/config.toml` は PreToolUse hook を `pwsh` 経由で有効化する。`pwsh` がない環境や hooks 非対応の Codex CLI では hook が実行されない可能性があるため、execpolicy rules と shell wrapper 禁止を併用する。
+- Phase 1 では shell wrapper 系の `bash -lc`, `sh -c`, `pwsh -Command`, `cmd /c` は auto-net rules 側で forbidden 寄りに扱う。
 
 ## Report file generation policy
 - `docs/reports/` は durable な調査・監査・検証結果の置き場であり、通常のレビュー返答、進捗報告、軽い確認結果、run 内ログの既定保存先ではない。

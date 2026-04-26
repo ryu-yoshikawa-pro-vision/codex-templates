@@ -24,3 +24,11 @@
 - New tasks:
 - Remaining:
 - Progress: NN% (done/total)
+
+## Deletion candidates
+- Codex はファイルやディレクトリを削除しない。
+- 不要に見えるファイルは、ユーザーが手動確認できるようにここへ記録する。
+
+| Path | Reason | Suggested action |
+|---|---|---|
+|  |  |  |

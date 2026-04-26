@@ -1,5 +1,31 @@
 [CmdletBinding(PositionalBinding = $false)]
 param(
+    [ValidateSet("safe", "readonly", "auto-net")]
+    [string]$Preset,
+
+    [ValidateSet("host", "docker-sandbox")]
+    [string]$Runtime,
+
+    [string]$PromptFile,
+
+    [string]$OutputFile,
+
+    [string]$OutputSchema,
+
+    [string]$ReportPath,
+
+    [string]$VerifyCommand,
+
+    [switch]$AllowSearch,
+
+    [switch]$SkipPreflight,
+
+    [switch]$SkipVerify,
+
+    [string]$LogPath,
+
+    [string]$RunId,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$Arguments
 )
@@ -319,6 +345,26 @@ $report = [ordered]@{
     status = "pending"
 }
 
+$normalizedArguments = New-Object System.Collections.Generic.List[string]
+if ($PSBoundParameters.ContainsKey('Preset')) { $normalizedArguments.Add('--preset'); $normalizedArguments.Add($Preset) }
+if ($PSBoundParameters.ContainsKey('Runtime')) { $normalizedArguments.Add('--runtime'); $normalizedArguments.Add($Runtime) }
+if ($PSBoundParameters.ContainsKey('PromptFile')) { $normalizedArguments.Add('--prompt-file'); $normalizedArguments.Add($PromptFile) }
+if ($PSBoundParameters.ContainsKey('OutputFile')) { $normalizedArguments.Add('--output-file'); $normalizedArguments.Add($OutputFile) }
+if ($PSBoundParameters.ContainsKey('OutputSchema')) { $normalizedArguments.Add('--output-schema'); $normalizedArguments.Add($OutputSchema) }
+if ($PSBoundParameters.ContainsKey('ReportPath')) { $normalizedArguments.Add('--report-path'); $normalizedArguments.Add($ReportPath) }
+if ($PSBoundParameters.ContainsKey('VerifyCommand')) { $normalizedArguments.Add('--verify-command'); $normalizedArguments.Add($VerifyCommand) }
+if ($AllowSearch) { $normalizedArguments.Add('--allow-search') }
+if ($SkipPreflight) { $normalizedArguments.Add('--skip-preflight') }
+if ($SkipVerify) { $normalizedArguments.Add('--skip-verify') }
+if ($PSBoundParameters.ContainsKey('LogPath')) { $normalizedArguments.Add('--log-path'); $normalizedArguments.Add($LogPath) }
+if ($PSBoundParameters.ContainsKey('RunId')) { $normalizedArguments.Add('--run-id'); $normalizedArguments.Add($RunId) }
+if ($Arguments) {
+    foreach ($arg in $Arguments) {
+        $normalizedArguments.Add($arg)
+    }
+}
+$Arguments = $normalizedArguments.ToArray()
+
 $positionals = New-Object System.Collections.Generic.List[string]
 $i = 0
 while ($i -lt $Arguments.Count) {
@@ -430,7 +476,7 @@ if (-not (Test-Path $logParent)) {
 }
 Write-TaskLog -Path $state.log_path -Event "wrapper_start" -Data @{ runtime = $state.runtime; preset = $state.preset; run_id = $state.run_id }
 
-if ($state.preset -notin @("safe", "readonly")) {
+if ($state.preset -notin @("safe", "readonly", "auto-net")) {
     Fail-Task -Status "invalid_args" -Message "Unsupported preset: $($state.preset)" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
 }
 
@@ -474,7 +520,7 @@ $report.cwd = $cwd
 if (-not $state.skip_preflight) {
     Write-TaskLog -Path $state.log_path -Event "preflight_start" -Data @{}
     try {
-        $preflightArgs = @("-ExecutionPolicy", "Bypass", "-File", (Join-Path $repoRoot "scripts\\codex-safe.ps1"), "-PreflightOnly")
+        $preflightArgs = @("-ExecutionPolicy", "Bypass", "-File", (Join-Path $repoRoot "scripts\\codex-safe.ps1"), "-Preset", $state.preset, "-PreflightOnly")
         if (-not [string]::IsNullOrWhiteSpace($state.run_id)) {
             $preflightArgs += @("-RunId", $state.run_id)
         }
@@ -487,13 +533,19 @@ if (-not $state.skip_preflight) {
 }
 
 $sandboxMode = if ($state.preset -eq "readonly") { "read-only" } else { "workspace-write" }
+$approvalPolicy = "never"
+$profileName = switch ($state.preset) {
+    "readonly" { "repo_readonly" }
+    "auto-net" { "repo_auto_net" }
+    default { "repo_safe" }
+}
 $codexCmd = try { Get-CodexCommand } catch { $null }
 if (-not $codexCmd) {
     Fail-Task -Status "codex_missing" -Message "codex command not found in PATH" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
 }
 
 Write-TaskLog -Path $state.log_path -Event "codex_exec_start" -Data @{ runtime = $state.runtime; output_file = $state.output_file }
-$codexArgs = @("--ask-for-approval", "never")
+$codexArgs = @("--profile", $profileName, "--ask-for-approval", $approvalPolicy)
 if ($state.allow_search) {
     $codexArgs += "--search"
 }
@@ -556,7 +608,7 @@ else {
         $dockerArgs += @("-e", "OPENAI_API_KEY")
     }
 
-    $containerArgs = @("codex", "--ask-for-approval", "never")
+    $containerArgs = @("codex", "--profile", $profileName, "--ask-for-approval", $approvalPolicy)
     if ($state.allow_search) {
         $containerArgs += "--search"
     }

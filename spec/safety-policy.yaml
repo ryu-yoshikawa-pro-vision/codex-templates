@@ -1,5 +1,6 @@
 {
   "rules_dir": "template/.codex/rules",
+  "auto_net_rules_dir": "template/.codex/rules-auto-net",
   "wrappers": [
     "template/scripts/codex-safe.ps1",
     "template/scripts/codex-safe.sh",
@@ -22,9 +23,35 @@
       "allow_login_shell = false",
       "[shell_environment_policy]",
       "inherit = \"core\"",
+      "[features]",
+      "codex_hooks = true",
+      "[[hooks.PreToolUse]]",
+      "pre_tool_use_policy.ps1",
       "[profiles.repo_safe]",
+      "[profiles.repo_auto_net]",
+      "approval_policy = \"never\"",
+      "network_access = true",
       "[profiles.repo_readonly]"
     ]
+  },
+  "execution_modes": {
+    "project_top_level_default": "safe",
+    "managed_auto_net_preset": "auto-net",
+    "interactive_default_preset": "safe",
+    "task_default_preset": "safe",
+    "auto_net": {
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "network_access": true,
+      "danger_full_access_allowed": false,
+      "dangerous_bypass_allowed": false,
+      "delete_operations_allowed": false,
+      "raw_full_auto_argument_allowed": false,
+      "git_add_allowed": false,
+      "git_commit_allowed": false,
+      "git_push_allowed": false,
+      "shell_wrappers_allow_phase": "after_hook_validation_only"
+    }
   },
   "requirements": {
     "file": "template/.codex/requirements.toml",
@@ -40,10 +67,24 @@
     "Remove-Item",
     "rmdir",
     "unlink",
-    "git rm"
+    "git add",
+    "git commit",
+    "git push",
+    "git rm",
+    "git reset --hard",
+    "git clean -fdx",
+    "terraform apply",
+    "terraform destroy",
+    "kubectl apply",
+    "kubectl delete",
+    "aws s3 rm",
+    "npm publish",
+    "pip uninstall",
+    "python -c"
   ],
   "blocked_tokens": [
     "--dangerously-bypass-approvals-and-sandbox",
+    "--full-auto",
     "--add-dir",
     "--config",
     "--sandbox",

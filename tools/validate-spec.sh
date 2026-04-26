@@ -66,6 +66,8 @@ for rel in safety.get("delegating_wrappers", []):
     assert_exists(rel)
 
 assert_exists(safety["rules_dir"])
+if "auto_net_rules_dir" in safety:
+    assert_exists(safety["auto_net_rules_dir"])
 assert_exists(safety["verify"])
 assert_contains(
     "template/docs/reference/naming-conventions.md",

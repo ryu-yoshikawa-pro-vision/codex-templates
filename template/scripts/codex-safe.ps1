@@ -1,6 +1,6 @@
 [CmdletBinding(PositionalBinding = $false)]
 param(
-    [ValidateSet("safe", "readonly")]
+    [ValidateSet("safe", "readonly", "auto-net")]
     [string]$Preset = "safe",
 
     [switch]$SkipPreflight,
@@ -219,14 +219,31 @@ function Test-UserArguments {
 }
 
 function Get-RuleFiles {
-    param([string]$RepoRoot)
+    param(
+        [string]$RepoRoot,
+        [string]$PresetName
+    )
     $rulesDir = Join-Path $RepoRoot ".codex\\rules"
     if (-not (Test-Path $rulesDir)) {
         throw "Rules directory not found: $rulesDir"
     }
     $files = Get-ChildItem -Path $rulesDir -Filter *.rules | Sort-Object Name
+    if ($PresetName -eq 'auto-net') {
+        $files = @($files | Where-Object { $_.Name -ne '20-risky-prompt.rules' })
+    }
     if (-not $files) {
         throw "No .rules files found in $rulesDir"
+    }
+    if ($PresetName -eq 'auto-net') {
+        $autoNetRulesDir = Join-Path $RepoRoot ".codex\\rules-auto-net"
+        if (-not (Test-Path $autoNetRulesDir)) {
+            throw "Rules directory not found: $autoNetRulesDir"
+        }
+        $autoNetFiles = Get-ChildItem -Path $autoNetRulesDir -Filter *.rules | Sort-Object Name
+        if (-not $autoNetFiles) {
+            throw "No .rules files found in $autoNetRulesDir"
+        }
+        $files = @($files) + @($autoNetFiles)
     }
     return $files
 }
@@ -258,20 +275,40 @@ function Invoke-ExecpolicyCheck {
 function Invoke-Preflight {
     param(
         [string]$CodexExe,
-        [System.IO.FileInfo[]]$RuleFiles
+        [System.IO.FileInfo[]]$RuleFiles,
+        [string]$PresetName
     )
 
-    $tests = @(
+    $tests = [System.Collections.Generic.List[object]]::new()
+    @(
         @{ Tokens = @('git', 'status'); Decisions = @('allow') },
         @{ Tokens = @('rg', '--files', 'docs'); Decisions = @('allow') },
-        @{ Tokens = @('git', 'add', '.'); Decisions = @('prompt') },
+        @{ Tokens = @('git', 'add', '.'); Decisions = @('forbidden') },
         @{ Tokens = @('git', 'reset', '--hard', 'HEAD~1'); Decisions = @('forbidden') },
         @{ Tokens = @('terraform', 'destroy', '-auto-approve'); Decisions = @('forbidden') },
-        @{ Tokens = @('docker', 'ps'); Decisions = @('prompt') },
         @{ Tokens = @('rm', 'file.txt'); Decisions = @('forbidden') },
         @{ Tokens = @('Remove-Item', 'file.txt'); Decisions = @('forbidden') },
         @{ Tokens = @('git', 'rm', 'file.txt'); Decisions = @('forbidden') }
-    )
+    ) | ForEach-Object { $tests.Add($_) }
+
+    if ($PresetName -eq 'auto-net') {
+        @(
+            @{ Tokens = @('docker', 'ps'); Decisions = @('allow') },
+            @{ Tokens = @('npm', 'test'); Decisions = @('allow') },
+            @{ Tokens = @('curl', 'https://example.com'); Decisions = @('allow') },
+            @{ Tokens = @('bash', '-lc', 'npm test'); Decisions = @('forbidden') },
+            @{ Tokens = @('chmod', '644', 'file.txt'); Decisions = @('forbidden') },
+            @{ Tokens = @('systemctl', 'stop', 'nginx'); Decisions = @('forbidden') },
+            @{ Tokens = @('crontab', '-e'); Decisions = @('forbidden') },
+            @{ Tokens = @('netsh', 'advfirewall', 'show', 'allprofiles'); Decisions = @('forbidden') },
+            @{ Tokens = @('git', 'checkout', 'feature'); Decisions = @('forbidden') },
+            @{ Tokens = @('terraform', 'apply', '-auto-approve'); Decisions = @('forbidden') },
+            @{ Tokens = @('kubectl', 'apply', '-f', 'deploy.yaml'); Decisions = @('forbidden') }
+        ) | ForEach-Object { $tests.Add($_) }
+    }
+    else {
+        $tests.Add(@{ Tokens = @('docker', 'ps'); Decisions = @('prompt') })
+    }
 
     foreach ($test in $tests) {
         $result = Invoke-ExecpolicyCheck -CodexExe $CodexExe -RuleFiles $RuleFiles -CommandTokens $test.Tokens
@@ -298,6 +335,13 @@ function Get-PresetConfig {
                 Profile  = 'repo_readonly'
             }
         }
+        'auto-net' {
+            return @{
+                Sandbox = 'workspace-write'
+                Approval = 'never'
+                Profile  = 'repo_auto_net'
+            }
+        }
         default {
             throw "Unsupported preset: $PresetName"
         }
@@ -318,8 +362,8 @@ $codexCmd = if (-not [string]::IsNullOrWhiteSpace($env:CODEX_BIN)) {
 else {
     (Get-Command codex -ErrorAction Stop).Source
 }
-$rules = Get-RuleFiles -RepoRoot $repoRoot
 $presetConfig = Get-PresetConfig -PresetName $Preset
+$rules = Get-RuleFiles -RepoRoot $repoRoot -PresetName $Preset
 $resolvedLogPath = Get-LogPathResolved -RepoRoot $repoRoot -DisableLogging:$NoLog.IsPresent -ExplicitPath $LogPath -RunId $RunId
 
 Write-HarnessLog -Path $resolvedLogPath -Event 'wrapper_start' -Data @{
@@ -353,7 +397,7 @@ if (-not (Test-IsPathUnderRoot -Path $cwd -Root $repoRoot)) {
 if (-not $SkipPreflight) {
     Write-HarnessLog -Path $resolvedLogPath -Event 'preflight_start' -Data @{}
     try {
-        Invoke-Preflight -CodexExe $codexCmd -RuleFiles $rules
+        Invoke-Preflight -CodexExe $codexCmd -RuleFiles $rules -PresetName $Preset
         Write-HarnessLog -Path $resolvedLogPath -Event 'preflight_ok' -Data @{}
     }
     catch {
@@ -373,6 +417,7 @@ if ($PreflightOnly) {
 }
 
 $finalArgs = @(
+    '--profile', $presetConfig.Profile,
     '-C', $cwd,
     '--sandbox', $presetConfig.Sandbox,
     '--ask-for-approval', $presetConfig.Approval
@@ -398,8 +443,8 @@ if ($PrintCommand) {
         rules = ($rules | ForEach-Object { $_.Name })
         preflight = (-not $SkipPreflight.IsPresent)
         preset = $Preset
+        profile = $presetConfig.Profile
         run_id = $RunId
-        profile_hint = $presetConfig.Profile
         log_path = $resolvedLogPath
     } | ConvertTo-Json -Depth 4
     exit 0

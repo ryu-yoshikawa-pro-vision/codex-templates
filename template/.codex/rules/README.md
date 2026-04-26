@@ -5,8 +5,9 @@ This directory stores repository-local Codex execpolicy rule files (`*.rules`).
 ## Files
 
 - `10-readonly-allow.rules`: common read-only commands that can run without prompts
-- `20-risky-prompt.rules`: broad prompt rules for mutating/high-impact command families
+- `20-risky-prompt.rules`: broad prompt rules for mutating/high-impact command families in safe modes
 - `30-destructive-forbidden.rules`: explicitly forbidden destructive prefixes
+- `../rules-auto-net/*.rules`: additional rules loaded only by wrapper `--preset auto-net`
 
 ## Validation
 

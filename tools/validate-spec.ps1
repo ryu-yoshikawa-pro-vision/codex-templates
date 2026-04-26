@@ -68,6 +68,9 @@ foreach ($wrapperPath in $safety.delegating_wrappers) {
 }
 
 Assert-Exists -RelativePath $safety.rules_dir
+if ($safety.PSObject.Properties.Name -contains "auto_net_rules_dir") {
+    Assert-Exists -RelativePath $safety.auto_net_rules_dir
+}
 Assert-Exists -RelativePath $safety.verify
 
 Assert-Contains -RelativePath "template/docs/reference/naming-conventions.md" -Patterns @(

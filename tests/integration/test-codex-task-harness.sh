@@ -53,6 +53,16 @@ assert_status "$temp_root/ok.report.json" ok
 bash "$wrapper" --preset readonly --output-file "$temp_root/readonly.json" --report-path "$temp_root/readonly.report.json" --log-path "$temp_root/readonly.jsonl" --skip-verify "READONLY_OK"
 assert_status "$temp_root/readonly.report.json" verify_skipped
 
+FAKE_CODEX_DOCKER_PS_DECISION=allow FAKE_CODEX_ALLOW_NEVER=1 bash "$wrapper" --preset auto-net --output-file "$temp_root/auto-net.json" --report-path "$temp_root/auto-net.report.json" --log-path "$temp_root/auto-net.jsonl" --skip-verify "AUTO_NET_OK"
+assert_status "$temp_root/auto-net.report.json" verify_skipped
+"$python_cmd" - "$temp_root/auto-net.report.json" <<'PY'
+import json
+import sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+if data["preset"] != "auto-net":
+    raise SystemExit(f"expected auto-net preset, got {data['preset']}")
+PY
+
 run_id="20260420-020201-JST"
 bash "$wrapper" --run-id "$run_id" --skip-verify "RUN_ID_OK"
 run_report="$(find "$template_root/.codex/runs/$run_id/reports" -type f -name 'codex-task-*.report.json' | sort | tail -n 1)"

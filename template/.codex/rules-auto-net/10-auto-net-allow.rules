@@ -1,0 +1,97 @@
+# auto-net-only rules. These are loaded only when --preset auto-net is selected.
+
+prefix_rule(
+  pattern = [["git"], ["status", "diff", "log", "ls-files", "branch"]],
+  decision = "allow",
+  match = ["git status", "git diff", "git log", "git ls-files", "git branch --show-current"],
+)
+
+prefix_rule(
+  pattern = [["rg", "grep", "findstr"]],
+  decision = "allow",
+  match = ["rg --files", "grep -R pattern .", "findstr /s pattern *.md"],
+)
+
+prefix_rule(
+  pattern = ["npm", ["ci", "install", "test"]],
+  decision = "allow",
+  match = ["npm ci --ignore-scripts", "npm install --ignore-scripts", "npm test"],
+)
+
+prefix_rule(
+  pattern = ["npm", "run", ["build", "test", "lint", "typecheck"]],
+  decision = "allow",
+  match = ["npm run build", "npm run lint", "npm run typecheck"],
+)
+
+prefix_rule(
+  pattern = ["pnpm", ["install", "test"]],
+  decision = "allow",
+  match = ["pnpm install --ignore-scripts", "pnpm test"],
+)
+
+prefix_rule(
+  pattern = ["pnpm", "run", ["build", "test", "lint", "typecheck"]],
+  decision = "allow",
+  match = ["pnpm run build", "pnpm run lint"],
+)
+
+prefix_rule(
+  pattern = ["yarn", ["install", "test"]],
+  decision = "allow",
+  match = ["yarn install --ignore-scripts", "yarn test"],
+)
+
+prefix_rule(
+  pattern = ["yarn", ["build", "lint", "typecheck"]],
+  decision = "allow",
+  match = ["yarn build", "yarn lint"],
+)
+
+prefix_rule(
+  pattern = [["pip", "pip3"], "install"],
+  decision = "allow",
+  match = ["pip install -r requirements.txt", "pip3 install pytest"],
+)
+
+prefix_rule(
+  pattern = [["python", "python3", "py"], "-m", ["pytest", "pip"]],
+  decision = "allow",
+  match = ["python -m pytest", "python -m pip install -r requirements.txt"],
+)
+
+prefix_rule(
+  pattern = ["pytest"],
+  decision = "allow",
+  match = ["pytest"],
+)
+
+prefix_rule(
+  pattern = [["curl", "wget", "Invoke-WebRequest", "iwr", "Invoke-RestMethod", "irm"]],
+  decision = "allow",
+  match = ["curl https://example.com", "wget https://example.com/file.txt"],
+)
+
+prefix_rule(
+  pattern = ["docker", ["ps", "build"]],
+  decision = "allow",
+  match = ["docker ps", "docker build ."],
+)
+
+prefix_rule(
+  pattern = ["terraform", "plan"],
+  decision = "allow",
+  match = ["terraform plan"],
+)
+
+prefix_rule(
+  pattern = ["kubectl", "get"],
+  decision = "allow",
+  match = ["kubectl get pods"],
+)
+
+prefix_rule(
+  pattern = ["aws", "s3", "ls"],
+  decision = "allow",
+  match = ["aws s3 ls"],
+)

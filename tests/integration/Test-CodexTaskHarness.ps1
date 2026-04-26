@@ -152,6 +152,39 @@ try {
     if ($readonly.ExitCode -ne 0) { throw "Readonly case failed unexpectedly: $($readonly.Combined)" }
     Assert-ReportStatus -Path $readonlyReport -ExpectedStatus 'verify_skipped' | Out-Null
 
+    $autoNetOut = Join-Path $tempRoot "auto-net.json"
+    $autoNetReport = Join-Path $tempRoot "auto-net.report.json"
+    $autoNetEnv = @{
+        CODEX_BIN = $fakeCodex
+        FAKE_CODEX_DOCKER_PS_DECISION = 'allow'
+        FAKE_CODEX_ALLOW_NEVER = '1'
+    }
+    $autoNet = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--preset', 'auto-net',
+        '--output-file', $autoNetOut,
+        '--report-path', $autoNetReport,
+        '--log-path', (Join-Path $tempRoot "auto-net.jsonl"),
+        '--skip-verify',
+        'AUTO_NET_OK'
+    ) -ExtraEnv $autoNetEnv
+    if ($autoNet.ExitCode -ne 0) { throw "auto-net case failed unexpectedly: $($autoNet.Combined)" }
+    $autoNetJson = Assert-ReportStatus -Path $autoNetReport -ExpectedStatus 'verify_skipped'
+    if ($autoNetJson.preset -ne 'auto-net') { throw "Expected auto-net preset in report" }
+
+    $nativeParamOut = Join-Path $tempRoot "native-param.json"
+    $nativeParamReport = Join-Path $tempRoot "native-param.report.json"
+    $nativeParam = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '-Preset', 'auto-net',
+        '-OutputFile', $nativeParamOut,
+        '-ReportPath', $nativeParamReport,
+        '-LogPath', (Join-Path $tempRoot "native-param.jsonl"),
+        '-SkipVerify',
+        'AUTO_NET_NATIVE_PARAM_OK'
+    ) -ExtraEnv $autoNetEnv
+    if ($nativeParam.ExitCode -ne 0) { throw "native PowerShell parameter case failed unexpectedly: $($nativeParam.Combined)" }
+    $nativeParamJson = Assert-ReportStatus -Path $nativeParamReport -ExpectedStatus 'verify_skipped'
+    if ($nativeParamJson.preset -ne 'auto-net') { throw "Expected auto-net preset for native PowerShell parameter case" }
+
     $runId = "20260420-020301-JST"
     $runIdCase = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
         '--run-id', $runId,

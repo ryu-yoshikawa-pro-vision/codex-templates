@@ -33,3 +33,24 @@
 - 非対話タスク: `scripts/codex-task.ps1` / `scripts/codex-task.sh`
 - Docker sandbox 実験: `scripts/codex-sandbox.ps1` / `scripts/codex-sandbox.sh`
 - 詳細: `docs/reference/codex-implementation-harness.md`
+
+## Execution modes
+このテンプレートの project-level default は safe のままです。通常起動と wrapper の既定では `workspace-write`、`approval_policy = "untrusted"`、workspace network disabled を使います。
+
+ネットワークアクセスつきの自律的な workspace 内作業が必要な場合だけ、管理された `auto-net` preset を明示します。
+
+```bash
+bash scripts/codex-safe.sh --preset auto-net
+bash scripts/codex-task.sh --preset auto-net --prompt-file .codex/runs/<run_id>/PROMPT.md
+```
+
+PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/codex-safe.ps1 -Preset auto-net
+powershell -ExecutionPolicy Bypass -File scripts/codex-task.ps1 --preset auto-net --prompt-file .codex/runs/<run_id>/PROMPT.md
+```
+
+`auto-net` は `workspace-write`、approval prompts disabled、workspace network enabled、削除・破壊操作 forbidden の preset です。`--full-auto`、`danger-full-access`、`--dangerously-bypass-approvals-and-sandbox` は使いません。
+
+`auto-net` の remote script piping や delete / rename patch は `.codex/hooks/pre_tool_use_policy.ps1` でも検出します。hooks 非対応または `pwsh` 不在の環境では、shell wrapper 系を forbidden にする execpolicy rules が主な fallback です。
