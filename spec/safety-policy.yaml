@@ -31,7 +31,10 @@
       "[profiles.repo_auto_net]",
       "approval_policy = \"never\"",
       "network_access = true",
-      "[profiles.repo_readonly]"
+      "[profiles.repo_readonly]",
+      "[agents]",
+      "max_threads = 4",
+      "max_depth = 1"
     ]
   },
   "execution_modes": {
