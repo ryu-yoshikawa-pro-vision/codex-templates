@@ -56,6 +56,9 @@ for rel in safety["wrappers"]:
     assert_contains(rel, safety["blocked_tokens"])
 
 assert_contains(safety["config"]["file"], safety["config"]["must_contain"])
+for agent in safety.get("subagents", []):
+    assert_exists(agent["file"])
+    assert_contains(agent["file"], agent["must_contain"])
 assert_contains(safety["requirements"]["file"], safety["requirements"]["must_contain"])
 assert_contains(
     f'{safety["rules_dir"]}/30-destructive-forbidden.rules',
