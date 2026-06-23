@@ -39,7 +39,7 @@
   },
   "subagents": [
     {
-      "file": "template/.codex/agents/code-researcher.toml",
+      "file": "template/.codex/agents/code_researcher.toml",
       "must_contain": [
         "name = \"code_researcher\"",
         "model = \"gpt-5.4-mini\"",
@@ -50,7 +50,7 @@
       ]
     },
     {
-      "file": "template/.codex/agents/implementation-researcher.toml",
+      "file": "template/.codex/agents/implementation_researcher.toml",
       "must_contain": [
         "name = \"implementation_researcher\"",
         "model = \"gpt-5.4-mini\"",
@@ -61,7 +61,7 @@
       ]
     },
     {
-      "file": "template/.codex/agents/test-investigator.toml",
+      "file": "template/.codex/agents/test_investigator.toml",
       "must_contain": [
         "name = \"test_investigator\"",
         "model = \"gpt-5.4-mini\"",
