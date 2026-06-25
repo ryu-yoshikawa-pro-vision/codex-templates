@@ -9,7 +9,10 @@
       "docs/reference/codex-safety-harness.md",
       "docs/reference/codex-implementation-harness.md",
       "Report file",
-      "command-based deletion"
+      "command-based deletion",
+      "Subagent 運用",
+      "gpt-5.4-mini",
+      ".codex/agents/"
     ]
   },
   "planning": {
