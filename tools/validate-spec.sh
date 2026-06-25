@@ -56,9 +56,21 @@ for rel in safety["wrappers"]:
     assert_contains(rel, safety["blocked_tokens"])
 
 assert_contains(safety["config"]["file"], safety["config"]["must_contain"])
-for agent in safety.get("subagents", []):
-    assert_exists(agent["file"])
-    assert_contains(agent["file"], agent["must_contain"])
+for idx, agent in enumerate(safety.get("subagents", []), start=1):
+    if not isinstance(agent, dict):
+        raise SystemExit(f"safety.subagents[{idx}] must be an object")
+
+    rel = agent.get("file")
+    patterns = agent.get("must_contain")
+
+    if not isinstance(rel, str) or not rel:
+        raise SystemExit(f"safety.subagents[{idx}].file must be a non-empty string")
+
+    if not isinstance(patterns, list) or not all(isinstance(p, str) for p in patterns):
+        raise SystemExit(f"safety.subagents[{idx}].must_contain must be a string array")
+
+    assert_exists(rel)
+    assert_contains(rel, patterns)
 assert_contains(safety["requirements"]["file"], safety["requirements"]["must_contain"])
 assert_contains(
     f'{safety["rules_dir"]}/30-destructive-forbidden.rules',
