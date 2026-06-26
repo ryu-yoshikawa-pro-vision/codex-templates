@@ -1,0 +1,168 @@
+{
+  "rules_dir": "template/.codex/rules",
+  "auto_net_rules_dir": "template/.codex/rules-auto-net",
+  "wrappers": [
+    "template/scripts/codex-safe.ps1",
+    "template/scripts/codex-safe.sh",
+    "template/scripts/codex-task.ps1",
+    "template/scripts/codex-task.sh"
+  ],
+  "delegating_wrappers": [
+    "template/scripts/codex-sandbox.ps1",
+    "template/scripts/codex-sandbox.sh"
+  ],
+  "verify": "template/scripts/verify",
+  "config": {
+    "file": "template/.codex/config.toml",
+    "must_contain": [
+      "sandbox_mode = \"workspace-write\"",
+      "approval_policy = \"untrusted\"",
+      "web_search = \"cached\"",
+      "network_access = false",
+      "writable_roots = []",
+      "allow_login_shell = false",
+      "[shell_environment_policy]",
+      "inherit = \"core\"",
+      "[features]",
+      "codex_hooks = true",
+      "[[hooks.PreToolUse]]",
+      "pre_tool_use_policy.ps1",
+      "[profiles.repo_safe]",
+      "[profiles.repo_auto_net]",
+      "approval_policy = \"never\"",
+      "network_access = true",
+      "[profiles.repo_readonly]",
+      "[agents]",
+      "max_threads = 4",
+      "max_depth = 1"
+    ]
+  },
+  "subagents": [
+    {
+      "file": "template/.codex/agents/code_researcher.toml",
+      "must_contain": [
+        "name = \"code_researcher\"",
+        "model = \"gpt-5.4-mini\"",
+        "model_reasoning_effort = \"medium\"",
+        "sandbox_mode = \"read-only\"",
+        "developer_instructions",
+        "コードやドキュメントを編集しない"
+      ]
+    },
+    {
+      "file": "template/.codex/agents/implementation_researcher.toml",
+      "must_contain": [
+        "name = \"implementation_researcher\"",
+        "model = \"gpt-5.4-mini\"",
+        "model_reasoning_effort = \"medium\"",
+        "sandbox_mode = \"read-only\"",
+        "developer_instructions",
+        "ファイルを編集しない"
+      ]
+    },
+    {
+      "file": "template/.codex/agents/implementation_worker.toml",
+      "must_contain": [
+        "name = \"implementation_worker\"",
+        "model = \"gpt-5.4-mini\"",
+        "model_reasoning_effort = \"medium\"",
+        "sandbox_mode = \"workspace-write\"",
+        "developer_instructions",
+        "親 agent が明示した計画",
+        "親 agent が指定していないファイルを編集しない",
+        "最小差分で変更し",
+        "ファイル削除、rename、移動をしない",
+        "git add / git commit / git push / git rm / git reset / git clean を実行しない",
+        "command-based deletion is forbidden",
+        "delete / rename を含む patch operation は行わない",
+        "スコープ遵守確認",
+        "指定外ファイルを変更していないことの確認",
+        "削除 / rename / git mutation を行っていないことの確認"
+      ]
+    },
+    {
+      "file": "template/.codex/agents/test_investigator.toml",
+      "must_contain": [
+        "name = \"test_investigator\"",
+        "model = \"gpt-5.4-mini\"",
+        "model_reasoning_effort = \"medium\"",
+        "sandbox_mode = \"read-only\"",
+        "developer_instructions",
+        "テストや実装ファイルを編集しない"
+      ]
+    }
+  ],
+  "execution_modes": {
+    "project_top_level_default": "safe",
+    "managed_auto_net_preset": "auto-net",
+    "interactive_default_preset": "safe",
+    "task_default_preset": "safe",
+    "implementation_worker": {
+      "sandbox_mode": "workspace-write",
+      "scope": "parent_approved_small_scoped_changes",
+      "delete_operations_allowed": false,
+      "rename_operations_allowed": false,
+      "git_mutation_allowed": false,
+      "parallel_writable_agents_default": false
+    },
+    "auto_net": {
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "network_access": true,
+      "danger_full_access_allowed": false,
+      "dangerous_bypass_allowed": false,
+      "delete_operations_allowed": false,
+      "raw_full_auto_argument_allowed": false,
+      "git_add_allowed": false,
+      "git_commit_allowed": false,
+      "git_push_allowed": false,
+      "shell_wrappers_allow_phase": "after_hook_validation_only"
+    }
+  },
+  "requirements": {
+    "file": "template/.codex/requirements.toml",
+    "must_contain": [
+      "docs/reference/codex-safety-harness.md",
+      "docs/reference/codex-implementation-harness.md"
+    ]
+  },
+  "forbidden_delete_commands": [
+    "rm",
+    "del",
+    "erase",
+    "Remove-Item",
+    "rmdir",
+    "unlink",
+    "git add",
+    "git commit",
+    "git push",
+    "git rm",
+    "git reset --hard",
+    "git clean -fdx",
+    "terraform apply",
+    "terraform destroy",
+    "kubectl apply",
+    "kubectl delete",
+    "aws s3 rm",
+    "npm publish",
+    "pip uninstall",
+    "python -c"
+  ],
+  "blocked_tokens": [
+    "--dangerously-bypass-approvals-and-sandbox",
+    "--full-auto",
+    "--add-dir",
+    "--config",
+    "--sandbox",
+    "--ask-for-approval",
+    "--profile",
+    "--cd",
+    "--enable",
+    "--disable",
+    "-c",
+    "-s",
+    "-a",
+    "-p",
+    "-C"
+  ]
+}
