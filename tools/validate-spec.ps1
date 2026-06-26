@@ -82,6 +82,21 @@ foreach ($agent in $safety.subagents) {
     Assert-Contains -RelativePath $agent.file -Patterns $agent.must_contain
 }
 
+$workerMode = $safety.execution_modes.implementation_worker
+if (-not $workerMode) {
+    throw "safety.execution_modes.implementation_worker must be set"
+}
+if (
+    $workerMode.sandbox_mode -ne "workspace-write" -or
+    $workerMode.scope -ne "parent_approved_small_scoped_changes" -or
+    $workerMode.delete_operations_allowed -ne $false -or
+    $workerMode.rename_operations_allowed -ne $false -or
+    $workerMode.git_mutation_allowed -ne $false -or
+    $workerMode.parallel_writable_agents_default -ne $false
+) {
+    throw "safety.execution_modes.implementation_worker is out of contract"
+}
+
 Assert-Contains -RelativePath $safety.requirements.file -Patterns $safety.requirements.must_contain
 Assert-Contains -RelativePath (Join-Path $safety.rules_dir "30-destructive-forbidden.rules") -Patterns $safety.forbidden_delete_commands
 
