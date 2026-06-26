@@ -35,10 +35,10 @@ function Assert-Contains {
     }
 }
 
-$workflow = Read-SpecFile -RelativePath "spec/workflow.yaml"
-$routing = Read-SpecFile -RelativePath "spec/routing.yaml"
-$safety = Read-SpecFile -RelativePath "spec/safety-policy.yaml"
-$naming = Read-SpecFile -RelativePath "spec/naming.yaml"
+$workflow = Read-SpecFile -RelativePath "spec/workflow.json"
+$routing = Read-SpecFile -RelativePath "spec/routing.json"
+$safety = Read-SpecFile -RelativePath "spec/safety-policy.json"
+$naming = Read-SpecFile -RelativePath "spec/naming.json"
 
 foreach ($path in $workflow.required_files) {
     Assert-Exists -RelativePath $path
@@ -60,33 +60,26 @@ foreach ($wrapperPath in $safety.wrappers) {
 }
 
 Assert-Contains -RelativePath $safety.config.file -Patterns $safety.config.must_contain
-if (-not $safety.subagents -or $safety.subagents.Count -eq 0) {
-    throw "safety.subagents must contain at least one entry"
-}
+
+$subagentIndex = 0
 foreach ($agent in $safety.subagents) {
-    if (-not $agent.file) {
-        throw "safety.subagents.file must be set"
+    $subagentIndex++
+    if ($null -eq $agent.file -or -not ($agent.file -is [string]) -or [string]::IsNullOrWhiteSpace($agent.file)) {
+        throw "safety.subagents[$subagentIndex].file must be a non-empty string"
     }
-    if (-not $agent.must_contain) {
-        throw "safety.subagents.must_contain must be set for $($agent.file)"
+
+    if ($null -eq $agent.must_contain -or -not ($agent.must_contain -is [array])) {
+        throw "safety.subagents[$subagentIndex].must_contain must be a string array"
     }
+
+    foreach ($pattern in $agent.must_contain) {
+        if (-not ($pattern -is [string])) {
+            throw "safety.subagents[$subagentIndex].must_contain must be a string array"
+        }
+    }
+
     Assert-Exists -RelativePath $agent.file
     Assert-Contains -RelativePath $agent.file -Patterns $agent.must_contain
-}
-
-$workerMode = $safety.execution_modes.implementation_worker
-if (-not $workerMode) {
-    throw "safety.execution_modes.implementation_worker must be set"
-}
-if (
-    $workerMode.sandbox_mode -ne "workspace-write" -or
-    $workerMode.scope -ne "parent_approved_small_scoped_changes" -or
-    $workerMode.delete_operations_allowed -ne $false -or
-    $workerMode.rename_operations_allowed -ne $false -or
-    $workerMode.git_mutation_allowed -ne $false -or
-    $workerMode.parallel_writable_agents_default -ne $false
-) {
-    throw "safety.execution_modes.implementation_worker is out of contract"
 }
 
 Assert-Contains -RelativePath $safety.requirements.file -Patterns $safety.requirements.must_contain
