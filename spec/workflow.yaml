@@ -32,6 +32,7 @@
     "template/.codex/config.toml",
     "template/.codex/agents/code_researcher.toml",
     "template/.codex/agents/implementation_researcher.toml",
+    "template/.codex/agents/implementation_worker.toml",
     "template/.codex/agents/test_investigator.toml",
     "template/.codex/requirements.toml",
     "template/.codex/hooks/pre_tool_use_policy.py",
