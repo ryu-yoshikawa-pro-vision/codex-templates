@@ -9,13 +9,15 @@
 - `spec/` が workflow / naming / routing / safety の単一正本。
 - `tools/` と `tests/` が source repo の保守と検証を担う。
 - root の `AGENTS.md`、`PLANS.md`、`CODE_REVIEW.md` は source repo の保守作業用入口。
-- consumer-facing template では `AGENTS.md` が常設 instruction surface、`.agents/skills/` が task-scoped workflow の正本、`.codex/` が config/runtime、`docs/reference/` が人間向け補助資料。
+- consumer-facing template では `AGENTS.md` が常設 instruction surface、`.agents/skills/` が task-scoped workflow の正本、`.codex/` が config/runtime/subagent、`docs/reference/` が人間向け補助資料。
+- consumer-facing subagent は、read-only 調査 agent（`code_researcher` / `implementation_researcher` / `test_investigator`）と、親 agent 承認後の小さく限定された実装だけを扱う workspace-write agent（`implementation_worker`）に分ける。
 - consumer-facing `scripts/` は `codex-safe`（手動対話）、`codex-task`（非対話実装）、`codex-sandbox`（Docker 実験）の 3 層ハーネスを持つ。
 - consumer-facing `.codex/config.toml` は `workspace-write` + `untrusted` + cached web search + workspace network disabled を標準 baseline とする。
 - consumer-facing `.codex/config.toml` は明示指定専用の `repo_auto_net` profile を持ち、wrapper の `--preset auto-net` でのみ approval never + workspace network enabled を使う。wrapper default は `safe` のまま維持する。
 - consumer-facing execpolicy は global rules を safe baseline とし、auto-net 専用 rules を `template/.codex/rules-auto-net/` に分離する。
 - consumer-facing wrapper は `--run-id` / `-RunId` を受け取り、run がある作業では `.codex/runs/<run_id>/artifacts|reports|logs` に出力を集約する。
 - command-based deletion は禁止する。`apply_patch` は差分単位で確認できる通常の編集手段として許可し、tracked runtime artifact の配布除外は明示された `git rm --cached -- <path>` の index-only migration に限定する。
+- `implementation_worker` でも削除、rename、移動、git mutation、delete / rename を含む patch operation、スコープ外リファクタリングは禁止する。writable subagent は原則 1 タスクにつき 1 つだけ使う。
 - auto-net でも削除、git add/commit/push/rm/reset/clean、remote script piping、外部 resource deletion は禁止する。PreToolUse hook は補助防御として扱い、唯一の安全境界にはしない。
 
 ## 運用の要点
@@ -47,6 +49,7 @@
 ## 補足メモ
 - consumer repo 側の living documentation 雛形は `template/docs/PROJECT_CONTEXT.md` にある。
 - consumer repo 側の workflow 詳細は `template/.agents/skills/*/references/` に置き、`template/docs/agent/` は廃止した。
+- consumer repo 側の subagent 定義は `template/.codex/agents/` にあり、`implementation_worker` は親 agent がスコープを確定した後の限定実装だけに使う。
 - consumer repo 側の非対話実装では `template/scripts/codex-task.* --run-id <run_id>` が output/report/log を run-local 成果物として残し、Docker runtime は `CODEX_DOCKER_IMAGE` 必須の experimental path とする。
 - template 適用後の初期化補助として `template/codex-project.toml` と `template/scripts/init-project.*` を持つ。
 - runtime artifact の既定保存先は Git 追跡対象外。`template/.codex/artifacts/`, `template/.codex/reports/`, `template/.codex/logs/*.jsonl`, `template/.codex/runs/` は配布対象外にする。
