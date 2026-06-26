@@ -60,6 +60,9 @@ foreach ($wrapperPath in $safety.wrappers) {
 }
 
 Assert-Contains -RelativePath $safety.config.file -Patterns $safety.config.must_contain
+if (-not $safety.subagents -or $safety.subagents.Count -eq 0) {
+    throw "safety.subagents must contain at least one entry"
+}
 foreach ($agent in $safety.subagents) {
     if (-not $agent.file) {
         throw "safety.subagents.file must be set"
@@ -70,6 +73,22 @@ foreach ($agent in $safety.subagents) {
     Assert-Exists -RelativePath $agent.file
     Assert-Contains -RelativePath $agent.file -Patterns $agent.must_contain
 }
+
+$workerMode = $safety.execution_modes.implementation_worker
+if (-not $workerMode) {
+    throw "safety.execution_modes.implementation_worker must be set"
+}
+if (
+    $workerMode.sandbox_mode -ne "workspace-write" -or
+    $workerMode.scope -ne "parent_approved_small_scoped_changes" -or
+    $workerMode.delete_operations_allowed -ne $false -or
+    $workerMode.rename_operations_allowed -ne $false -or
+    $workerMode.git_mutation_allowed -ne $false -or
+    $workerMode.parallel_writable_agents_default -ne $false
+) {
+    throw "safety.execution_modes.implementation_worker is out of contract"
+}
+
 Assert-Contains -RelativePath $safety.requirements.file -Patterns $safety.requirements.must_contain
 Assert-Contains -RelativePath (Join-Path $safety.rules_dir "30-destructive-forbidden.rules") -Patterns $safety.forbidden_delete_commands
 
