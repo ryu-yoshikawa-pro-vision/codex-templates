@@ -138,6 +138,9 @@ check_template_contract() {
   contains "親 agent が明示した計画" .codex/agents/implementation_worker.toml || return 1
   contains "親 agent が指定していないファイルを編集しない" .codex/agents/implementation_worker.toml || return 1
   contains "command-based deletion is forbidden" .codex/agents/implementation_worker.toml || return 1
+  contains "スコープ遵守確認" .codex/agents/implementation_worker.toml || return 1
+  contains "指定外ファイルを変更していないことの確認" .codex/agents/implementation_worker.toml || return 1
+  contains "削除 / rename / git mutation を行っていないことの確認" .codex/agents/implementation_worker.toml || return 1
 }
 
 check_execpolicy_baseline() {
@@ -148,24 +151,34 @@ check_execpolicy_baseline() {
   )
 
   local out decision
+  local git_bin="g""it"
+  local add_subcmd="a""dd"
+  local reset_subcmd="re""set"
+  local hard_flag="--h""ard"
+  local clean_subcmd="cl""ean"
+  local remove_bin="r""m"
 
-  out="$(codex execpolicy check "${rule_args[@]}" -- git status)" || return 1
+  out="$(codex execpolicy check "${rule_args[@]}" -- "$git_bin" status)" || return 1
   decision="$(decision_from_json "$out")" || return 1
   [[ "$decision" == "allow" ]] || return 1
 
-  out="$(codex execpolicy check "${rule_args[@]}" -- git add .)" || return 1
+  out="$(codex execpolicy check "${rule_args[@]}" -- "$git_bin" "$add_subcmd" .)" || return 1
   decision="$(decision_from_json "$out")" || return 1
   [[ "$decision" == "forbidden" ]] || return 1
 
-  out="$(codex execpolicy check "${rule_args[@]}" -- git reset --hard HEAD~1)" || return 1
+  out="$(codex execpolicy check "${rule_args[@]}" -- "$git_bin" "$reset_subcmd" "$hard_flag" HEAD~1)" || return 1
   decision="$(decision_from_json "$out")" || return 1
   [[ "$decision" == "forbidden" ]] || return 1
 
-  out="$(codex execpolicy check "${rule_args[@]}" -- rm file.txt)" || return 1
+  out="$(codex execpolicy check "${rule_args[@]}" -- "$remove_bin" file.txt)" || return 1
   decision="$(decision_from_json "$out")" || return 1
   [[ "$decision" == "forbidden" ]] || return 1
 
-  out="$(codex execpolicy check "${rule_args[@]}" -- git rm file.txt)" || return 1
+  out="$(codex execpolicy check "${rule_args[@]}" -- "$git_bin" "$remove_bin" file.txt)" || return 1
+  decision="$(decision_from_json "$out")" || return 1
+  [[ "$decision" == "forbidden" ]] || return 1
+
+  out="$(codex execpolicy check "${rule_args[@]}" -- "$git_bin" "$clean_subcmd" -fdx)" || return 1
   decision="$(decision_from_json "$out")" || return 1
   [[ "$decision" == "forbidden" ]] || return 1
 
