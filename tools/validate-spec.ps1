@@ -60,6 +60,16 @@ foreach ($wrapperPath in $safety.wrappers) {
 }
 
 Assert-Contains -RelativePath $safety.config.file -Patterns $safety.config.must_contain
+foreach ($agent in $safety.subagents) {
+    if (-not $agent.file) {
+        throw "safety.subagents.file must be set"
+    }
+    if (-not $agent.must_contain) {
+        throw "safety.subagents.must_contain must be set for $($agent.file)"
+    }
+    Assert-Exists -RelativePath $agent.file
+    Assert-Contains -RelativePath $agent.file -Patterns $agent.must_contain
+}
 Assert-Contains -RelativePath $safety.requirements.file -Patterns $safety.requirements.must_contain
 Assert-Contains -RelativePath (Join-Path $safety.rules_dir "30-destructive-forbidden.rules") -Patterns $safety.forbidden_delete_commands
 
