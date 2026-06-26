@@ -42,10 +42,24 @@
 1. consumer repo 側の現在の `template_version` を確認する。
 2. [`CHANGELOG.md`](CHANGELOG.md) と [`MIGRATION.md`](MIGRATION.md) を確認する。
 3. consumer repo 側で作業ブランチを切る。
-4. `template/` 差分を同期する。
-5. `docs/PROJECT_CONTEXT.md`、`docs/adr/`、`docs/plans/`、`docs/reports/` など consumer 固有ファイルは機械的に上書きしない。
-6. `bash scripts/verify` または PowerShell 版 verify を実行する。
-7. PR で差分をレビューし、運用ルールや安全制約が consumer repo の実態と矛盾しないことを確認する。
+4. `tools/sync-template.*` を使う場合は、まず dry-run で削除対象を確認する。
+   - Bash: `tools/sync-template.sh --dry-run --force <destination>`
+   - PowerShell: `powershell -ExecutionPolicy Bypass -File tools/sync-template.ps1 -Destination <destination> -Force -DryRun`
+5. dry-run の削除対象が想定通りの場合だけ、明示確認フラグ付きで同期する。
+   - Bash: `tools/sync-template.sh --force --confirm-destructive-overwrite <destination>`
+   - PowerShell: `powershell -ExecutionPolicy Bypass -File tools/sync-template.ps1 -Destination <destination> -Force -ConfirmDestructiveOverwrite`
+6. `docs/PROJECT_CONTEXT.md`、`docs/adr/`、`docs/plans/`、`docs/reports/` など consumer 固有ファイルは機械的に上書きしない。
+7. `bash scripts/verify` または PowerShell 版 verify を実行する。
+8. PR で差分をレビューし、運用ルールや安全制約が consumer repo の実態と矛盾しないことを確認する。
+
+## sync-template safety
+
+`tools/sync-template.*` で既存ディレクトリへ同期すると、同期先の top-level contents を置き換えるため、誤った destination を指定すると重要ファイルを失うリスクがあります。
+
+- `--dry-run` / `-DryRun` で必ず削除対象を確認する。
+- 既存 destination に `--force` / `-Force` だけでは同期しない。
+- destructive overwrite には `--confirm-destructive-overwrite` / `-ConfirmDestructiveOverwrite` を追加する。
+- consumer 固有ファイルを残す必要がある場合は、直接同期ではなく別ディレクトリに同期して差分を手動反映する。
 
 ## auto-net の利用条件
 
