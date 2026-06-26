@@ -15,6 +15,11 @@
   - bash 向け Codex 起動 wrapper（PowerShell 版と同方針）
   - 危険 CLI 引数の拒否、`--sandbox` / `--ask-for-approval` 固定注入、preflight を実施
   - `--print-command` / `--preflight-only` / `--allow-search` / `--run-id` / `--log-path` をサポート
+- `.codex/agents/*.toml`
+  - project-scoped custom agents の定義
+  - `code_researcher` / `implementation_researcher` / `test_investigator` は read-only 調査 agent
+  - `implementation_worker` は親 agent が承認した小さく限定された実装だけを扱う workspace-write agent
+  - writable subagent は原則 1 タスクにつき 1 つだけ使い、削除、rename、git mutation、スコープ外編集をしない
 - `.codex/rules/*.rules`
   - `execpolicy` ルール
   - 読み取り系の allow、広い prompt、破壊系の forbidden を定義
@@ -98,6 +103,7 @@ bash scripts/codex-safe.sh --preset auto-net
 - shell / PowerShell / git command による削除は禁止する。対象例は `rm`, `del`, `erase`, `Remove-Item`, `rmdir`, `unlink`, 通常の `git rm`。
 - `auto-net` では `git add`, `git commit`, `git push`, `git rm`, `git reset`, `git clean` も forbidden にする。
 - `auto-net` では delete / rename を含む patch operation も禁止する。不要に見えるファイルは削除候補として `REPORT.md` に記録する。
+- `implementation_worker` も削除、rename、移動、git mutation、delete / rename を含む patch operation を行わない。
 - 追跡済み runtime artifact を配布対象から外す migration では、明示された対象に限って `git rm --cached -- <path>` を使ってよい。物理ファイルは削除しない。
 
 ## Hook guard

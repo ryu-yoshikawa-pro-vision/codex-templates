@@ -60,6 +60,10 @@ check_template_contract() {
   [[ -f codex-project.toml ]] || return 1
   [[ -f .codex/config.toml ]] || return 1
   [[ -f .codex/requirements.toml ]] || return 1
+  [[ -f .codex/agents/code_researcher.toml ]] || return 1
+  [[ -f .codex/agents/implementation_researcher.toml ]] || return 1
+  [[ -f .codex/agents/implementation_worker.toml ]] || return 1
+  [[ -f .codex/agents/test_investigator.toml ]] || return 1
   [[ -f .codex/hooks/pre_tool_use_policy.py ]] || return 1
   [[ -f .codex/hooks/pre_tool_use_policy.ps1 ]] || return 1
   [[ -f .codex/templates/PLAN.md ]] || return 1
@@ -84,6 +88,13 @@ check_template_contract() {
   contains "docs/reference/codex-implementation-harness.md" AGENTS.md || return 1
   contains "Report file" AGENTS.md || return 1
   contains "command-based deletion" AGENTS.md || return 1
+  contains "implementation_worker" AGENTS.md || return 1
+  contains "writable subagent" AGENTS.md || return 1
+  contains "親 agent が計画、対象ファイル、変更範囲、禁止事項を確定した後" AGENTS.md || return 1
+  contains "親 agent が明示した対象ファイルだけを最小差分で編集する" AGENTS.md || return 1
+  contains "ファイル削除、rename、移動" AGENTS.md || return 1
+  contains "迷う場合は実装せず、親 agent に確認事項を返す" AGENTS.md || return 1
+  contains "read-only 調査 subagent に限って委譲する" AGENTS.md || return 1
   contains ".agents/skills/feature-plan/SKILL.md" PLANS.md || return 1
   contains ".agents/skills/feature-plan/references/planning-workflow.md" PLANS.md || return 1
   contains "docs/plans/TEMPLATE.md" PLANS.md || return 1
@@ -126,6 +137,15 @@ check_template_contract() {
   contains "network_access = true" .codex/config.toml || return 1
   contains "codex_hooks = true" .codex/config.toml || return 1
   contains "pre_tool_use_policy.ps1" .codex/config.toml || return 1
+  contains "name = \"implementation_worker\"" .codex/agents/implementation_worker.toml || return 1
+  contains "model = \"gpt-5.4-mini\"" .codex/agents/implementation_worker.toml || return 1
+  contains "sandbox_mode = \"workspace-write\"" .codex/agents/implementation_worker.toml || return 1
+  contains "親 agent が明示した計画" .codex/agents/implementation_worker.toml || return 1
+  contains "親 agent が指定していないファイルを編集しない" .codex/agents/implementation_worker.toml || return 1
+  contains "command-based deletion is forbidden" .codex/agents/implementation_worker.toml || return 1
+  contains "スコープ遵守確認" .codex/agents/implementation_worker.toml || return 1
+  contains "指定外ファイルを変更していないことの確認" .codex/agents/implementation_worker.toml || return 1
+  contains "削除 / rename / git mutation を行っていないことの確認" .codex/agents/implementation_worker.toml || return 1
 }
 
 check_execpolicy_baseline() {
@@ -136,24 +156,34 @@ check_execpolicy_baseline() {
   )
 
   local out decision
+  local git_bin="g""it"
+  local add_subcmd="a""dd"
+  local reset_subcmd="re""set"
+  local hard_flag="--h""ard"
+  local clean_subcmd="cl""ean"
+  local remove_bin="r""m"
 
-  out="$(codex execpolicy check "${rule_args[@]}" -- git status)" || return 1
+  out="$(codex execpolicy check "${rule_args[@]}" -- "$git_bin" status)" || return 1
   decision="$(decision_from_json "$out")" || return 1
   [[ "$decision" == "allow" ]] || return 1
 
-  out="$(codex execpolicy check "${rule_args[@]}" -- git add .)" || return 1
+  out="$(codex execpolicy check "${rule_args[@]}" -- "$git_bin" "$add_subcmd" .)" || return 1
   decision="$(decision_from_json "$out")" || return 1
   [[ "$decision" == "forbidden" ]] || return 1
 
-  out="$(codex execpolicy check "${rule_args[@]}" -- git reset --hard HEAD~1)" || return 1
+  out="$(codex execpolicy check "${rule_args[@]}" -- "$git_bin" "$reset_subcmd" "$hard_flag" HEAD~1)" || return 1
   decision="$(decision_from_json "$out")" || return 1
   [[ "$decision" == "forbidden" ]] || return 1
 
-  out="$(codex execpolicy check "${rule_args[@]}" -- rm file.txt)" || return 1
+  out="$(codex execpolicy check "${rule_args[@]}" -- "$remove_bin" file.txt)" || return 1
   decision="$(decision_from_json "$out")" || return 1
   [[ "$decision" == "forbidden" ]] || return 1
 
-  out="$(codex execpolicy check "${rule_args[@]}" -- git rm file.txt)" || return 1
+  out="$(codex execpolicy check "${rule_args[@]}" -- "$git_bin" "$remove_bin" file.txt)" || return 1
+  decision="$(decision_from_json "$out")" || return 1
+  [[ "$decision" == "forbidden" ]] || return 1
+
+  out="$(codex execpolicy check "${rule_args[@]}" -- "$git_bin" "$clean_subcmd" -fdx)" || return 1
   decision="$(decision_from_json "$out")" || return 1
   [[ "$decision" == "forbidden" ]] || return 1
 

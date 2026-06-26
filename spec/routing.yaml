@@ -12,7 +12,12 @@
       "command-based deletion",
       "Subagent 運用",
       "gpt-5.4-mini",
-      ".codex/agents/"
+      ".codex/agents/",
+      "implementation_worker",
+      "親 agent が計画、対象ファイル、変更範囲、禁止事項を確定した後",
+      "親 agent が明示した対象ファイルだけを最小差分で編集する",
+      "ファイル削除、rename、移動",
+      "迷う場合は実装せず、親 agent に確認事項を返す"
     ]
   },
   "planning": {
