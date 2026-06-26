@@ -10,7 +10,7 @@
 - Minor: consumer-facing file、workflow、safety rule、guide、配布手順を追加・拡張する。
 - Patch: 誤字、説明補足、validator の非破壊的修正、source repo 内部の保守。
 
-## Unreleased
+## 0.3.0 - 2026-06-27
 
 ### Changed
 
@@ -22,8 +22,13 @@
 - PowerShell validator に subagent spec validation を追加し、bash validator と検証観点を近づける。
 - PRレビュー依頼テンプレートと GitHub Actions validation workflow を追加。
 - Integration test の shell fixture 呼び出しを `bash` 経由に統一し、CI 上の実行権限差分を避ける。
+- `tools/sync-template.sh` と `tools/sync-template.ps1` に dry-run と destructive overwrite の明示確認を追加。
+- PowerShell sync で `.codex` など hidden entries も同期対象に含めるように修正。
+- README と MIGRATION に安全な template sync 手順を追加。
 
 ### Migration notes
 
 - `spec/*.yaml` を参照している source repo 側の手順やスクリプトがある場合は、`spec/*.json` へ参照を更新する。
+- 既存 consumer repo へ template 更新を反映する場合は、まず dry-run で削除対象を確認する。
+- `sync-template` で既存 destination を上書きする場合は、`--force` / `-Force` に加えて明示確認フラグを指定する。
 - consumer repo へ template 更新を反映する場合は、`docs/PROJECT_CONTEXT.md` など consumer 固有ファイルを機械的に上書きしない。
