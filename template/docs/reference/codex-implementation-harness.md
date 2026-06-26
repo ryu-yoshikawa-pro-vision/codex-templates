@@ -59,6 +59,14 @@
 - repo root を `/workspace` に mount し、必要なら `~/.codex` と `OPENAI_API_KEY` を container へ渡す。
 - host fallback はしない。Docker 実行に必要な前提が足りない場合は明示エラーで止める。
 
+## Subagent 実装フロー
+- 実装前の調査は `code_researcher` / `implementation_researcher` / `test_investigator` に委譲できる。
+- `implementation_worker` は、親 agent が計画、対象ファイル、変更範囲、禁止事項を確定した後にだけ使う。
+- `implementation_worker` は小さく限定された実装を行う workspace-write subagent であり、親 agent が指定した対象ファイルだけを最小差分で編集する。
+- writable subagent は原則 1 タスクにつき 1 つだけ使う。
+- `implementation_worker` の実装後は、親 agent が diff、仕様判断、未検証点、検証結果を確認する。
+- `implementation_worker` は削除、rename、移動、git mutation、delete / rename を含む patch operation、スコープ外リファクタリングを行わない。
+
 ## 推奨フロー
 - 手動で探索・相談しながら進める:
   - `codex-safe`
