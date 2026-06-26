@@ -90,6 +90,11 @@ check_template_contract() {
   contains "command-based deletion" AGENTS.md || return 1
   contains "implementation_worker" AGENTS.md || return 1
   contains "writable subagent" AGENTS.md || return 1
+  contains "親 agent が計画、対象ファイル、変更範囲、禁止事項を確定した後" AGENTS.md || return 1
+  contains "親 agent が明示した対象ファイルだけを最小差分で編集する" AGENTS.md || return 1
+  contains "ファイル削除、rename、移動" AGENTS.md || return 1
+  contains "迷う場合は実装せず、親 agent に確認事項を返す" AGENTS.md || return 1
+  contains "read-only 調査 subagent に限って委譲する" AGENTS.md || return 1
   contains ".agents/skills/feature-plan/SKILL.md" PLANS.md || return 1
   contains ".agents/skills/feature-plan/references/planning-workflow.md" PLANS.md || return 1
   contains "docs/plans/TEMPLATE.md" PLANS.md || return 1
