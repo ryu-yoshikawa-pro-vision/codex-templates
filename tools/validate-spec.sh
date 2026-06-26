@@ -20,19 +20,23 @@ import sys
 
 repo_root = pathlib.Path(sys.argv[1])
 
+
 def read_spec(rel):
     return json.loads((repo_root / rel).read_text(encoding="utf-8"))
+
 
 def assert_exists(rel):
     path = repo_root / rel
     if not path.exists():
         raise SystemExit(f"Required path missing: {rel}")
 
+
 def assert_contains(rel, patterns):
     content = (repo_root / rel).read_text(encoding="utf-8")
     for pattern in patterns:
         if pattern not in content:
             raise SystemExit(f"Pattern '{pattern}' not found in {rel}")
+
 
 workflow = read_spec("spec/workflow.yaml")
 routing = read_spec("spec/routing.yaml")
@@ -56,7 +60,11 @@ for rel in safety["wrappers"]:
     assert_contains(rel, safety["blocked_tokens"])
 
 assert_contains(safety["config"]["file"], safety["config"]["must_contain"])
-for idx, agent in enumerate(safety.get("subagents", []), start=1):
+subagents = safety.get("subagents")
+if not isinstance(subagents, list) or not subagents:
+    raise SystemExit("safety.subagents must contain at least one entry")
+
+for idx, agent in enumerate(subagents, start=1):
     if not isinstance(agent, dict):
         raise SystemExit(f"safety.subagents[{idx}] must be an object")
 
@@ -71,6 +79,26 @@ for idx, agent in enumerate(safety.get("subagents", []), start=1):
 
     assert_exists(rel)
     assert_contains(rel, patterns)
+
+worker_mode = safety.get("execution_modes", {}).get("implementation_worker")
+if not isinstance(worker_mode, dict):
+    raise SystemExit("safety.execution_modes.implementation_worker must be set")
+
+expected_worker_mode = {
+    "sandbox_mode": "workspace-write",
+    "scope": "parent_approved_small_scoped_changes",
+    "delete_operations_allowed": False,
+    "rename_operations_allowed": False,
+    "git_mutation_allowed": False,
+    "parallel_writable_agents_default": False,
+}
+
+for key, expected in expected_worker_mode.items():
+    if worker_mode.get(key) != expected:
+        raise SystemExit(
+            f"safety.execution_modes.implementation_worker.{key} is out of contract"
+        )
+
 assert_contains(safety["requirements"]["file"], safety["requirements"]["must_contain"])
 assert_contains(
     f'{safety["rules_dir"]}/30-destructive-forbidden.rules',
