@@ -12,7 +12,8 @@
       "command-based deletion",
       "Subagent 運用",
       "gpt-5.4-mini",
-      ".codex/agents/"
+      ".codex/agents/",
+      "implementation_worker"
     ]
   },
   "planning": {
