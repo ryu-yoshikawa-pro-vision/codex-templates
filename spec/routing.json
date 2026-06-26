@@ -1,0 +1,67 @@
+{
+  "instructions": {
+    "file": "template/AGENTS.md",
+    "must_contain": [
+      "PLANS.md",
+      "CODE_REVIEW.md",
+      ".agents/skills/feature-plan/SKILL.md",
+      ".agents/skills/code-review/SKILL.md",
+      "docs/reference/codex-safety-harness.md",
+      "docs/reference/codex-implementation-harness.md",
+      "Report file",
+      "command-based deletion",
+      "Subagent 運用",
+      "gpt-5.4-mini",
+      ".codex/agents/",
+      "implementation_worker",
+      "親 agent が計画、対象ファイル、変更範囲、禁止事項を確定した後",
+      "親 agent が明示した対象ファイルだけを最小差分で編集する",
+      "ファイル削除、rename、移動",
+      "迷う場合は実装せず、親 agent に確認事項を返す"
+    ]
+  },
+  "planning": {
+    "file": "template/PLANS.md",
+    "must_contain": [
+      ".agents/skills/feature-plan/SKILL.md",
+      ".agents/skills/feature-plan/references/planning-workflow.md",
+      "docs/plans/TEMPLATE.md",
+      "Goal",
+      "Current understanding",
+      "Assumptions",
+      "Non-goals",
+      "Impacted areas",
+      "Files to inspect",
+      "Change strategy",
+      "Validation plan",
+      "Risks",
+      "Open questions",
+      "Ambiguity handling",
+      "mandatory-question"
+    ]
+  },
+  "review": {
+    "file": "template/CODE_REVIEW.md",
+    "must_contain": [
+      ".agents/skills/code-review/SKILL.md",
+      ".agents/skills/code-review/references/review-workflow.md",
+      "findings-first",
+      "Severity",
+      "Location",
+      "Why it matters",
+      "Evidence",
+      "Suggested fix",
+      "Open questions",
+      "Verdict",
+      "confidence",
+      "review-only",
+      "report file"
+    ]
+  },
+  "skills": [
+    "template/.agents/skills/feature-plan/SKILL.md",
+    "template/.agents/skills/feature-plan/references/planning-workflow.md",
+    "template/.agents/skills/code-review/SKILL.md",
+    "template/.agents/skills/code-review/references/review-workflow.md"
+  ]
+}
