@@ -70,7 +70,10 @@
         "developer_instructions",
         "親 agent が明示した計画",
         "親 agent が指定していないファイルを編集しない",
-        "command-based deletion is forbidden"
+        "command-based deletion is forbidden",
+        "スコープ遵守確認",
+        "指定外ファイルを変更していないことの確認",
+        "削除 / rename / git mutation を行っていないことの確認"
       ]
     },
     {
