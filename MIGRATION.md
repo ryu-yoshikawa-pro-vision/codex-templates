@@ -30,8 +30,14 @@
 
 ## Consumer repo の作り方
 1. `template/` の中身を新規 repo のルートへ展開する。
-2. もしくは `tools/sync-template.ps1 -Force` / `tools/sync-template.sh --force` を使って同期する。
-3. 展開先 repo では `template/` プレフィックスを外した状態で運用する。
+2. 既存 repo へ同期する場合は、まず dry-run で削除対象を確認する。
+   - Bash: `tools/sync-template.sh --dry-run --force <destination>`
+   - PowerShell: `powershell -ExecutionPolicy Bypass -File tools/sync-template.ps1 -Destination <destination> -Force -DryRun`
+3. dry-run の削除対象が想定通りの場合だけ、明示確認フラグ付きで同期する。
+   - Bash: `tools/sync-template.sh --force --confirm-destructive-overwrite <destination>`
+   - PowerShell: `powershell -ExecutionPolicy Bypass -File tools/sync-template.ps1 -Destination <destination> -Force -ConfirmDestructiveOverwrite`
+4. 展開先 repo では `template/` プレフィックスを外した状態で運用する。
+5. `docs/PROJECT_CONTEXT.md`、`docs/adr/`、`docs/plans/`、`docs/reports/`、`.codex/runs/` など consumer 固有情報は機械的に上書きしない。
 
 ## Source repo の確認ポイント
 - root `AGENTS.md` は source repo メンテナンス用に変わっています。
