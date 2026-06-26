@@ -37,7 +37,7 @@
 
 ## 既存 consumer repo の更新手順
 
-既存 repo へ template 更新を反映する場合は、新規導入より慎重に扱います。
+既存 repo へ template 更新を反映する場合は、新規導入より慎重に扱います。詳細は [`template/docs/guides/consumer-update.md`](template/docs/guides/consumer-update.md) を参照してください。
 
 1. consumer repo 側の現在の `template_version` を確認する。
 2. [`CHANGELOG.md`](CHANGELOG.md) と [`MIGRATION.md`](MIGRATION.md) を確認する。
@@ -85,4 +85,6 @@
 - 移行案内: [`MIGRATION.md`](MIGRATION.md)
 - source repo 文脈: [`maintainers/PROJECT_CONTEXT.md`](maintainers/PROJECT_CONTEXT.md)
 - consumer 向け quickstart: [`template/docs/guides/quickstart.md`](template/docs/guides/quickstart.md)
+- consumer 更新ガイド: [`template/docs/guides/consumer-update.md`](template/docs/guides/consumer-update.md)
 - consumer 向け safety harness: [`template/docs/reference/codex-safety-harness.md`](template/docs/reference/codex-safety-harness.md)
+- run examples: [`examples/runs/`](examples/runs/)
