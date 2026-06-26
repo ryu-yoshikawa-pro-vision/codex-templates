@@ -20,7 +20,7 @@
 - consumer quickstart に新規導入手順、既存 repo 更新手順、mode 選択の目安を追加。
 - `template/codex-project.toml` の patch operation policy を明確化。
 - PowerShell validator に subagent spec validation を追加し、bash validator と検証観点を近づける。
-- PRレビュー依頼テンプレート、run artifact examples、GitHub Actions validation workflow を追加。
+- PRレビュー依頼テンプレートと GitHub Actions validation workflow を追加。
 - Integration test の shell fixture 呼び出しを `bash` 経由に統一し、CI 上の実行権限差分を避ける。
 
 ### Migration notes
