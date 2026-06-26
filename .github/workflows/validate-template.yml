@@ -1,0 +1,21 @@
+name: Validate template
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate spec
+        run: bash tools/validate-spec.sh
+      - name: Validate ps1 spec
+        run: pwsh -NoProfile -File tools/validate-spec.ps1
+      - name: Verify template
+        run: bash template/scripts/verify
+      - name: Run integration tests
+        run: bash tests/integration/test-codex-safety-harness.sh

@@ -41,6 +41,7 @@
     "template/.codex/rules-auto-net/20-auto-net-risky-forbidden.rules",
     "template/.codex/rules-auto-net/30-auto-net-forbidden.rules",
     "template/docs/PROJECT_CONTEXT.md",
+    "template/docs/guides/pr-review-request.md",
     "template/docs/reference/codex-safety-harness.md",
     "template/docs/reference/codex-implementation-harness.md",
     "template/.codex/templates/PLAN.md",

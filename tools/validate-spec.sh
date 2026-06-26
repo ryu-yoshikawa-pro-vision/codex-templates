@@ -38,10 +38,10 @@ def assert_contains(rel, patterns):
             raise SystemExit(f"Pattern '{pattern}' not found in {rel}")
 
 
-workflow = read_spec("spec/workflow.yaml")
-routing = read_spec("spec/routing.yaml")
-safety = read_spec("spec/safety-policy.yaml")
-naming = read_spec("spec/naming.yaml")
+workflow = read_spec("spec/workflow.json")
+routing = read_spec("spec/routing.json")
+safety = read_spec("spec/safety-policy.json")
+naming = read_spec("spec/naming.json")
 
 for rel in workflow["required_files"]:
     assert_exists(rel)

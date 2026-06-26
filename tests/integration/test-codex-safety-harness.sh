@@ -4,7 +4,9 @@ set -euo pipefail
 source_repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 repo_root="$source_repo_root/template"
 wrapper="$repo_root/scripts/codex-safe.sh"
+wrapper_cmd=(bash "$wrapper")
 fake_codex="$source_repo_root/tests/fixtures/fake-codex.sh"
+fake_codex_cmd=(bash "$fake_codex")
 export CODEX_BIN="$fake_codex"
 python_cmd="python3"
 if ! command -v python3 >/dev/null 2>&1; then
@@ -33,7 +35,7 @@ assert_decision() {
   local expected="$1"
   shift
   local output
-  output="$("$CODEX_BIN" execpolicy check "${rule_args[@]}" -- "$@")"
+  output="$("${fake_codex_cmd[@]}" execpolicy check "${rule_args[@]}" -- "$@")"
   local actual
   actual="$(decision_from_json "$output")"
   if [[ "$actual" != "$expected" ]]; then
@@ -45,7 +47,7 @@ assert_decision() {
 assert_wrapper_blocked() {
   local out
   set +e
-  out="$($wrapper --no-log --print-command "$@" 2>&1)"
+  out="$("${wrapper_cmd[@]}" --no-log --print-command "$@" 2>&1)"
   local code=$?
   set -e
   if [[ $code -eq 0 ]]; then
@@ -63,7 +65,7 @@ assert_wrapper_failed() {
   shift
   local out
   set +e
-  out="$($wrapper --no-log "$@" 2>&1)"
+  out="$("${wrapper_cmd[@]}" --no-log "$@" 2>&1)"
   local code=$?
   set -e
   if [[ $code -eq 0 ]]; then
@@ -77,7 +79,7 @@ assert_wrapper_failed() {
 }
 
 assert_wrapper_preview_ok() {
-  "$wrapper" --no-log --print-command "$@" >/tmp/codex-safe-preview.json
+  "${wrapper_cmd[@]}" --no-log --print-command "$@" >/tmp/codex-safe-preview.json
   rm -f /tmp/codex-safe-preview.json
 }
 
@@ -97,9 +99,9 @@ FAKE_CODEX_DOCKER_PS_DECISION=allow assert_decision forbidden crontab -e
 FAKE_CODEX_DOCKER_PS_DECISION=allow assert_decision forbidden netsh advfirewall show allprofiles
 FAKE_CODEX_DOCKER_PS_DECISION=allow assert_decision forbidden git checkout feature
 
-"$wrapper" --no-log --preflight-only >/tmp/codex-safe-preflight.log
+"${wrapper_cmd[@]}" --no-log --preflight-only >/tmp/codex-safe-preflight.log
 rm -f /tmp/codex-safe-preflight.log
-FAKE_CODEX_DOCKER_PS_DECISION=allow "$wrapper" --no-log --preset auto-net --preflight-only >/tmp/codex-safe-auto-net-preflight.log
+FAKE_CODEX_DOCKER_PS_DECISION=allow "${wrapper_cmd[@]}" --no-log --preset auto-net --preflight-only >/tmp/codex-safe-auto-net-preflight.log
 rm -f /tmp/codex-safe-auto-net-preflight.log
 
 if command -v python3 >/dev/null 2>&1; then
@@ -143,7 +145,7 @@ assert_wrapper_blocked -s danger-full-access
 assert_wrapper_preview_ok --allow-search exec --help
 
 run_id="20260420-010101-JST"
-"$wrapper" --run-id "$run_id" --print-command exec --help >/tmp/codex-safe-run-id-preview.json
+"${wrapper_cmd[@]}" --run-id "$run_id" --print-command exec --help >/tmp/codex-safe-run-id-preview.json
 "$python_cmd" - "$run_id" /tmp/codex-safe-run-id-preview.json <<'PY'
 import json
 import sys
@@ -156,7 +158,7 @@ if f".codex/runs/{run_id}/logs" not in data.get("log_path", "").replace("\\", "/
     raise SystemExit(f"Run-id log path not under .codex/runs: {data.get('log_path')}")
 PY
 rm -f /tmp/codex-safe-run-id-preview.json
-FAKE_CODEX_DOCKER_PS_DECISION=allow "$wrapper" --preset auto-net --print-command exec --help >/tmp/codex-safe-auto-net-preview.json
+FAKE_CODEX_DOCKER_PS_DECISION=allow "${wrapper_cmd[@]}" --preset auto-net --print-command exec --help >/tmp/codex-safe-auto-net-preview.json
 "$python_cmd" - /tmp/codex-safe-auto-net-preview.json <<'PY'
 import json
 import sys
@@ -174,7 +176,7 @@ rm -f /tmp/codex-safe-auto-net-preview.json
 assert_wrapper_failed "Invalid --run-id" --run-id "../escape" --print-command exec --help
 
 log_path="$(mktemp)"
-"$wrapper" --print-command --log-path "$log_path" exec --help >/tmp/codex-safe-log-preview.json
+"${wrapper_cmd[@]}" --print-command --log-path "$log_path" exec --help >/tmp/codex-safe-log-preview.json
 rm -f /tmp/codex-safe-log-preview.json
 if ! grep -q '"event":"wrapper_start"' "$log_path"; then
   echo "Missing wrapper_start event in log" >&2
@@ -195,7 +197,7 @@ rm -f "$log_path"
 
 failure_log="$(mktemp)"
 set +e
-"$wrapper" --log-path "$failure_log" exec --definitely-invalid-flag >/tmp/codex-safe-failure-case.out 2>&1
+"${wrapper_cmd[@]}" --log-path "$failure_log" exec --definitely-invalid-flag >/tmp/codex-safe-failure-case.out 2>&1
 failure_code=$?
 set -e
 rm -f /tmp/codex-safe-failure-case.out
