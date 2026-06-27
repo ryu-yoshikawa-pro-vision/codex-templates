@@ -42,6 +42,43 @@ if data["status"] != expected:
 PY
 }
 
+assert_manifest_baseline() {
+  local path="$1"
+  local expected_run_id="$2"
+  local expected_report_name="$3"
+  "$python_cmd" - "$path" "$expected_run_id" "$expected_report_name" <<'PY'
+import json
+import sys
+path, expected_run_id, expected_report_name = sys.argv[1:4]
+data = json.load(open(path, encoding="utf-8"))
+if data["run_id"] != expected_run_id:
+    raise SystemExit(f"expected run_id {expected_run_id}, got {data['run_id']}")
+if data["task_type"] != "implementation":
+    raise SystemExit(f"expected default task_type implementation, got {data['task_type']}")
+if data["workflow_level"] != "standard":
+    raise SystemExit(f"expected default workflow_level standard, got {data['workflow_level']}")
+if data["validation"]["status"] != "skipped":
+    raise SystemExit(f"expected validation.status skipped, got {data['validation']['status']}")
+if data["status"] != "completed":
+    raise SystemExit(f"expected run status completed, got {data['status']}")
+reports = data["codex_task_reports"]
+if not reports:
+    raise SystemExit("expected codex_task_reports to contain at least one path")
+report_ref = reports[0].replace("\\", "/")
+expected_prefix = f".codex/runs/{expected_run_id}/reports/"
+if expected_prefix not in report_ref:
+    raise SystemExit(f"expected report path under {expected_prefix}, got {report_ref}")
+if not report_ref.endswith(expected_report_name):
+    raise SystemExit(f"expected report ref to end with {expected_report_name}, got {report_ref}")
+if data["changed_files"] != []:
+    raise SystemExit(f"expected changed_files to be empty, got {data['changed_files']}")
+if data["evaluation_path"] is not None:
+    raise SystemExit(f"expected evaluation_path null, got {data['evaluation_path']}")
+if data["primary_failure_category"] is not None:
+    raise SystemExit(f"expected primary_failure_category null, got {data['primary_failure_category']}")
+PY
+}
+
 export CODEX_BIN="$fake_codex"
 cd "$template_root"
 printf '{"type":"object","required":["status"],"properties":{"status":{"type":"string"}},"additionalProperties":false}\n' > "$temp_root/schema.json"
@@ -78,6 +115,37 @@ for key in ("output_file", "log_path"):
     if f".codex/runs/{expected_run_id}/" not in data[key].replace("\\", "/"):
         raise SystemExit(f"{key} is not run-local: {data[key]}")
 PY
+
+manifest_run_id="20260420-020203-JST"
+bash "$wrapper" --run-id "$manifest_run_id" --record-run-manifest --skip-verify "RUN_MANIFEST_OK"
+manifest_report="$(find "$template_root/.codex/runs/$manifest_run_id/reports" -type f -name 'codex-task-*.report.json' | sort | tail -n 1)"
+manifest_path="$template_root/.codex/runs/$manifest_run_id/run.json"
+assert_status "$manifest_report" verify_skipped
+assert_manifest_baseline "$manifest_path" "$manifest_run_id" "$(basename "$manifest_report")"
+
+set +e
+bash "$wrapper" --report-path "$temp_root/missing-run-id.report.json" --log-path "$temp_root/missing-run-id.jsonl" --record-run-manifest --skip-verify "RUN_MANIFEST_NO_RUN_ID" >"$temp_root/missing-run-id.out" 2>&1
+code=$?
+set -e
+[[ $code -ne 0 ]]
+grep -q -- "--record-run-manifest requires --run-id" "$temp_root/missing-run-id.out"
+assert_status "$temp_root/missing-run-id.report.json" invalid_args
+
+set +e
+bash "$wrapper" --report-path "$temp_root/invalid-task-type.report.json" --log-path "$temp_root/invalid-task-type.jsonl" --task-type invalid --skip-verify "INVALID_TASK_TYPE" >"$temp_root/invalid-task-type.out" 2>&1
+code=$?
+set -e
+[[ $code -ne 0 ]]
+grep -q "Invalid --task-type" "$temp_root/invalid-task-type.out"
+assert_status "$temp_root/invalid-task-type.report.json" invalid_args
+
+set +e
+bash "$wrapper" --report-path "$temp_root/invalid-workflow-level.report.json" --log-path "$temp_root/invalid-workflow-level.jsonl" --workflow-level invalid --skip-verify "INVALID_WORKFLOW_LEVEL" >"$temp_root/invalid-workflow-level.out" 2>&1
+code=$?
+set -e
+[[ $code -ne 0 ]]
+grep -q "Invalid --workflow-level" "$temp_root/invalid-workflow-level.out"
+assert_status "$temp_root/invalid-workflow-level.report.json" invalid_args
 
 set +e
 bash "$wrapper" --report-path "$temp_root/invalid-run.report.json" --log-path "$temp_root/invalid-run.jsonl" --run-id "../escape" --skip-verify "RUN_ID_BAD" >"$temp_root/invalid-run.out" 2>&1

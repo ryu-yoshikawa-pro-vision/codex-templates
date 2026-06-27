@@ -97,6 +97,36 @@ function Assert-ReportStatus {
     return $report
 }
 
+function Assert-RunManifestBaseline {
+    param(
+        [string]$Path,
+        [string]$ExpectedRunId,
+        [string]$ExpectedReportName
+    )
+
+    if (-not (Test-Path $Path)) {
+        throw "Missing run manifest file: $Path"
+    }
+
+    $manifest = Get-Content -Raw $Path | ConvertFrom-Json
+    if ($manifest.run_id -ne $ExpectedRunId) { throw "Expected run_id $ExpectedRunId, got $($manifest.run_id)" }
+    if ($manifest.task_type -ne 'implementation') { throw "Expected default task_type implementation, got $($manifest.task_type)" }
+    if ($manifest.workflow_level -ne 'standard') { throw "Expected default workflow_level standard, got $($manifest.workflow_level)" }
+    if ($manifest.validation.status -ne 'skipped') { throw "Expected validation.status skipped, got $($manifest.validation.status)" }
+    if ($manifest.status -ne 'completed') { throw "Expected run status completed, got $($manifest.status)" }
+    if (@($manifest.codex_task_reports).Count -lt 1) { throw "Expected codex_task_reports to contain at least one entry" }
+    $reportRef = ([string]$manifest.codex_task_reports[0] -replace '\\', '/') -replace '/+', '/'
+    if ($reportRef -notmatch [regex]::Escape(".codex/runs/$ExpectedRunId/reports/")) {
+        throw "Expected report ref under .codex/runs/$ExpectedRunId/reports/, got $reportRef"
+    }
+    if (-not $reportRef.EndsWith($ExpectedReportName)) {
+        throw "Expected report ref to end with $ExpectedReportName, got $reportRef"
+    }
+    if (@($manifest.changed_files).Count -ne 0) { throw "Expected changed_files to be empty" }
+    if ($null -ne $manifest.evaluation_path) { throw "Expected evaluation_path to be null" }
+    if ($null -ne $manifest.primary_failure_category) { throw "Expected primary_failure_category to be null" }
+}
+
 New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
 Push-Location $templateRoot
 try {
@@ -202,6 +232,55 @@ try {
             throw "Run-local path expected, got: $value"
         }
     }
+
+    $manifestRunId = "20260420-020303-JST"
+    $manifestCase = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $manifestRunId,
+        '--record-run-manifest',
+        '--skip-verify',
+        'RUN_MANIFEST_OK'
+    ) -ExtraEnv $envMap
+    if ($manifestCase.ExitCode -ne 0) { throw "run manifest case failed unexpectedly: $($manifestCase.Combined)" }
+    $manifestReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $manifestRunId "reports"))
+    $manifestReportPath = (Get-ChildItem -Path $manifestReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $manifestReportPath -ExpectedStatus 'verify_skipped' | Out-Null
+    Assert-RunManifestBaseline -Path (Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $manifestRunId "run.json"))) -ExpectedRunId $manifestRunId -ExpectedReportName ([System.IO.Path]::GetFileName($manifestReportPath))
+
+    $missingRunIdReport = Join-Path $tempRoot "missing-run-id.report.json"
+    $missingRunId = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--report-path', $missingRunIdReport,
+        '--log-path', (Join-Path $tempRoot "missing-run-id.jsonl"),
+        '--record-run-manifest',
+        '--skip-verify',
+        'RUN_MANIFEST_NO_RUN_ID'
+    ) -ExtraEnv $envMap
+    if ($missingRunId.ExitCode -eq 0) { throw "missing run-id manifest case unexpectedly succeeded" }
+    if ($missingRunId.Combined -notmatch [regex]::Escape('--record-run-manifest requires --run-id')) { throw "Missing run-id manifest message missing: $($missingRunId.Combined)" }
+    Assert-ReportStatus -Path $missingRunIdReport -ExpectedStatus 'invalid_args' | Out-Null
+
+    $invalidTaskTypeReport = Join-Path $tempRoot "invalid-task-type.report.json"
+    $invalidTaskType = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--report-path', $invalidTaskTypeReport,
+        '--log-path', (Join-Path $tempRoot "invalid-task-type.jsonl"),
+        '--task-type', 'invalid',
+        '--skip-verify',
+        'INVALID_TASK_TYPE'
+    ) -ExtraEnv $envMap
+    if ($invalidTaskType.ExitCode -eq 0) { throw "invalid task-type case unexpectedly succeeded" }
+    if ($invalidTaskType.Combined -notmatch 'Invalid --task-type') { throw "Invalid task-type message missing: $($invalidTaskType.Combined)" }
+    Assert-ReportStatus -Path $invalidTaskTypeReport -ExpectedStatus 'invalid_args' | Out-Null
+
+    $invalidWorkflowLevelReport = Join-Path $tempRoot "invalid-workflow-level.report.json"
+    $invalidWorkflowLevel = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--report-path', $invalidWorkflowLevelReport,
+        '--log-path', (Join-Path $tempRoot "invalid-workflow-level.jsonl"),
+        '--workflow-level', 'invalid',
+        '--skip-verify',
+        'INVALID_WORKFLOW_LEVEL'
+    ) -ExtraEnv $envMap
+    if ($invalidWorkflowLevel.ExitCode -eq 0) { throw "invalid workflow-level case unexpectedly succeeded" }
+    if ($invalidWorkflowLevel.Combined -notmatch 'Invalid --workflow-level') { throw "Invalid workflow-level message missing: $($invalidWorkflowLevel.Combined)" }
+    Assert-ReportStatus -Path $invalidWorkflowLevelReport -ExpectedStatus 'invalid_args' | Out-Null
 
     $invalidRunReport = Join-Path $tempRoot "invalid-run.report.json"
     $invalidRun = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(

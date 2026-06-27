@@ -19,16 +19,21 @@
 - `examples/runs/README.md` に run examples の入口を追加。
 - Codex harness の契約整理として `spec/artifact-responsibility.json`、`spec/failure-taxonomy.json`、`template/docs/reference/run-artifacts.md`、`template/docs/reference/failure-taxonomy.md`、`template/docs/reference/evaluation.md`、`template/docs/reference/change-scope-policy.md` を追加。
 - Codex harness の schema validation support として `spec/evaluation.schema.json`、`spec/run-manifest.schema.json`、`template/.codex/templates/RUN_MANIFEST.json`、`template/.codex/templates/EVALUATION.md` を追加。
+- `codex-task` に `--task-type`、`--workflow-level`、`--record-run-manifest` を追加。
+- `codex-task --record-run-manifest --run-id <run_id>` で `.codex/runs/<run_id>/run.json` を生成する baseline support を追加。
 
 ### Changed
 
 - `template/docs/reference/codex-safety-harness.md` に `apply_patch` の operation policy 表を追加。
 - `template/docs/guides/quickstart.md` から consumer update guide へ誘導するように更新。
 - `tools/validate-spec.sh`、`tools/validate-spec.ps1`、`template/scripts/verify` を拡張し、新規 schema / template / static catalog / reference docs の整合性を検証するように更新。
+- `run.json` を low-level `codex-task-*.report.json` の置き換えではなく aggregate manifest として扱うように `codex-task` wrapper と integration test を更新。
+- `spec/run-manifest.schema.json`、validator、wrapper runtime record を `host | docker-sandbox | sdk` に揃えた。
 
 ### Migration notes
 
 - 既存 consumer repo が更新後の `template/scripts/verify` を取り込む場合は、`.codex/templates/RUN_MANIFEST.json`、`.codex/templates/EVALUATION.md`、`docs/reference/run-artifacts.md`、`docs/reference/failure-taxonomy.md`、`docs/reference/evaluation.md`、`docs/reference/change-scope-policy.md` も同期対象に含める。
+- 既存 consumer repo が `codex-task` 更新を取り込む場合は、`scripts/codex-task.sh`、`scripts/codex-task.ps1`、`.codex/templates/RUN_MANIFEST.json`、`codex-project.toml` を合わせて同期する。
 
 ## 0.3.0 - 2026-06-27
 
