@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "catalog_type": "static_change_scope_policy_catalog",
-  "notes": "This catalog fixes the change scope contract before runner enforcement. Validators check catalog presence and invariants, while runner enforcement, glob matching, and changed_files collection remain deferred.",
+  "notes": "This catalog defines the baseline change scope contract enforced by codex-task. Validators check catalog presence and invariants, while glob matching remains deferred beyond the TASK-006B exact-path baseline.",
   "path_normalization": {
     "canonical_format": "repo_relative_posix",
     "windows_separator_normalization": true,
@@ -52,8 +52,8 @@
     "must_not_be_mixed_with_source_changes": true
   },
   "deferred": {
-    "runner_enforcement": true,
+    "runner_enforcement": false,
     "glob_matching": true,
-    "changed_files_collection": true
+    "changed_files_collection": false
   }
 }

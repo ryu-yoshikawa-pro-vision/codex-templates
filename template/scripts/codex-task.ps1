@@ -32,6 +32,10 @@ param(
 
     [string]$RunId,
 
+    [string[]]$AllowedFiles,
+
+    [string[]]$ExpectedChangedFiles,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$Arguments
 )
@@ -139,6 +143,76 @@ function Test-RunId {
     param([string]$RunId)
 
     return [string]::IsNullOrWhiteSpace($RunId) -or $RunId -match '^\d{8}-\d{6}-JST$'
+}
+
+function Normalize-RepoRelativePosixPath {
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Path,
+        [switch]$ValidateScopePath,
+        [string]$OptionName
+    )
+
+    if ($ValidateScopePath -and [string]::IsNullOrWhiteSpace($Path)) {
+        throw "$OptionName requires a non-empty path"
+    }
+
+    $normalizedInput = $Path -replace '\\', '/'
+    if ($ValidateScopePath) {
+        if ($normalizedInput.IndexOfAny([char[]]@('*', '?', '[', ']')) -ge 0) {
+            throw "$OptionName does not support glob patterns: $Path"
+        }
+        if ([System.IO.Path]::IsPathRooted($normalizedInput) -or $normalizedInput -match '^[A-Za-z]:/' -or $normalizedInput.StartsWith('//', [System.StringComparison]::Ordinal)) {
+            throw "$OptionName requires a repo-relative path: $Path"
+        }
+    }
+
+    $segments = New-Object System.Collections.Generic.List[string]
+    foreach ($segment in $normalizedInput.Split('/', [System.StringSplitOptions]::None)) {
+        if ([string]::IsNullOrEmpty($segment) -or $segment -eq '.') {
+            continue
+        }
+        if ($segment -eq '..') {
+            if ($segments.Count -eq 0) {
+                if ($ValidateScopePath) {
+                    throw "$OptionName path escapes repo root: $Path"
+                }
+                return $null
+            }
+            $segments.RemoveAt($segments.Count - 1)
+            continue
+        }
+        $segments.Add($segment)
+    }
+
+    if ($segments.Count -eq 0) {
+        if ($ValidateScopePath) {
+            throw "$OptionName requires a repo-relative file path: $Path"
+        }
+        return $null
+    }
+
+    return ($segments -join '/')
+}
+
+function Add-NormalizedScopePaths {
+    param(
+        [Parameter(Mandatory = $true)]$Target,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$RawList,
+        [Parameter(Mandatory = $true)][string]$OptionName
+    )
+
+    foreach ($item in $RawList.Split(',', [System.StringSplitOptions]::None)) {
+        $Target.Add((Normalize-RepoRelativePosixPath -Path $item -ValidateScopePath -OptionName $OptionName))
+    }
+}
+
+function Get-SortedUniqueStrings {
+    param([string[]]$Values)
+
+    if ($null -eq $Values -or @($Values).Count -eq 0) {
+        return @()
+    }
+    return @($Values | Sort-Object -Unique)
 }
 
 function Get-CodexCommand {
@@ -317,7 +391,7 @@ function Write-RunManifest {
         codex_task_reports = @(
             Convert-ToRepoRelativePath -RepoRoot $RepoRoot -Path $State.report_path
         )
-        changed_files = @()
+        changed_files = @($State.changed_files)
         validation = [ordered]@{
             status = $State.validation_status
             commands = $validationCommands
@@ -326,7 +400,7 @@ function Write-RunManifest {
             network = ($State.preset -eq "auto-net" -or $State.allow_search)
             delete_attempt_blocked = $false
             git_mutation_attempt_blocked = $false
-            scope_violation = $false
+            scope_violation = $State.scope_violation
         }
         evaluation_path = $null
         status = $State.run_status
@@ -334,6 +408,160 @@ function Write-RunManifest {
     }
 
     ($manifest | ConvertTo-Json -Depth 8) | Set-Content -Path $Path
+}
+
+function Get-GitChangedFiles {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    try {
+        & git -C $RepoRoot rev-parse --is-inside-work-tree *> $null
+        if ($LASTEXITCODE -ne 0) {
+            return @()
+        }
+    }
+    catch {
+        return @()
+    }
+
+    $gitCmd = Get-Command git -ErrorAction SilentlyContinue
+    if (-not $gitCmd) {
+        return @()
+    }
+
+    $psi = [System.Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = $gitCmd.Source
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $escapedRepoRoot = $RepoRoot.Replace('"', '\"')
+    $psi.Arguments = "-C `"$escapedRepoRoot`" status --porcelain=v1 -z --untracked-files=all"
+
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo = $psi
+    $buffer = New-Object System.IO.MemoryStream
+
+    try {
+        $process.Start() | Out-Null
+        $process.StandardOutput.BaseStream.CopyTo($buffer)
+        $null = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+        if ($process.ExitCode -ne 0) {
+            return @()
+        }
+
+        $entries = ([System.Text.Encoding]::UTF8.GetString($buffer.ToArray())).Split([char]0, [System.StringSplitOptions]::None)
+        $paths = New-Object System.Collections.Generic.List[string]
+        for ($i = 0; $i -lt $entries.Count; $i++) {
+            $entry = $entries[$i]
+            if ([string]::IsNullOrEmpty($entry)) {
+                continue
+            }
+
+            $status = $entry.Substring(0, 2)
+            $primary = $entry.Substring(3)
+            $normalized = Normalize-RepoRelativePosixPath -Path $primary
+            if (-not [string]::IsNullOrWhiteSpace($normalized) -and
+                $normalized -ne '.codex/runs' -and
+                -not $normalized.StartsWith('.codex/runs/', [System.StringComparison]::Ordinal)) {
+                $paths.Add($normalized)
+            }
+
+            if ($status.Contains('R') -or $status.Contains('C')) {
+                if (($i + 1) -lt $entries.Count) {
+                    $secondary = $entries[$i + 1]
+                    $i++
+                    if ($status.Contains('R')) {
+                        $normalized = Normalize-RepoRelativePosixPath -Path $secondary
+                        if (-not [string]::IsNullOrWhiteSpace($normalized) -and
+                            $normalized -ne '.codex/runs' -and
+                            -not $normalized.StartsWith('.codex/runs/', [System.StringComparison]::Ordinal)) {
+                            $paths.Add($normalized)
+                        }
+                    }
+                }
+            }
+        }
+
+        return @($paths | Sort-Object -Unique)
+    }
+    finally {
+        $buffer.Dispose()
+        $process.Dispose()
+    }
+}
+
+function Invoke-ScopeChecks {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$State,
+        [Parameter(Mandatory = $true)][hashtable]$Report,
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    if (@($State.allowed_files).Count -gt 0) {
+        $allowedLookup = @{}
+        foreach ($path in @($State.allowed_files)) {
+            $allowedLookup[$path] = $true
+        }
+
+        $violations = New-Object System.Collections.Generic.List[string]
+        foreach ($path in @($State.changed_files)) {
+            if (-not $allowedLookup.ContainsKey($path)) {
+                $violations.Add($path)
+            }
+        }
+
+        if ($violations.Count -gt 0) {
+            $orderedViolations = @($violations | Sort-Object -Unique)
+            $evidence = "changed files outside allowed_files: " + ($orderedViolations -join ', ')
+            $Report.status = "scope_violation"
+            $State.validation_status = "blocked"
+            $State.validation_command = "change scope check"
+            $State.validation_command_exit_code = 1
+            $State.validation_command_status = "blocked"
+            $State.validation_command_evidence = $evidence
+            $State.run_status = "failed"
+            $State.scope_violation = $true
+            Write-TaskLog -Path $State.log_path -Event "scope_violation" -Data @{ evidence = $evidence }
+            Write-TaskReport -Path $State.report_path -Report $Report
+            if ($State.record_run_manifest) {
+                Write-RunManifest -Path $State.manifest_path -State $State -Report $Report -RepoRoot $RepoRoot
+            }
+            exit 1
+        }
+    }
+
+    if (@($State.expected_changed_files).Count -gt 0) {
+        $changedLookup = @{}
+        foreach ($path in @($State.changed_files)) {
+            $changedLookup[$path] = $true
+        }
+
+        $missingExpected = New-Object System.Collections.Generic.List[string]
+        foreach ($path in @($State.expected_changed_files)) {
+            if (-not $changedLookup.ContainsKey($path)) {
+                $missingExpected.Add($path)
+            }
+        }
+
+        if ($missingExpected.Count -gt 0) {
+            $orderedMissing = @($missingExpected | Sort-Object -Unique)
+            $evidence = "expected files were not changed: " + ($orderedMissing -join ', ')
+            $Report.status = "expected_changes_missing"
+            $State.validation_status = "failed"
+            $State.validation_command = "expected changed files check"
+            $State.validation_command_exit_code = 1
+            $State.validation_command_status = "failed"
+            $State.validation_command_evidence = $evidence
+            $State.run_status = "failed"
+            $State.scope_violation = $false
+            Write-TaskLog -Path $State.log_path -Event "expected_changes_missing" -Data @{ evidence = $evidence }
+            Write-TaskReport -Path $State.report_path -Report $Report
+            if ($State.record_run_manifest) {
+                Write-RunManifest -Path $State.manifest_path -State $State -Report $Report -RepoRoot $RepoRoot
+            }
+            exit 1
+        }
+    }
 }
 
 function Fail-Task {
@@ -405,6 +633,10 @@ $state = [ordered]@{
     validation_command_exit_code = $null
     validation_command_status = $null
     validation_command_evidence = $null
+    allowed_files = (New-Object System.Collections.Generic.List[string])
+    expected_changed_files = (New-Object System.Collections.Generic.List[string])
+    changed_files = @()
+    scope_violation = $false
 }
 
 $report = [ordered]@{
@@ -440,6 +672,18 @@ if ($SkipPreflight) { $normalizedArguments.Add('--skip-preflight') }
 if ($SkipVerify) { $normalizedArguments.Add('--skip-verify') }
 if ($PSBoundParameters.ContainsKey('LogPath')) { $normalizedArguments.Add('--log-path'); $normalizedArguments.Add($LogPath) }
 if ($PSBoundParameters.ContainsKey('RunId')) { $normalizedArguments.Add('--run-id'); $normalizedArguments.Add($RunId) }
+if ($PSBoundParameters.ContainsKey('AllowedFiles')) {
+    foreach ($value in $AllowedFiles) {
+        $normalizedArguments.Add('--allowed-files')
+        $normalizedArguments.Add($value)
+    }
+}
+if ($PSBoundParameters.ContainsKey('ExpectedChangedFiles')) {
+    foreach ($value in $ExpectedChangedFiles) {
+        $normalizedArguments.Add('--expected-changed-files')
+        $normalizedArguments.Add($value)
+    }
+}
 if ($Arguments) {
     foreach ($arg in $Arguments) {
         $normalizedArguments.Add($arg)
@@ -533,6 +777,26 @@ while ($i -lt $Arguments.Count) {
             if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--run-id requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
             $state.run_id = $Arguments[$i]
         }
+        '--allowed-files' {
+            $i++
+            if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--allowed-files requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
+            try {
+                Add-NormalizedScopePaths -Target $state.allowed_files -RawList $Arguments[$i] -OptionName '--allowed-files'
+            }
+            catch {
+                Fail-Task -Status "invalid_args" -Message $_.Exception.Message -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+            }
+        }
+        '--expected-changed-files' {
+            $i++
+            if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--expected-changed-files requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
+            try {
+                Add-NormalizedScopePaths -Target $state.expected_changed_files -RawList $Arguments[$i] -OptionName '--expected-changed-files'
+            }
+            catch {
+                Fail-Task -Status "invalid_args" -Message $_.Exception.Message -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+            }
+        }
         '--record-run-manifest' { $state.record_run_manifest = $true }
         '--dangerously-bypass-approvals-and-sandbox' { Block-UnsafeArgument -Token $token -Reason "dangerous bypass is prohibited" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
         { $_ -like '--config*' -or $_ -like '-c*' } { Block-UnsafeArgument -Token $token -Reason "user config overrides are blocked; wrapper injects fixed safety settings" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
@@ -551,6 +815,17 @@ while ($i -lt $Arguments.Count) {
         }
     }
     $i++
+}
+
+$state.allowed_files = @(Get-SortedUniqueStrings -Values @($state.allowed_files))
+$state.expected_changed_files = @(Get-SortedUniqueStrings -Values @($state.expected_changed_files))
+
+if (@($state.allowed_files).Count -gt 0 -and (-not $state.record_run_manifest -or [string]::IsNullOrWhiteSpace($state.run_id))) {
+    Fail-Task -Status "invalid_args" -Message "--allowed-files requires --run-id and --record-run-manifest" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+}
+
+if (@($state.expected_changed_files).Count -gt 0 -and (-not $state.record_run_manifest -or [string]::IsNullOrWhiteSpace($state.run_id))) {
+    Fail-Task -Status "invalid_args" -Message "--expected-changed-files requires --run-id and --record-run-manifest" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
 }
 
 if ($state.record_run_manifest -and [string]::IsNullOrWhiteSpace($state.run_id)) {
@@ -759,6 +1034,10 @@ else {
 }
 
 Write-TaskLog -Path $state.log_path -Event "codex_exec_exit" -Data @{ exit_code = $report.codex_exit_code }
+if ($state.record_run_manifest) {
+    $state.changed_files = @(Get-GitChangedFiles -RepoRoot $repoRoot)
+    Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
+}
 if ($report.codex_exit_code -ne 0) {
     $report.status = "codex_failed"
     Write-TaskReport -Path $state.report_path -Report $report
@@ -772,6 +1051,8 @@ if ($report.codex_exit_code -ne 0) {
 if (-not (Test-Path $state.output_file)) {
     Fail-Task -Status "missing_output" -Message "codex exec completed without writing output file" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
 }
+
+Invoke-ScopeChecks -State $state -Report $report -RepoRoot $repoRoot
 
 if ($state.output_schema) {
     $pythonCmd = Get-PythonCommand
