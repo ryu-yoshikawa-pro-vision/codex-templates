@@ -67,6 +67,8 @@ check_template_contract() {
   [[ -f .codex/hooks/pre_tool_use_policy.py ]] || return 1
   [[ -f .codex/hooks/pre_tool_use_policy.ps1 ]] || return 1
   [[ -f .codex/templates/PLAN.md ]] || return 1
+  [[ -f .codex/templates/RUN_MANIFEST.json ]] || return 1
+  [[ -f .codex/templates/EVALUATION.md ]] || return 1
   [[ -f .codex/rules/10-readonly-allow.rules ]] || return 1
   [[ -f .codex/rules-auto-net/10-auto-net-allow.rules ]] || return 1
   [[ -f .codex/rules-auto-net/20-auto-net-risky-forbidden.rules ]] || return 1
@@ -82,6 +84,10 @@ check_template_contract() {
   [[ -f .agents/skills/code-review/references/review-workflow.md ]] || return 1
   [[ -f docs/reference/codex-safety-harness.md ]] || return 1
   [[ -f docs/reference/codex-implementation-harness.md ]] || return 1
+  [[ -f docs/reference/run-artifacts.md ]] || return 1
+  [[ -f docs/reference/failure-taxonomy.md ]] || return 1
+  [[ -f docs/reference/evaluation.md ]] || return 1
+  [[ -f docs/reference/change-scope-policy.md ]] || return 1
   contains ".agents/skills/feature-plan/SKILL.md" AGENTS.md || return 1
   contains ".agents/skills/code-review/SKILL.md" AGENTS.md || return 1
   contains "docs/reference/codex-safety-harness.md" AGENTS.md || return 1
@@ -146,6 +152,19 @@ check_template_contract() {
   contains "スコープ遵守確認" .codex/agents/implementation_worker.toml || return 1
   contains "指定外ファイルを変更していないことの確認" .codex/agents/implementation_worker.toml || return 1
   contains "削除 / rename / git mutation を行っていないことの確認" .codex/agents/implementation_worker.toml || return 1
+  contains "run.json" docs/reference/run-artifacts.md || return 1
+  contains "evaluation.json" docs/reference/run-artifacts.md || return 1
+  contains "codex-task" docs/reference/run-artifacts.md || return 1
+  contains "Source-of-Truth" docs/reference/run-artifacts.md || return 1
+  contains "primary_failure_category" docs/reference/failure-taxonomy.md || return 1
+  contains "failure_categories" docs/reference/failure-taxonomy.md || return 1
+  contains "artifact_contract_gap" docs/reference/failure-taxonomy.md || return 1
+  contains "rating + evidence" docs/reference/evaluation.md || return 1
+  contains "improvement_candidates" docs/reference/evaluation.md || return 1
+  contains "not_evaluated" docs/reference/evaluation.md || return 1
+  contains "allowed_files" docs/reference/change-scope-policy.md || return 1
+  contains "expected_changed_files" docs/reference/change-scope-policy.md || return 1
+  contains ".codex/runs/" docs/reference/change-scope-policy.md || return 1
 }
 
 check_execpolicy_baseline() {
