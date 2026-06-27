@@ -245,6 +245,7 @@ Assert-Condition ($pathNormalization.canonical_format -eq "repo_relative_posix")
 Assert-Condition ($pathNormalization.windows_separator_normalization -eq $true) "spec/change-scope-policy.json path_normalization.windows_separator_normalization is out of contract"
 Assert-Condition ($pathNormalization.absolute_paths_for_comparison -eq $false) "spec/change-scope-policy.json path_normalization.absolute_paths_for_comparison is out of contract"
 Assert-Condition ($pathNormalization.prevent_repo_escape -eq $true) "spec/change-scope-policy.json path_normalization.prevent_repo_escape is out of contract"
+Assert-Condition ($pathNormalization.case_sensitive -eq $true) "spec/change-scope-policy.json path_normalization.case_sensitive is out of contract"
 
 Expect-EnumContains -Values $changeScopePolicy.changed_file_kinds -Expected @(
     "modified",
@@ -259,11 +260,24 @@ Expect-EnumContains -Values $changeScopePolicy.generated_artifact_exclusions -Ex
 
 Assert-Condition ($changeScopePolicy.allowed_files.meaning -eq "maximum_change_boundary") "spec/change-scope-policy.json allowed_files.meaning is out of contract"
 Assert-Condition ($changeScopePolicy.allowed_files.match_mode -eq "exact_path") "spec/change-scope-policy.json allowed_files.match_mode is out of contract"
+Assert-Condition ($changeScopePolicy.allowed_files.glob_support -eq "deferred") "spec/change-scope-policy.json allowed_files.glob_support is out of contract"
+Assert-Condition ($changeScopePolicy.allowed_files.scope_violation_when_not_allowed -eq $true) "spec/change-scope-policy.json allowed_files.scope_violation_when_not_allowed is out of contract"
 Assert-Condition ($changeScopePolicy.expected_changed_files.meaning -eq "expected_required_changes") "spec/change-scope-policy.json expected_changed_files.meaning is out of contract"
+Assert-Condition ($changeScopePolicy.expected_changed_files.must_be_subset_of_allowed_files -eq "recommended") "spec/change-scope-policy.json expected_changed_files.must_be_subset_of_allowed_files is out of contract"
+Assert-Condition ($changeScopePolicy.expected_changed_files.missing_expected_change_severity -eq "warning_or_failure_candidate") "spec/change-scope-policy.json expected_changed_files.missing_expected_change_severity is out of contract"
+Assert-Condition ($changeScopePolicy.deleted_files.included_in_changed_files -eq $true) "spec/change-scope-policy.json deleted_files.included_in_changed_files is out of contract"
+Assert-Condition ($changeScopePolicy.deleted_files.requires_allowed_path -eq $true) "spec/change-scope-policy.json deleted_files.requires_allowed_path is out of contract"
+Assert-Condition ($changeScopePolicy.renamed_files.evaluate_old_path -eq $true) "spec/change-scope-policy.json renamed_files.evaluate_old_path is out of contract"
+Assert-Condition ($changeScopePolicy.renamed_files.evaluate_new_path -eq $true) "spec/change-scope-policy.json renamed_files.evaluate_new_path is out of contract"
+Assert-Condition ($changeScopePolicy.renamed_files.new_path_requires_allowed_path -eq $true) "spec/change-scope-policy.json renamed_files.new_path_requires_allowed_path is out of contract"
+Assert-Condition ($changeScopePolicy.copied_files.evaluate_new_path -eq $true) "spec/change-scope-policy.json copied_files.evaluate_new_path is out of contract"
+Assert-Condition ($changeScopePolicy.copied_files.new_path_requires_allowed_path -eq $true) "spec/change-scope-policy.json copied_files.new_path_requires_allowed_path is out of contract"
 Assert-Condition ($changeScopePolicy.run_artifacts.path_prefix -eq ".codex/runs/") "spec/change-scope-policy.json run_artifacts.path_prefix is out of contract"
 Assert-Condition ($changeScopePolicy.run_artifacts.excluded_from_scope_check -eq $true) "spec/change-scope-policy.json run_artifacts.excluded_from_scope_check is out of contract"
 Assert-Condition ($changeScopePolicy.run_artifacts.may_be_recorded_in_manifest -eq $true) "spec/change-scope-policy.json run_artifacts.may_be_recorded_in_manifest is out of contract"
+Assert-Condition ($changeScopePolicy.run_artifacts.must_not_be_mixed_with_source_changes -eq $true) "spec/change-scope-policy.json run_artifacts.must_not_be_mixed_with_source_changes is out of contract"
 Assert-Condition ($changeScopePolicy.deferred.runner_enforcement -eq $true) "spec/change-scope-policy.json deferred.runner_enforcement is out of contract"
+Assert-Condition ($changeScopePolicy.deferred.glob_matching -eq $true) "spec/change-scope-policy.json deferred.glob_matching is out of contract"
 Assert-Condition ($changeScopePolicy.deferred.changed_files_collection -eq $true) "spec/change-scope-policy.json deferred.changed_files_collection is out of contract"
 
 $taxonomyEntries = Normalize-ToArray $failureTaxonomy.categories

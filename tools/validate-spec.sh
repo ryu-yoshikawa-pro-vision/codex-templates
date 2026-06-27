@@ -209,6 +209,10 @@ ensure(
     path_normalization.get("prevent_repo_escape") is True,
     "spec/change-scope-policy.json path_normalization.prevent_repo_escape is out of contract",
 )
+ensure(
+    path_normalization.get("case_sensitive") is True,
+    "spec/change-scope-policy.json path_normalization.case_sensitive is out of contract",
+)
 
 expect_enum_contains(
     change_scope_policy.get("changed_file_kinds", []),
@@ -238,11 +242,61 @@ ensure(
     allowed_files.get("match_mode") == "exact_path",
     "spec/change-scope-policy.json allowed_files.match_mode is out of contract",
 )
+ensure(
+    allowed_files.get("glob_support") == "deferred",
+    "spec/change-scope-policy.json allowed_files.glob_support is out of contract",
+)
+ensure(
+    allowed_files.get("scope_violation_when_not_allowed") is True,
+    "spec/change-scope-policy.json allowed_files.scope_violation_when_not_allowed is out of contract",
+)
 
 expected_changed_files = change_scope_policy.get("expected_changed_files", {})
 ensure(
     expected_changed_files.get("meaning") == "expected_required_changes",
     "spec/change-scope-policy.json expected_changed_files.meaning is out of contract",
+)
+ensure(
+    expected_changed_files.get("must_be_subset_of_allowed_files") == "recommended",
+    "spec/change-scope-policy.json expected_changed_files.must_be_subset_of_allowed_files is out of contract",
+)
+ensure(
+    expected_changed_files.get("missing_expected_change_severity") == "warning_or_failure_candidate",
+    "spec/change-scope-policy.json expected_changed_files.missing_expected_change_severity is out of contract",
+)
+
+deleted_files = change_scope_policy.get("deleted_files", {})
+ensure(
+    deleted_files.get("included_in_changed_files") is True,
+    "spec/change-scope-policy.json deleted_files.included_in_changed_files is out of contract",
+)
+ensure(
+    deleted_files.get("requires_allowed_path") is True,
+    "spec/change-scope-policy.json deleted_files.requires_allowed_path is out of contract",
+)
+
+renamed_files = change_scope_policy.get("renamed_files", {})
+ensure(
+    renamed_files.get("evaluate_old_path") is True,
+    "spec/change-scope-policy.json renamed_files.evaluate_old_path is out of contract",
+)
+ensure(
+    renamed_files.get("evaluate_new_path") is True,
+    "spec/change-scope-policy.json renamed_files.evaluate_new_path is out of contract",
+)
+ensure(
+    renamed_files.get("new_path_requires_allowed_path") is True,
+    "spec/change-scope-policy.json renamed_files.new_path_requires_allowed_path is out of contract",
+)
+
+copied_files = change_scope_policy.get("copied_files", {})
+ensure(
+    copied_files.get("evaluate_new_path") is True,
+    "spec/change-scope-policy.json copied_files.evaluate_new_path is out of contract",
+)
+ensure(
+    copied_files.get("new_path_requires_allowed_path") is True,
+    "spec/change-scope-policy.json copied_files.new_path_requires_allowed_path is out of contract",
 )
 
 run_artifacts = change_scope_policy.get("run_artifacts", {})
@@ -258,11 +312,19 @@ ensure(
     run_artifacts.get("may_be_recorded_in_manifest") is True,
     "spec/change-scope-policy.json run_artifacts.may_be_recorded_in_manifest is out of contract",
 )
+ensure(
+    run_artifacts.get("must_not_be_mixed_with_source_changes") is True,
+    "spec/change-scope-policy.json run_artifacts.must_not_be_mixed_with_source_changes is out of contract",
+)
 
 deferred = change_scope_policy.get("deferred", {})
 ensure(
     deferred.get("runner_enforcement") is True,
     "spec/change-scope-policy.json deferred.runner_enforcement is out of contract",
+)
+ensure(
+    deferred.get("glob_matching") is True,
+    "spec/change-scope-policy.json deferred.glob_matching is out of contract",
 )
 ensure(
     deferred.get("changed_files_collection") is True,
