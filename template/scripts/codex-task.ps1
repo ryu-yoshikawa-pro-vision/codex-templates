@@ -28,6 +28,16 @@ param(
 
     [switch]$SkipVerify,
 
+    [switch]$EvaluationTemplate,
+
+    [switch]$RequireEvaluation,
+
+    [switch]$RequireCleanGit,
+
+    [switch]$RequireRunId,
+
+    [string]$MaxIterations,
+
     [string]$LogPath,
 
     [string]$RunId,
@@ -355,7 +365,7 @@ function Write-TaskLog {
 function Write-TaskReport {
     param(
         [string]$Path,
-        [hashtable]$Report
+        [System.Collections.IDictionary]$Report
     )
 
     $parent = Split-Path -Parent $Path
@@ -366,29 +376,51 @@ function Write-TaskReport {
     ($Report | ConvertTo-Json -Depth 6) | Set-Content -Path $Path
 }
 
+function Add-ValidationCommand {
+    param(
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$State,
+        [Parameter(Mandatory = $true)][string]$Command,
+        [Parameter(Mandatory = $true)][AllowNull()]$ExitCode,
+        [Parameter(Mandatory = $true)][string]$Status,
+        [Parameter(Mandatory = $true)][string]$Evidence
+    )
+
+    $State.validation_commands = @($State.validation_commands) + @(
+        [ordered]@{
+            command = $Command
+            exit_code = $ExitCode
+            status = $Status
+            evidence = $Evidence
+        }
+    )
+
+    switch ($Status) {
+        'blocked' { $State.validation_status = 'blocked' }
+        'failed' { $State.validation_status = 'failed' }
+        'passed' {
+            if ($State.validation_status -in @('not_run', 'skipped')) {
+                $State.validation_status = 'passed'
+            }
+        }
+        'skipped' {
+            if ($State.validation_status -eq 'not_run') {
+                $State.validation_status = 'skipped'
+            }
+        }
+    }
+}
+
 function Write-RunManifest {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][hashtable]$State,
-        [Parameter(Mandatory = $true)][hashtable]$Report,
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$State,
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Report,
         [Parameter(Mandatory = $true)][string]$RepoRoot
     )
 
     $parent = Split-Path -Parent $Path
     if (-not [string]::IsNullOrWhiteSpace($parent) -and -not (Test-Path $parent)) {
         New-Item -ItemType Directory -Path $parent -Force | Out-Null
-    }
-
-    $validationCommands = @()
-    if (-not [string]::IsNullOrWhiteSpace($State.validation_command_status)) {
-        $validationCommands = @(
-            [ordered]@{
-                command = $State.validation_command
-                exit_code = $State.validation_command_exit_code
-                status = $State.validation_command_status
-                evidence = $State.validation_command_evidence
-            }
-        )
     }
 
     $manifest = [ordered]@{
@@ -408,7 +440,7 @@ function Write-RunManifest {
         changed_files = @($State.changed_files)
         validation = [ordered]@{
             status = $State.validation_status
-            commands = $validationCommands
+            commands = @($State.validation_commands)
         }
         safety = [ordered]@{
             network = ($State.preset -eq "auto-net" -or $State.allow_search)
@@ -416,9 +448,9 @@ function Write-RunManifest {
             git_mutation_attempt_blocked = $false
             scope_violation = $State.scope_violation
         }
-        evaluation_path = $null
+        evaluation_path = $State.evaluation_path
         status = $State.run_status
-        primary_failure_category = $null
+        primary_failure_category = $State.primary_failure_category
     }
 
     ($manifest | ConvertTo-Json -Depth 8) | Set-Content -Path $Path
@@ -506,8 +538,8 @@ function Get-GitChangedFiles {
 
 function Invoke-ScopeChecks {
     param(
-        [Parameter(Mandatory = $true)][hashtable]$State,
-        [Parameter(Mandatory = $true)][hashtable]$Report,
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$State,
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Report,
         [Parameter(Mandatory = $true)][string]$RepoRoot
     )
 
@@ -528,11 +560,7 @@ function Invoke-ScopeChecks {
             $orderedViolations = @(Get-SortedUniqueStrings -Values @($violations))
             $evidence = "changed files outside allowed_files: " + ($orderedViolations -join ', ')
             $Report.status = "scope_violation"
-            $State.validation_status = "blocked"
-            $State.validation_command = "change scope check"
-            $State.validation_command_exit_code = 1
-            $State.validation_command_status = "blocked"
-            $State.validation_command_evidence = $evidence
+            Add-ValidationCommand -State $State -Command "change scope check" -ExitCode 1 -Status "blocked" -Evidence $evidence
             $State.run_status = "failed"
             $State.scope_violation = $true
             Write-TaskLog -Path $State.log_path -Event "scope_violation" -Data @{ evidence = $evidence }
@@ -561,11 +589,7 @@ function Invoke-ScopeChecks {
             $orderedMissing = @(Get-SortedUniqueStrings -Values @($missingExpected))
             $evidence = "expected files were not changed: " + ($orderedMissing -join ', ')
             $Report.status = "expected_changes_missing"
-            $State.validation_status = "failed"
-            $State.validation_command = "expected changed files check"
-            $State.validation_command_exit_code = 1
-            $State.validation_command_status = "failed"
-            $State.validation_command_evidence = $evidence
+            Add-ValidationCommand -State $State -Command "expected changed files check" -ExitCode 1 -Status "failed" -Evidence $evidence
             $State.run_status = "failed"
             $State.scope_violation = $false
             Write-TaskLog -Path $State.log_path -Event "expected_changes_missing" -Data @{ evidence = $evidence }
@@ -578,13 +602,234 @@ function Invoke-ScopeChecks {
     }
 }
 
+function Invoke-CleanGitPrecondition {
+    param(
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$State,
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Report,
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    if (-not $State.require_clean_git) {
+        return
+    }
+
+    $State.changed_files = @(Get-GitChangedFiles -RepoRoot $RepoRoot)
+    if (@($State.changed_files).Count -eq 0) {
+        return
+    }
+
+    $evidence = "working tree has pre-existing source changes: " + (@($State.changed_files) -join ', ')
+    $Report.status = "dirty_git"
+    $State.run_status = "failed"
+    Add-ValidationCommand -State $State -Command "clean git check" -ExitCode 1 -Status "blocked" -Evidence $evidence
+    Write-TaskLog -Path $State.log_path -Event "dirty_git" -Data @{ evidence = $evidence }
+    Write-TaskReport -Path $State.report_path -Report $Report
+    if ($State.record_run_manifest) {
+        Write-RunManifest -Path $State.manifest_path -State $State -Report $Report -RepoRoot $RepoRoot
+    }
+    exit 1
+}
+
+function Initialize-EvaluationTemplate {
+    param(
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$State,
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    if (-not $State.evaluation_template) {
+        return
+    }
+
+    $State.evaluation_path = ".codex/runs/$($State.run_id)/evaluation.json"
+    $parent = Split-Path -Parent $State.evaluation_file_path
+    if (-not [string]::IsNullOrWhiteSpace($parent) -and -not (Test-Path $parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+    if (Test-Path $State.evaluation_file_path) {
+        Write-TaskLog -Path $State.log_path -Event "evaluation_template_exists" -Data @{ path = $State.evaluation_path }
+        return
+    }
+
+    $evaluation = [ordered]@{
+        schema_version = 1
+        run_id = $State.run_id
+        result = "not_evaluated"
+        primary_failure_category = $null
+        failure_categories = @()
+        dimensions = [ordered]@{
+            task_completion = [ordered]@{
+                rating = "not_evaluated"
+                evidence = "Task completion has not been evaluated yet."
+            }
+            scope_control = [ordered]@{
+                rating = "not_evaluated"
+                evidence = "Scope control has not been evaluated yet."
+            }
+            validation_confidence = [ordered]@{
+                rating = "not_evaluated"
+                evidence = "Validation confidence has not been evaluated yet."
+            }
+            safety_compliance = [ordered]@{
+                rating = "not_evaluated"
+                evidence = "Safety compliance has not been evaluated yet."
+            }
+            reviewability = [ordered]@{
+                rating = "not_evaluated"
+                evidence = "Reviewability has not been evaluated yet."
+            }
+            maintainability = [ordered]@{
+                rating = "not_evaluated"
+                evidence = "Maintainability has not been evaluated yet."
+            }
+            reproducibility = [ordered]@{
+                rating = "not_evaluated"
+                evidence = "Reproducibility has not been evaluated yet."
+            }
+        }
+        findings = @()
+        improvement_candidates = @()
+    }
+
+    ($evaluation | ConvertTo-Json -Depth 8) | Set-Content -Path $State.evaluation_file_path
+    Write-TaskLog -Path $State.log_path -Event "evaluation_template_created" -Data @{ path = $State.evaluation_path }
+}
+
+function Invoke-JsonSchemaValidation {
+    param(
+        [Parameter(Mandatory = $true)][string]$SchemaPath,
+        [Parameter(Mandatory = $true)][string]$JsonPath
+    )
+
+    $pythonCmd = Get-PythonCommand
+    if (-not $pythonCmd) {
+        throw "Python is required to validate JSON schema"
+    }
+
+    $result = & $pythonCmd (Join-Path $repoRoot "scripts\\validate-output-schema.py") $SchemaPath $JsonPath 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $message = ($result | Out-String).Trim()
+        if ([string]::IsNullOrWhiteSpace($message)) {
+            $message = "schema validation failed"
+        }
+        throw $message
+    }
+}
+
+function Resolve-EvaluationSchemaPath {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    foreach ($candidate in @(
+            (Join-Path $RepoRoot "spec\\evaluation.schema.json"),
+            (Join-Path $RepoRoot ".codex\\templates\\evaluation.schema.json")
+        )) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+function Get-EvaluationPrimaryFailureCategory {
+    param(
+        [Parameter(Mandatory = $true)][string]$EvaluationPath,
+        [Parameter(Mandatory = $true)][string]$ExpectedRunId
+    )
+
+    if (-not (Test-Path $EvaluationPath)) {
+        throw "evaluation.json is missing: $EvaluationPath"
+    }
+
+    try {
+        $data = Get-Content -Raw -Path $EvaluationPath | ConvertFrom-Json
+    }
+    catch {
+        throw "Invalid JSON in ${EvaluationPath}: $($_.Exception.Message)"
+    }
+
+    $actualRunId = [string]$data.run_id
+    if ($actualRunId -ne $ExpectedRunId) {
+        throw "evaluation run_id mismatch: expected $ExpectedRunId, got $actualRunId"
+    }
+
+    $value = $data.primary_failure_category
+    if ($null -eq $value) {
+        return "null"
+    }
+
+    return [string]$value
+}
+
+function Invoke-RequiredEvaluationValidation {
+    param(
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$State,
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Report,
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    if (-not $State.require_evaluation) {
+        return
+    }
+
+    $expectedRepoPath = ".codex/runs/$($State.run_id)/evaluation.json"
+    if (-not (Test-Path $State.evaluation_file_path)) {
+        $Report.status = "evaluation_missing"
+        $State.run_status = "failed"
+        $State.evaluation_path = $null
+        $evidence = "evaluation.json is missing: $expectedRepoPath"
+        Add-ValidationCommand -State $State -Command "evaluation validation" -ExitCode 1 -Status "failed" -Evidence $evidence
+        Write-TaskLog -Path $State.log_path -Event "evaluation_missing" -Data @{ evidence = $evidence }
+        Write-TaskReport -Path $State.report_path -Report $Report
+        if ($State.record_run_manifest) {
+            Write-RunManifest -Path $State.manifest_path -State $State -Report $Report -RepoRoot $RepoRoot
+        }
+        exit 1
+    }
+
+    $State.evaluation_path = $expectedRepoPath
+    $evaluationSchemaPath = Resolve-EvaluationSchemaPath -RepoRoot $RepoRoot
+    if (-not $evaluationSchemaPath) {
+        $Report.status = "evaluation_invalid"
+        $State.run_status = "failed"
+        $evidence = "Evaluation schema not found: spec/evaluation.schema.json or .codex/templates/evaluation.schema.json"
+        Add-ValidationCommand -State $State -Command "evaluation validation" -ExitCode 1 -Status "failed" -Evidence $evidence
+        Write-TaskLog -Path $State.log_path -Event "evaluation_invalid" -Data @{ evidence = $evidence }
+        Write-TaskReport -Path $State.report_path -Report $Report
+        if ($State.record_run_manifest) {
+            Write-RunManifest -Path $State.manifest_path -State $State -Report $Report -RepoRoot $RepoRoot
+        }
+        exit 1
+    }
+
+    try {
+        Invoke-JsonSchemaValidation -SchemaPath $evaluationSchemaPath -JsonPath $State.evaluation_file_path
+        $category = Get-EvaluationPrimaryFailureCategory -EvaluationPath $State.evaluation_file_path -ExpectedRunId $State.run_id
+    }
+    catch {
+        $Report.status = "evaluation_invalid"
+        $State.run_status = "failed"
+        $evidence = $_.Exception.Message
+        Add-ValidationCommand -State $State -Command "evaluation validation" -ExitCode 1 -Status "failed" -Evidence $evidence
+        Write-TaskLog -Path $State.log_path -Event "evaluation_invalid" -Data @{ evidence = $evidence }
+        Write-TaskReport -Path $State.report_path -Report $Report
+        if ($State.record_run_manifest) {
+            Write-RunManifest -Path $State.manifest_path -State $State -Report $Report -RepoRoot $RepoRoot
+        }
+        exit 1
+    }
+
+    $State.primary_failure_category = if ($category -eq 'null') { $null } else { $category }
+    Add-ValidationCommand -State $State -Command "evaluation validation" -ExitCode 0 -Status "passed" -Evidence "evaluation.json passed schema validation"
+    Write-TaskLog -Path $State.log_path -Event "evaluation_valid" -Data @{ path = $State.evaluation_path }
+}
+
 function Fail-Task {
     param(
         [string]$Status,
         [string]$Message,
         [string]$LogPath,
         [string]$ReportPath,
-        [hashtable]$Report
+        [System.Collections.IDictionary]$Report
     )
 
     $Report.status = $Status
@@ -603,7 +848,7 @@ function Block-UnsafeArgument {
         [string]$Reason,
         [string]$LogPath,
         [string]$ReportPath,
-        [hashtable]$Report
+        [System.Collections.IDictionary]$Report
     )
 
     Fail-Task -Status "blocked_args" -Message "Unsafe Codex argument blocked: '$Token' ($Reason)" -LogPath $LogPath -ReportPath $ReportPath -Report $Report
@@ -625,7 +870,16 @@ $state = [ordered]@{
     task_type = "implementation"
     workflow_level = "standard"
     record_run_manifest = $false
+    evaluation_template = $false
+    require_evaluation = $false
+    require_clean_git = $false
+    require_run_id = $false
+    max_iterations = $null
     run_id = $null
+    run_root = $null
+    evaluation_file_path = $null
+    evaluation_path = $null
+    primary_failure_category = $null
     prompt_file = $null
     prompt = $null
     output_file = Join-Path $artifactsDir ("codex-task-" + $timestamp + ".json")
@@ -643,10 +897,7 @@ $state = [ordered]@{
     manifest_started = $false
     run_status = "pending"
     validation_status = "not_run"
-    validation_command = $null
-    validation_command_exit_code = $null
-    validation_command_status = $null
-    validation_command_evidence = $null
+    validation_commands = @()
     allowed_files = (New-Object System.Collections.Generic.List[string])
     expected_changed_files = (New-Object System.Collections.Generic.List[string])
     changed_files = @()
@@ -684,6 +935,11 @@ if ($PSBoundParameters.ContainsKey('VerifyCommand')) { $normalizedArguments.Add(
 if ($AllowSearch) { $normalizedArguments.Add('--allow-search') }
 if ($SkipPreflight) { $normalizedArguments.Add('--skip-preflight') }
 if ($SkipVerify) { $normalizedArguments.Add('--skip-verify') }
+if ($EvaluationTemplate) { $normalizedArguments.Add('--evaluation-template') }
+if ($RequireEvaluation) { $normalizedArguments.Add('--require-evaluation') }
+if ($RequireCleanGit) { $normalizedArguments.Add('--require-clean-git') }
+if ($RequireRunId) { $normalizedArguments.Add('--require-run-id') }
+if ($PSBoundParameters.ContainsKey('MaxIterations')) { $normalizedArguments.Add('--max-iterations'); $normalizedArguments.Add($MaxIterations) }
 if ($PSBoundParameters.ContainsKey('LogPath')) { $normalizedArguments.Add('--log-path'); $normalizedArguments.Add($LogPath) }
 if ($PSBoundParameters.ContainsKey('RunId')) { $normalizedArguments.Add('--run-id'); $normalizedArguments.Add($RunId) }
 if ($PSBoundParameters.ContainsKey('AllowedFiles')) {
@@ -780,11 +1036,20 @@ while ($i -lt $Arguments.Count) {
         '--allow-search' { $state.allow_search = $true }
         '--skip-preflight' { $state.skip_preflight = $true }
         '--skip-verify' { $state.skip_verify = $true }
+        '--evaluation-template' { $state.evaluation_template = $true }
+        '--require-evaluation' { $state.require_evaluation = $true }
+        '--require-clean-git' { $state.require_clean_git = $true }
+        '--require-run-id' { $state.require_run_id = $true }
         '--log-path' {
             $i++
             if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--log-path requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
             $state.log_path = Resolve-RepoPath -RepoRoot $repoRoot -Path $Arguments[$i]
             $state.explicit_log_path = $true
+        }
+        '--max-iterations' {
+            $i++
+            if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--max-iterations requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
+            $state.max_iterations = $Arguments[$i]
         }
         '--run-id' {
             $i++
@@ -842,6 +1107,29 @@ if (@($state.expected_changed_files).Count -gt 0 -and (-not $state.record_run_ma
     Fail-Task -Status "invalid_args" -Message "--expected-changed-files requires --run-id and --record-run-manifest" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
 }
 
+if ($state.evaluation_template -and (-not $state.record_run_manifest -or [string]::IsNullOrWhiteSpace($state.run_id))) {
+    Fail-Task -Status "invalid_args" -Message "--evaluation-template requires --run-id and --record-run-manifest" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+}
+
+if ($state.require_evaluation -and (-not $state.record_run_manifest -or [string]::IsNullOrWhiteSpace($state.run_id))) {
+    Fail-Task -Status "invalid_args" -Message "--require-evaluation requires --run-id and --record-run-manifest" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+}
+
+if ($state.require_run_id -and [string]::IsNullOrWhiteSpace($state.run_id)) {
+    Fail-Task -Status "invalid_args" -Message "--require-run-id requires --run-id" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+}
+
+if ($null -ne $state.max_iterations) {
+    $parsedMaxIterations = 0
+    if ([string]::IsNullOrWhiteSpace([string]$state.max_iterations) -or
+        -not [int]::TryParse([string]$state.max_iterations, [ref]$parsedMaxIterations) -or
+        $parsedMaxIterations -lt 1 -or
+        $parsedMaxIterations -gt 10) {
+        Fail-Task -Status "invalid_args" -Message "--max-iterations must be an integer between 1 and 10" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+    }
+    $state.max_iterations = $parsedMaxIterations
+}
+
 if ($state.record_run_manifest -and [string]::IsNullOrWhiteSpace($state.run_id)) {
     Fail-Task -Status "invalid_args" -Message "--record-run-manifest requires --run-id" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
 }
@@ -851,6 +1139,7 @@ if (-not [string]::IsNullOrWhiteSpace($state.run_id)) {
         Fail-Task -Status "invalid_args" -Message "Invalid --run-id: expected YYYYMMDD-HHMMSS-JST" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
     }
     $runRoot = Join-Path $repoRoot (Join-Path ".codex\\runs" $state.run_id)
+    $state.run_root = $runRoot
     $runsRoot = Join-Path $repoRoot ".codex\\runs"
     if (-not (Test-IsPathUnderRoot -Path $runRoot -Root $runsRoot)) {
         Fail-Task -Status "invalid_args" -Message "Invalid --run-id path: resolved run path escapes .codex/runs" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
@@ -867,6 +1156,7 @@ if (-not [string]::IsNullOrWhiteSpace($state.run_id)) {
     if ($state.record_run_manifest) {
         $state.manifest_path = Join-Path $runRoot "run.json"
     }
+    $state.evaluation_file_path = Join-Path $runRoot "evaluation.json"
 }
 
 $report.runtime = $state.runtime
@@ -883,7 +1173,6 @@ $logParent = Split-Path -Parent $state.log_path
 if (-not (Test-Path $logParent)) {
     New-Item -ItemType Directory -Path $logParent -Force | Out-Null
 }
-Write-TaskLog -Path $state.log_path -Event "wrapper_start" -Data @{ runtime = $state.runtime; preset = $state.preset; run_id = $state.run_id }
 
 if ($state.preset -notin @("safe", "readonly", "auto-net")) {
     Fail-Task -Status "invalid_args" -Message "Unsupported preset: $($state.preset)" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
@@ -910,6 +1199,13 @@ $report.cwd = $cwd
 if ($state.record_run_manifest) {
     $state.manifest_started = $true
     $state.run_status = "running"
+    Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
+}
+
+Invoke-CleanGitPrecondition -State $state -Report $report -RepoRoot $repoRoot
+Write-TaskLog -Path $state.log_path -Event "wrapper_start" -Data @{ runtime = $state.runtime; preset = $state.preset; run_id = $state.run_id }
+Initialize-EvaluationTemplate -State $state -RepoRoot $repoRoot
+if ($state.record_run_manifest) {
     Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
 }
 
@@ -1069,26 +1365,16 @@ if (-not (Test-Path $state.output_file)) {
 Invoke-ScopeChecks -State $state -Report $report -RepoRoot $repoRoot
 
 if ($state.output_schema) {
-    $pythonCmd = Get-PythonCommand
-    if (-not $pythonCmd) {
-        Fail-Task -Status "invalid_output" -Message "Python is required to validate output schema" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
-    }
     try {
-        & $pythonCmd (Join-Path $repoRoot "scripts\\validate-output-schema.py") $state.output_schema $state.output_file
-        if ($LASTEXITCODE -ne 0) {
-            throw "schema validation failed"
-        }
+        Invoke-JsonSchemaValidation -SchemaPath $state.output_schema -JsonPath $state.output_file
         Write-TaskLog -Path $state.log_path -Event "schema_ok" -Data @{}
+        Add-ValidationCommand -State $state -Command "output schema validation" -ExitCode 0 -Status "passed" -Evidence "output schema validation passed"
     }
     catch {
         $report.status = "invalid_output"
-        $message = if ($_.Exception.Message -eq 'schema validation failed') { 'schema validation failed' } else { $_.Exception.Message }
+        $message = $_.Exception.Message
         Write-TaskLog -Path $state.log_path -Event "schema_failed" -Data @{ message = $message }
-        $state.validation_status = "failed"
-        $state.validation_command = "output schema validation"
-        $state.validation_command_exit_code = 1
-        $state.validation_command_status = "failed"
-        $state.validation_command_evidence = "output schema validation failed"
+        Add-ValidationCommand -State $state -Command "output schema validation" -ExitCode 1 -Status "failed" -Evidence "output schema validation failed"
         Write-TaskReport -Path $state.report_path -Report $report
         $state.run_status = "failed"
         if ($state.record_run_manifest) {
@@ -1100,68 +1386,61 @@ if ($state.output_schema) {
 
 if ($state.skip_verify) {
     $report.status = "verify_skipped"
-    Write-TaskReport -Path $state.report_path -Report $report
-    $state.validation_status = "skipped"
     $state.run_status = "completed"
-    if ($state.record_run_manifest) {
-        Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
-    }
-    exit 0
-}
-
-$verifyCommand = $state.verify_command
-if ([string]::IsNullOrWhiteSpace($verifyCommand)) {
-    if (Test-Path (Join-Path $repoRoot "scripts\\verify.ps1")) {
-        $verifyCommand = "powershell.exe -ExecutionPolicy Bypass -File scripts/verify.ps1"
-    }
-    elseif ((Get-Command bash -ErrorAction SilentlyContinue) -and (Test-Path (Join-Path $repoRoot "scripts\\verify"))) {
-        $verifyCommand = "bash scripts/verify"
+    if ($state.validation_status -eq 'not_run') {
+        $state.validation_status = 'skipped'
     }
 }
-
-if ([string]::IsNullOrWhiteSpace($verifyCommand)) {
-    $report.status = "verify_skipped"
-    Write-TaskLog -Path $state.log_path -Event "verify_skipped" -Data @{}
-    Write-TaskReport -Path $state.report_path -Report $report
-    $state.validation_status = "skipped"
-    $state.run_status = "completed"
-    if ($state.record_run_manifest) {
-        Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
+else {
+    $verifyCommand = $state.verify_command
+    if ([string]::IsNullOrWhiteSpace($verifyCommand)) {
+        if (Test-Path (Join-Path $repoRoot "scripts\\verify.ps1")) {
+            $verifyCommand = "powershell.exe -ExecutionPolicy Bypass -File scripts/verify.ps1"
+        }
+        elseif ((Get-Command bash -ErrorAction SilentlyContinue) -and (Test-Path (Join-Path $repoRoot "scripts\\verify"))) {
+            $verifyCommand = "bash scripts/verify"
+        }
     }
-    exit 0
-}
 
-Write-TaskLog -Path $state.log_path -Event "verify_start" -Data @{ command = $verifyCommand }
-try {
-    $report.verify_exit_code = Invoke-VerifyCommand -CommandText $verifyCommand -RepoRoot $repoRoot
-}
-catch {
-    $report.verify_exit_code = 1
-    Write-TaskLog -Path $state.log_path -Event "verify_failed_to_start" -Data @{ message = $_.Exception.Message }
-}
-Write-TaskLog -Path $state.log_path -Event "verify_exit" -Data @{ exit_code = $report.verify_exit_code }
-$state.validation_command = $verifyCommand
-$state.validation_command_exit_code = $report.verify_exit_code
-
-if ($report.verify_exit_code -ne 0) {
-    $report.status = "verify_failed"
-    Write-TaskReport -Path $state.report_path -Report $report
-    $state.validation_status = "failed"
-    $state.validation_command_status = "failed"
-    $state.validation_command_evidence = "verify command failed"
-    $state.run_status = "failed"
-    if ($state.record_run_manifest) {
-        Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
+    if ([string]::IsNullOrWhiteSpace($verifyCommand)) {
+        $report.status = "verify_skipped"
+        $state.run_status = "completed"
+        if ($state.validation_status -eq 'not_run') {
+            $state.validation_status = 'skipped'
+        }
+        Write-TaskLog -Path $state.log_path -Event "verify_skipped" -Data @{}
     }
-    exit $report.verify_exit_code
+    else {
+        Write-TaskLog -Path $state.log_path -Event "verify_start" -Data @{ command = $verifyCommand }
+        try {
+            $report.verify_exit_code = Invoke-VerifyCommand -CommandText $verifyCommand -RepoRoot $repoRoot
+        }
+        catch {
+            $report.verify_exit_code = 1
+            Write-TaskLog -Path $state.log_path -Event "verify_failed_to_start" -Data @{ message = $_.Exception.Message }
+        }
+        Write-TaskLog -Path $state.log_path -Event "verify_exit" -Data @{ exit_code = $report.verify_exit_code }
+
+        if ($report.verify_exit_code -ne 0) {
+            $report.status = "verify_failed"
+            Add-ValidationCommand -State $state -Command $verifyCommand -ExitCode $report.verify_exit_code -Status "failed" -Evidence "verify command failed"
+            Write-TaskReport -Path $state.report_path -Report $report
+            $state.run_status = "failed"
+            if ($state.record_run_manifest) {
+                Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
+            }
+            exit $report.verify_exit_code
+        }
+
+        $report.status = "ok"
+        $state.run_status = "completed"
+        Add-ValidationCommand -State $state -Command $verifyCommand -ExitCode $report.verify_exit_code -Status "passed" -Evidence "verify command completed successfully"
+    }
 }
 
-$report.status = "ok"
+Invoke-RequiredEvaluationValidation -State $state -Report $report -RepoRoot $repoRoot
+
 Write-TaskReport -Path $state.report_path -Report $report
-$state.validation_status = "passed"
-$state.validation_command_status = "passed"
-$state.validation_command_evidence = "verify command completed successfully"
-$state.run_status = "completed"
 if ($state.record_run_manifest) {
     Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
 }

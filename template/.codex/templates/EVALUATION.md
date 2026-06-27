@@ -2,6 +2,14 @@
 
 `evaluation.json` は agent または reviewer が作成します。実行事実は `run.json`、`codex-task` report JSON、logs を参照し、ここでは解釈と判断だけを記述します。
 
+- `--evaluation-template` はこの artifact の初期 skeleton を作るだけです。
+- `--require-evaluation` はこの artifact の存在と schema validation を要求します。
+- runner は evaluation result を自動判断しません。
+- `evaluation.json` が failure interpretation の source of truth です。
+- `run.json.evaluation_path` は evaluation artifact への summary link です。
+- `run.json.primary_failure_category` は valid evaluation からコピーされる summary field です。
+- baseline では `--evaluation-template` と `--require-evaluation` は `--run-id` + `--record-run-manifest` と組み合わせます。
+
 ## Inputs
 
 - Run manifest:
@@ -32,31 +40,31 @@
   "dimensions": {
     "task_completion": {
       "rating": "not_evaluated",
-      "evidence": "<task completion has not been evaluated yet>"
+      "evidence": "Task completion has not been evaluated yet."
     },
     "scope_control": {
       "rating": "not_evaluated",
-      "evidence": "<scope control has not been evaluated yet>"
+      "evidence": "Scope control has not been evaluated yet."
     },
     "validation_confidence": {
       "rating": "not_evaluated",
-      "evidence": "<validation confidence has not been evaluated yet>"
+      "evidence": "Validation confidence has not been evaluated yet."
     },
     "safety_compliance": {
       "rating": "not_evaluated",
-      "evidence": "<safety compliance has not been evaluated yet>"
+      "evidence": "Safety compliance has not been evaluated yet."
     },
     "reviewability": {
       "rating": "not_evaluated",
-      "evidence": "<reviewability has not been evaluated yet>"
+      "evidence": "Reviewability has not been evaluated yet."
     },
     "maintainability": {
       "rating": "not_evaluated",
-      "evidence": "<maintainability has not been evaluated yet>"
+      "evidence": "Maintainability has not been evaluated yet."
     },
     "reproducibility": {
       "rating": "not_evaluated",
-      "evidence": "<reproducibility has not been evaluated yet>"
+      "evidence": "Reproducibility has not been evaluated yet."
     }
   },
   "findings": [],

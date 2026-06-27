@@ -30,6 +30,14 @@
 - ただし `.codex/runs/` 配下の artifact は manifest に記録してよいものとします。
 - `changed_files` は repo-relative POSIX path の配列として `run.json` に記録します。
 
+## Clean Git Precondition
+
+- `--require-clean-git` は Codex 実行前の source dirty を検出します。
+- tracked modified、added、untracked、deleted、renamed、copied を dirty source changes として扱います。
+- `.codex/runs/` は generated artifact として clean git 判定から除外します。
+- dirty の場合は Codex を実行しません。
+- dirty failure では `changed_files` に pre-existing source changes を記録してよいものとします。
+
 ## Allowed Files
 
 - `allowed_files` は「変更してよい上限」を表します。
@@ -44,6 +52,7 @@
 - `allowed_files` とは意味が違います。
 - `expected_changed_files` が変更されていない場合、baseline runner では failure として扱います。
 - `expected_changed_files` は `allowed_files` の subset であることが望ましいです。
+- `--require-evaluation` や `--require-clean-git` を併用しても、`.codex/runs/` の generated artifact は source scope に混ぜません。
 
 ## Deleted / Renamed / Copied
 

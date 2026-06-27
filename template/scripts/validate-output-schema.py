@@ -10,6 +10,7 @@ SUPPORTED_SCHEMA_KEYS = {
     "description",
     "type",
     "enum",
+    "minLength",
     "required",
     "properties",
     "items",
@@ -28,6 +29,8 @@ def load_json(path_str):
 
 
 def check_type(expected, value):
+    if isinstance(expected, list):
+        return any(check_type(item, value) for item in expected)
     if expected == "object":
         return isinstance(value, dict)
     if expected == "array":
@@ -55,6 +58,9 @@ def validate(schema, value, path, errors):
 
     if "enum" in schema and value not in schema["enum"]:
         errors.append(f"{path}: value {value!r} not in enum {schema['enum']!r}")
+
+    if isinstance(value, str) and "minLength" in schema and len(value) < schema["minLength"]:
+        errors.append(f"{path}: expected minLength {schema['minLength']}, got {len(value)}")
 
     if isinstance(value, dict):
         required = schema.get("required", [])

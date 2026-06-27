@@ -25,6 +25,11 @@
 - `codex-task` に `--allowed-files` / `--expected-changed-files` の baseline enforcement を追加。
 - `run.json.changed_files` と `run.json.safety.scope_violation` を runner が記録するように更新。
 - `.codex/runs/` 配下の generated artifact を scope check 対象外として扱うようにした。
+- `codex-task` に `--evaluation-template` / `--require-evaluation` の baseline support を追加。
+- `codex-task` に `--require-clean-git` / `--require-run-id` の runner precondition support を追加。
+- `--max-iterations` の repair-loop 向け予約仕様を追加。
+- `evaluation.json` の schema validation 結果を `run.json.validation.commands` に記録するようにした。
+- `run.json.evaluation_path` と `run.json.primary_failure_category` を valid evaluation artifact から更新できるようにした。
 
 ### Changed
 
@@ -34,11 +39,13 @@
 - `template/docs/reference/change-scope-policy.md` を更新し、Markdown contract と JSON catalog の責務を明確化した。
 - `run.json` を low-level `codex-task-*.report.json` の置き換えではなく aggregate manifest として扱うように `codex-task` wrapper と integration test を更新。
 - `spec/run-manifest.schema.json`、validator、wrapper runtime record を `host | docker-sandbox | sdk` に揃えた。
+- `template/docs/reference/run-artifacts.md` と `template/.codex/templates/EVALUATION.md` を更新し、runner completion milestone の evaluation / clean git / reserved max iterations contract を明文化した。
 
 ### Migration notes
 
 - 既存 consumer repo が更新後の `template/scripts/verify` を取り込む場合は、`.codex/templates/RUN_MANIFEST.json`、`.codex/templates/EVALUATION.md`、`docs/reference/run-artifacts.md`、`docs/reference/failure-taxonomy.md`、`docs/reference/evaluation.md`、`docs/reference/change-scope-policy.md` も同期対象に含める。
 - 既存 consumer repo が `codex-task` 更新を取り込む場合は、`scripts/codex-task.sh`、`scripts/codex-task.ps1`、`.codex/templates/RUN_MANIFEST.json`、`codex-project.toml` を合わせて同期する。
+- 既存 consumer repo が runner completion milestone を取り込む場合は、`docs/reference/run-artifacts.md`、`docs/reference/change-scope-policy.md`、`.codex/templates/EVALUATION.md`、`scripts/verify` も同期対象に含める。
 
 ## 0.3.0 - 2026-06-27
 

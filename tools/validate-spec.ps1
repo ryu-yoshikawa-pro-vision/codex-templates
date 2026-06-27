@@ -51,6 +51,96 @@ function Normalize-ToArray {
     return @($Value)
 }
 
+function Test-IsJsonObjectLike {
+    param([Parameter(Mandatory = $false)]$Value)
+
+    if ($null -eq $Value) {
+        return $false
+    }
+
+    return ($Value -is [System.Collections.IDictionary]) -or
+        ($Value -is [pscustomobject]) -or
+        ($Value.PSObject.TypeNames -contains 'System.Management.Automation.PSCustomObject')
+}
+
+function Get-JsonObjectPropertyNames {
+    param([Parameter(Mandatory = $true)]$Value)
+
+    if ($Value -is [System.Collections.IDictionary]) {
+        return @($Value.Keys | ForEach-Object { [string]$_ } | Sort-Object)
+    }
+
+    return @($Value.PSObject.Properties | Select-Object -ExpandProperty Name | Sort-Object)
+}
+
+function Get-JsonObjectPropertyValue {
+    param(
+        [Parameter(Mandatory = $true)]$Value,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    if ($Value -is [System.Collections.IDictionary]) {
+        return $Value[$Name]
+    }
+
+    return $Value.PSObject.Properties[$Name].Value
+}
+
+function Test-JsonStructureEqual {
+    param(
+        [Parameter(Mandatory = $false)]$Left,
+        [Parameter(Mandatory = $false)]$Right
+    )
+
+    if ($null -eq $Left -or $null -eq $Right) {
+        return ($null -eq $Left -and $null -eq $Right)
+    }
+
+    $leftIsObject = Test-IsJsonObjectLike -Value $Left
+    $rightIsObject = Test-IsJsonObjectLike -Value $Right
+    if ($leftIsObject -or $rightIsObject) {
+        if (-not ($leftIsObject -and $rightIsObject)) {
+            return $false
+        }
+
+        $leftNames = @(Get-JsonObjectPropertyNames -Value $Left)
+        $rightNames = @(Get-JsonObjectPropertyNames -Value $Right)
+        if ($leftNames.Count -ne $rightNames.Count -or (Compare-Object -ReferenceObject $leftNames -DifferenceObject $rightNames)) {
+            return $false
+        }
+
+        foreach ($name in $leftNames) {
+            if (-not (Test-JsonStructureEqual -Left (Get-JsonObjectPropertyValue -Value $Left -Name $name) -Right (Get-JsonObjectPropertyValue -Value $Right -Name $name))) {
+                return $false
+            }
+        }
+        return $true
+    }
+
+    $leftIsArray = ($Left -is [System.Collections.IEnumerable] -and -not ($Left -is [string]))
+    $rightIsArray = ($Right -is [System.Collections.IEnumerable] -and -not ($Right -is [string]))
+    if ($leftIsArray -or $rightIsArray) {
+        if (-not ($leftIsArray -and $rightIsArray)) {
+            return $false
+        }
+
+        $leftItems = @(Normalize-ToArray $Left)
+        $rightItems = @(Normalize-ToArray $Right)
+        if ($leftItems.Count -ne $rightItems.Count) {
+            return $false
+        }
+
+        for ($index = 0; $index -lt $leftItems.Count; $index++) {
+            if (-not (Test-JsonStructureEqual -Left $leftItems[$index] -Right $rightItems[$index])) {
+                return $false
+            }
+        }
+        return $true
+    }
+
+    return ($Left -eq $Right)
+}
+
 function Assert-Condition {
     param(
         [bool]$Condition,
@@ -218,6 +308,7 @@ $requiredPaths = @(
     "spec/failure-taxonomy.json",
     "template/.codex/templates/RUN_MANIFEST.json",
     "template/.codex/templates/EVALUATION.md",
+    "template/.codex/templates/evaluation.schema.json",
     "template/docs/reference/run-artifacts.md",
     "template/docs/reference/failure-taxonomy.md",
     "template/docs/reference/evaluation.md",
@@ -229,6 +320,7 @@ foreach ($path in $requiredPaths) {
 }
 
 $evaluationSchema = Read-SpecFile -RelativePath "spec/evaluation.schema.json"
+$bundledEvaluationSchema = Read-SpecFile -RelativePath "template/.codex/templates/evaluation.schema.json"
 $runManifestSchema = Read-SpecFile -RelativePath "spec/run-manifest.schema.json"
 $artifactResponsibility = Read-SpecFile -RelativePath "spec/artifact-responsibility.json"
 $changeScopePolicy = Read-SpecFile -RelativePath "spec/change-scope-policy.json"
@@ -333,6 +425,9 @@ Expect-PropertyKeys -Schema $evaluationSchema -Fields @(
 Expect-EnumContains -Values $evaluationSchema.properties.result.enum -Expected @("pass", "partial", "fail", "not_evaluated") -Label "spec/evaluation.schema.json result"
 Expect-EnumSet -Values $evaluationSchema.properties.primary_failure_category.enum -Expected ($taxonomyCategories + @($null)) -Label "spec/evaluation.schema.json primary_failure_category"
 Expect-EnumSet -Values $evaluationSchema.properties.failure_categories.items.enum -Expected $taxonomyCategories -Label "spec/evaluation.schema.json failure_categories items"
+if (-not (Test-JsonStructureEqual -Left $bundledEvaluationSchema -Right $evaluationSchema)) {
+    throw "template/.codex/templates/evaluation.schema.json must stay in sync with spec/evaluation.schema.json"
+}
 
 $dimensionNames = @(
     "task_completion",

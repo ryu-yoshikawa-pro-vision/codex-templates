@@ -41,7 +41,7 @@ function Test-PythonAvailable {
 function Invoke-WindowsPowerShellFile {
     param(
         [Parameter(Mandatory = $true)][string]$ScriptPath,
-        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [AllowEmptyCollection()][AllowEmptyString()][string[]]$Arguments = @(),
         [hashtable]$ExtraEnv
     )
 
@@ -140,9 +140,12 @@ function Assert-RunManifestValidationFailed {
     if ($manifest.status -ne 'failed') { throw "Expected run status failed, got $($manifest.status)" }
     if ($manifest.validation.status -ne 'failed') { throw "Expected validation.status failed, got $($manifest.validation.status)" }
     $commands = @($manifest.validation.commands)
-    if ($commands.Count -ne 1) { throw "Expected one validation command, got $($commands.Count)" }
-    if ($commands[0].status -ne 'failed') { throw "Expected validation command status failed, got $($commands[0].status)" }
-    if ([string]::IsNullOrWhiteSpace([string]$commands[0].evidence)) { throw "Expected non-empty validation command evidence" }
+    if ($commands.Count -lt 1) { throw "Expected at least one validation command, got $($commands.Count)" }
+    $failedCommands = @($commands | Where-Object { $_.status -eq 'failed' })
+    if ($failedCommands.Count -lt 1) { throw "Expected at least one failed validation command, got $($commands | ConvertTo-Json -Depth 6)" }
+    foreach ($command in $failedCommands) {
+        if ([string]::IsNullOrWhiteSpace([string]$command.evidence)) { throw "Expected non-empty validation command evidence" }
+    }
 }
 
 function Assert-RunManifestState {
@@ -175,10 +178,51 @@ function Assert-RunManifestState {
         return
     }
 
-    if ($commands.Count -ne 1) { throw "Expected one validation command, got $($commands.Count)" }
-    if ($commands[0].command -ne $ExpectedCommand) { throw "Expected validation command $ExpectedCommand, got $($commands[0].command)" }
-    if ($commands[0].status -ne $ExpectedCommandStatus) { throw "Expected validation command status $ExpectedCommandStatus, got $($commands[0].status)" }
-    if ([string]::IsNullOrWhiteSpace([string]$commands[0].evidence)) { throw "Expected non-empty validation command evidence" }
+    $match = @($commands | Where-Object { $_.command -eq $ExpectedCommand -and $_.status -eq $ExpectedCommandStatus } | Select-Object -First 1)
+    if ($match.Count -ne 1) { throw "Expected validation command $ExpectedCommand/$ExpectedCommandStatus, got $($commands | ConvertTo-Json -Depth 6)" }
+    if ([string]::IsNullOrWhiteSpace([string]$match[0].evidence)) { throw "Expected non-empty validation command evidence" }
+}
+
+function Assert-RunManifestContainsCommand {
+    param(
+        [string]$Path,
+        [string]$ExpectedCommand,
+        [string]$ExpectedStatus
+    )
+
+    if (-not (Test-Path $Path)) {
+        throw "Missing run manifest file: $Path"
+    }
+
+    $manifest = Get-Content -Raw $Path | ConvertFrom-Json
+    $match = @(@($manifest.validation.commands) | Where-Object { $_.command -eq $ExpectedCommand -and $_.status -eq $ExpectedStatus } | Select-Object -First 1)
+    if ($match.Count -ne 1) {
+        throw "Expected validation command $ExpectedCommand/$ExpectedStatus, got $($manifest.validation.commands | ConvertTo-Json -Depth 6)"
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$match[0].evidence)) {
+        throw "Expected non-empty validation command evidence"
+    }
+}
+
+function Assert-RunManifestEvaluationSummary {
+    param(
+        [string]$Path,
+        [string]$ExpectedEvaluationPath,
+        [AllowNull()]$ExpectedPrimaryFailureCategory
+    )
+
+    if (-not (Test-Path $Path)) {
+        throw "Missing run manifest file: $Path"
+    }
+
+    $manifest = Get-Content -Raw $Path | ConvertFrom-Json
+    if ($manifest.evaluation_path -ne $ExpectedEvaluationPath) {
+        throw "Expected evaluation_path $ExpectedEvaluationPath, got $($manifest.evaluation_path)"
+    }
+    $expectedCategory = if ([string]::IsNullOrEmpty([string]$ExpectedPrimaryFailureCategory)) { $null } else { $ExpectedPrimaryFailureCategory }
+    if ($manifest.primary_failure_category -ne $expectedCategory) {
+        throw "Expected primary_failure_category $ExpectedPrimaryFailureCategory, got $($manifest.primary_failure_category)"
+    }
 }
 
 function Restore-ScopeFixtures {
@@ -313,6 +357,304 @@ try {
     $manifestReportPath = (Get-ChildItem -Path $manifestReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
     Assert-ReportStatus -Path $manifestReportPath -ExpectedStatus 'verify_skipped' | Out-Null
     Assert-RunManifestBaseline -Path (Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $manifestRunId "run.json"))) -ExpectedRunId $manifestRunId -ExpectedReportName ([System.IO.Path]::GetFileName($manifestReportPath))
+
+    $evaluationTemplateRunId = "20260420-020311-JST"
+    $evaluationTemplate = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $evaluationTemplateRunId,
+        '--record-run-manifest',
+        '--evaluation-template',
+        '--skip-verify',
+        'EVALUATION_TEMPLATE_OK'
+    ) -ExtraEnv $envMap
+    if ($evaluationTemplate.ExitCode -ne 0) { throw "evaluation-template success case failed unexpectedly: $($evaluationTemplate.Combined)" }
+    $evaluationTemplateReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $evaluationTemplateRunId "reports"))
+    $evaluationTemplateReportPath = (Get-ChildItem -Path $evaluationTemplateReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $evaluationTemplateReportPath -ExpectedStatus 'verify_skipped' | Out-Null
+    $evaluationTemplateFile = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $evaluationTemplateRunId "evaluation.json"))
+    $evaluationTemplateJson = Get-Content -Raw $evaluationTemplateFile | ConvertFrom-Json
+    if ($evaluationTemplateJson.run_id -ne $evaluationTemplateRunId) { throw "Expected evaluation run_id $evaluationTemplateRunId, got $($evaluationTemplateJson.run_id)" }
+    if ($evaluationTemplateJson.result -ne 'not_evaluated') { throw "Expected evaluation result not_evaluated, got $($evaluationTemplateJson.result)" }
+    Assert-RunManifestEvaluationSummary -Path (Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $evaluationTemplateRunId "run.json"))) -ExpectedEvaluationPath ".codex/runs/$evaluationTemplateRunId/evaluation.json" -ExpectedPrimaryFailureCategory $null
+
+    $evaluationExistingRunId = "20260420-020312-JST"
+    $evaluationExistingFile = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $evaluationExistingRunId "evaluation.json"))
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $evaluationExistingFile) | Out-Null
+    Set-Content -Path $evaluationExistingFile -Value "{`"schema_version`":1,`"run_id`":`"$evaluationExistingRunId`",`"result`":`"not_evaluated`",`"primary_failure_category`":null,`"failure_categories`":[],`"dimensions`":{`"task_completion`":{`"rating`":`"not_evaluated`",`"evidence`":`"KEEP`"},`"scope_control`":{`"rating`":`"not_evaluated`",`"evidence`":`"KEEP`"},`"validation_confidence`":{`"rating`":`"not_evaluated`",`"evidence`":`"KEEP`"},`"safety_compliance`":{`"rating`":`"not_evaluated`",`"evidence`":`"KEEP`"},`"reviewability`":{`"rating`":`"not_evaluated`",`"evidence`":`"KEEP`"},`"maintainability`":{`"rating`":`"not_evaluated`",`"evidence`":`"KEEP`"},`"reproducibility`":{`"rating`":`"not_evaluated`",`"evidence`":`"KEEP`"}},`"findings`":[],`"improvement_candidates`":[]}"
+    $evaluationExisting = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $evaluationExistingRunId,
+        '--record-run-manifest',
+        '--evaluation-template',
+        '--skip-verify',
+        'EVALUATION_TEMPLATE_EXISTS'
+    ) -ExtraEnv $envMap
+    if ($evaluationExisting.ExitCode -ne 0) { throw "evaluation-template existing-file case failed unexpectedly: $($evaluationExisting.Combined)" }
+    if ((Get-Content -Raw $evaluationExistingFile) -notmatch '"evidence":"KEEP"') { throw "evaluation template overwrote existing evaluation.json" }
+
+    $requireEvaluationMissingRunId = "20260420-020313-JST"
+    $requireEvaluationMissing = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $requireEvaluationMissingRunId,
+        '--record-run-manifest',
+        '--require-evaluation',
+        '--skip-verify',
+        'EVALUATION_MISSING'
+    ) -ExtraEnv $envMap
+    if ($requireEvaluationMissing.ExitCode -eq 0) { throw "require-evaluation missing case unexpectedly succeeded" }
+    $requireEvaluationMissingReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationMissingRunId "reports"))
+    $requireEvaluationMissingReportPath = (Get-ChildItem -Path $requireEvaluationMissingReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $requireEvaluationMissingReportPath -ExpectedStatus 'evaluation_missing' | Out-Null
+    $requireEvaluationMissingManifest = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationMissingRunId "run.json"))
+    Assert-RunManifestState -Path $requireEvaluationMissingManifest -ExpectedRunStatus 'failed' -ExpectedValidationStatus 'failed' -ExpectedScopeViolation $false -ExpectedChangedFiles @() -ExpectedCommand 'evaluation validation' -ExpectedCommandStatus 'failed'
+    Assert-RunManifestContainsCommand -Path $requireEvaluationMissingManifest -ExpectedCommand 'evaluation validation' -ExpectedStatus 'failed'
+    $missingManifestJson = Get-Content -Raw $requireEvaluationMissingManifest | ConvertFrom-Json
+    if ($null -ne $missingManifestJson.evaluation_path) { throw "Expected evaluation_path to be null when evaluation is missing" }
+
+    $requireEvaluationValidRunId = "20260420-020314-JST"
+    $requireEvaluationValidFile = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationValidRunId "evaluation.json"))
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $requireEvaluationValidFile) | Out-Null
+    Set-Content -Path $requireEvaluationValidFile -Value @"
+{
+  "schema_version": 1,
+  "run_id": "$requireEvaluationValidRunId",
+  "result": "partial",
+  "primary_failure_category": "missing_validation",
+  "failure_categories": ["missing_validation"],
+  "dimensions": {
+    "task_completion": { "rating": "warn", "evidence": "Task completion needs follow-up." },
+    "scope_control": { "rating": "pass", "evidence": "Scope stayed within the requested files." },
+    "validation_confidence": { "rating": "warn", "evidence": "Validation was intentionally skipped." },
+    "safety_compliance": { "rating": "pass", "evidence": "No unsafe action was observed." },
+    "reviewability": { "rating": "pass", "evidence": "Artifacts were easy to inspect." },
+    "maintainability": { "rating": "pass", "evidence": "Changes remain localized." },
+    "reproducibility": { "rating": "pass", "evidence": "Run artifacts are reproducible." }
+  },
+  "findings": [],
+  "improvement_candidates": []
+}
+"@
+    $requireEvaluationValid = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $requireEvaluationValidRunId,
+        '--record-run-manifest',
+        '--require-evaluation',
+        '--skip-verify',
+        'EVALUATION_VALID'
+    ) -ExtraEnv $envMap
+    if ($requireEvaluationValid.ExitCode -ne 0) { throw "require-evaluation valid case failed unexpectedly: $($requireEvaluationValid.Combined)" }
+    $requireEvaluationValidReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationValidRunId "reports"))
+    $requireEvaluationValidReportPath = (Get-ChildItem -Path $requireEvaluationValidReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $requireEvaluationValidReportPath -ExpectedStatus 'verify_skipped' | Out-Null
+    $requireEvaluationValidManifest = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationValidRunId "run.json"))
+    Assert-RunManifestEvaluationSummary -Path $requireEvaluationValidManifest -ExpectedEvaluationPath ".codex/runs/$requireEvaluationValidRunId/evaluation.json" -ExpectedPrimaryFailureCategory 'missing_validation'
+    Assert-RunManifestContainsCommand -Path $requireEvaluationValidManifest -ExpectedCommand 'evaluation validation' -ExpectedStatus 'passed'
+
+    $requireEvaluationInvalidRunId = "20260420-020315-JST"
+    $requireEvaluationInvalidFile = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationInvalidRunId "evaluation.json"))
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $requireEvaluationInvalidFile) | Out-Null
+    Set-Content -Path $requireEvaluationInvalidFile -Value "{`"schema_version`":1,`"run_id`":`"$requireEvaluationInvalidRunId`",`"result`":`"not_evaluated`"}"
+    $requireEvaluationInvalid = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $requireEvaluationInvalidRunId,
+        '--record-run-manifest',
+        '--require-evaluation',
+        '--skip-verify',
+        'EVALUATION_INVALID'
+    ) -ExtraEnv $envMap
+    if ($requireEvaluationInvalid.ExitCode -eq 0) { throw "require-evaluation invalid schema case unexpectedly succeeded" }
+    $requireEvaluationInvalidReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationInvalidRunId "reports"))
+    $requireEvaluationInvalidReportPath = (Get-ChildItem -Path $requireEvaluationInvalidReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $requireEvaluationInvalidReportPath -ExpectedStatus 'evaluation_invalid' | Out-Null
+    Assert-RunManifestContainsCommand -Path (Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationInvalidRunId "run.json"))) -ExpectedCommand 'evaluation validation' -ExpectedStatus 'failed'
+
+    $requireEvaluationMismatchRunId = "20260420-020316-JST"
+    $requireEvaluationMismatchFile = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationMismatchRunId "evaluation.json"))
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $requireEvaluationMismatchFile) | Out-Null
+    Set-Content -Path $requireEvaluationMismatchFile -Value @"
+{
+  "schema_version": 1,
+  "run_id": "20260420-999999-JST",
+  "result": "not_evaluated",
+  "primary_failure_category": null,
+  "failure_categories": [],
+  "dimensions": {
+    "task_completion": { "rating": "not_evaluated", "evidence": "Task completion has not been evaluated yet." },
+    "scope_control": { "rating": "not_evaluated", "evidence": "Scope control has not been evaluated yet." },
+    "validation_confidence": { "rating": "not_evaluated", "evidence": "Validation confidence has not been evaluated yet." },
+    "safety_compliance": { "rating": "not_evaluated", "evidence": "Safety compliance has not been evaluated yet." },
+    "reviewability": { "rating": "not_evaluated", "evidence": "Reviewability has not been evaluated yet." },
+    "maintainability": { "rating": "not_evaluated", "evidence": "Maintainability has not been evaluated yet." },
+    "reproducibility": { "rating": "not_evaluated", "evidence": "Reproducibility has not been evaluated yet." }
+  },
+  "findings": [],
+  "improvement_candidates": []
+}
+"@
+    $requireEvaluationMismatch = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $requireEvaluationMismatchRunId,
+        '--record-run-manifest',
+        '--require-evaluation',
+        '--skip-verify',
+        'EVALUATION_MISMATCH'
+    ) -ExtraEnv $envMap
+    if ($requireEvaluationMismatch.ExitCode -eq 0) { throw "require-evaluation run-id mismatch case unexpectedly succeeded" }
+    $requireEvaluationMismatchReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationMismatchRunId "reports"))
+    $requireEvaluationMismatchReportPath = (Get-ChildItem -Path $requireEvaluationMismatchReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $requireEvaluationMismatchReportPath -ExpectedStatus 'evaluation_invalid' | Out-Null
+    $requireEvaluationMismatchManifest = Get-Content -Raw (Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationMismatchRunId "run.json"))) | ConvertFrom-Json
+    $mismatchEvidence = (@($requireEvaluationMismatchManifest.validation.commands) | ForEach-Object { [string]$_.evidence }) -join ' '
+    if ($mismatchEvidence -notmatch 'evaluation run_id mismatch') { throw "Expected run-id mismatch evidence, got $mismatchEvidence" }
+
+    $evaluationTemplateNoManifestReport = Join-Path $tempRoot "evaluation-template-no-manifest.report.json"
+    $evaluationTemplateNoManifest = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--report-path', $evaluationTemplateNoManifestReport,
+        '--log-path', (Join-Path $tempRoot "evaluation-template-no-manifest.jsonl"),
+        '--evaluation-template',
+        '--skip-verify',
+        'EVALUATION_TEMPLATE_NO_MANIFEST'
+    ) -ExtraEnv $envMap
+    if ($evaluationTemplateNoManifest.ExitCode -eq 0) { throw "evaluation-template without manifest unexpectedly succeeded" }
+    if ($evaluationTemplateNoManifest.Combined -notmatch [regex]::Escape('--evaluation-template requires --run-id and --record-run-manifest')) { throw "evaluation-template manifest requirement message missing: $($evaluationTemplateNoManifest.Combined)" }
+    Assert-ReportStatus -Path $evaluationTemplateNoManifestReport -ExpectedStatus 'invalid_args' | Out-Null
+
+    $requireEvaluationNoManifestReport = Join-Path $tempRoot "require-evaluation-no-manifest.report.json"
+    $requireEvaluationNoManifest = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--report-path', $requireEvaluationNoManifestReport,
+        '--log-path', (Join-Path $tempRoot "require-evaluation-no-manifest.jsonl"),
+        '--require-evaluation',
+        '--skip-verify',
+        'REQUIRE_EVALUATION_NO_MANIFEST'
+    ) -ExtraEnv $envMap
+    if ($requireEvaluationNoManifest.ExitCode -eq 0) { throw "require-evaluation without manifest unexpectedly succeeded" }
+    if ($requireEvaluationNoManifest.Combined -notmatch [regex]::Escape('--require-evaluation requires --run-id and --record-run-manifest')) { throw "require-evaluation manifest requirement message missing: $($requireEvaluationNoManifest.Combined)" }
+    Assert-ReportStatus -Path $requireEvaluationNoManifestReport -ExpectedStatus 'invalid_args' | Out-Null
+
+    $cleanGitReportNoRunId = Join-Path $templateRoot ".codex\\reports"
+    $cleanGitNoRunId = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--require-clean-git',
+        '--skip-verify',
+        'CLEAN_GIT_OK'
+    ) -ExtraEnv $envMap
+    if ($cleanGitNoRunId.ExitCode -ne 0) { throw "clean git no-run-id case failed unexpectedly: $($cleanGitNoRunId.Combined)" }
+    $cleanGitNoRunIdReportPath = (Get-ChildItem -Path $cleanGitReportNoRunId -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $cleanGitNoRunIdReportPath -ExpectedStatus 'verify_skipped' | Out-Null
+
+    $cleanGitRunId = "20260420-020317-JST"
+    $cleanGit = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $cleanGitRunId,
+        '--require-clean-git',
+        '--skip-verify',
+        'CLEAN_GIT_OK'
+    ) -ExtraEnv $envMap
+    if ($cleanGit.ExitCode -ne 0) { throw "clean git success case failed unexpectedly: $($cleanGit.Combined)" }
+    $cleanGitReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $cleanGitRunId "reports"))
+    $cleanGitReportPath = (Get-ChildItem -Path $cleanGitReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $cleanGitReportPath -ExpectedStatus 'verify_skipped' | Out-Null
+
+    Add-Content -Path (Join-Path $templateRoot "README.md") -Value "`nDIRTY_GIT"
+    $dirtyGitRunId = "20260420-020318-JST"
+    $dirtyGit = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $dirtyGitRunId,
+        '--record-run-manifest',
+        '--require-clean-git',
+        '--skip-verify',
+        'DIRTY_GIT'
+    ) -ExtraEnv $envMap
+    if ($dirtyGit.ExitCode -eq 0) { throw "dirty git case unexpectedly succeeded" }
+    $dirtyGitReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $dirtyGitRunId "reports"))
+    $dirtyGitReportPath = (Get-ChildItem -Path $dirtyGitReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    $dirtyGitReport = Assert-ReportStatus -Path $dirtyGitReportPath -ExpectedStatus 'dirty_git'
+    if ($null -ne $dirtyGitReport.codex_exit_code) { throw "Expected codex_exit_code to remain null when clean git precondition blocks execution" }
+    Assert-RunManifestState -Path (Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $dirtyGitRunId "run.json"))) -ExpectedRunStatus 'failed' -ExpectedValidationStatus 'blocked' -ExpectedScopeViolation $false -ExpectedChangedFiles @('README.md') -ExpectedCommand 'clean git check' -ExpectedCommandStatus 'blocked'
+    Restore-ScopeFixtures
+
+    $ignoredRunsDir = Join-Path $templateRoot ".codex\\runs\\some-run"
+    New-Item -ItemType Directory -Force -Path $ignoredRunsDir | Out-Null
+    Set-Content -Path (Join-Path $ignoredRunsDir "tmp.json") -Value '{"artifact":true}'
+    $ignoreRunsRunId = "20260420-020319-JST"
+    $ignoreRuns = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $ignoreRunsRunId,
+        '--require-clean-git',
+        '--skip-verify',
+        'IGNORE_RUN_ARTIFACTS'
+    ) -ExtraEnv $envMap
+    if ($ignoreRuns.ExitCode -ne 0) { throw "clean git should ignore .codex/runs artifacts: $($ignoreRuns.Combined)" }
+    $ignoreRunsReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $ignoreRunsRunId "reports"))
+    $ignoreRunsReportPath = (Get-ChildItem -Path $ignoreRunsReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $ignoreRunsReportPath -ExpectedStatus 'verify_skipped' | Out-Null
+
+    $requireRunIdReport = Join-Path $tempRoot "require-run-id.report.json"
+    $requireRunId = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--report-path', $requireRunIdReport,
+        '--log-path', (Join-Path $tempRoot "require-run-id.jsonl"),
+        '--require-run-id',
+        '--skip-verify',
+        'REQUIRE_RUN_ID'
+    ) -ExtraEnv $envMap
+    if ($requireRunId.ExitCode -eq 0) { throw "require-run-id without run-id unexpectedly succeeded" }
+    if ($requireRunId.Combined -notmatch [regex]::Escape('--require-run-id requires --run-id')) { throw "require-run-id message missing: $($requireRunId.Combined)" }
+    Assert-ReportStatus -Path $requireRunIdReport -ExpectedStatus 'invalid_args' | Out-Null
+
+    $requireRunIdOk = "20260420-020320-JST"
+    $requireRunIdOkResult = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $requireRunIdOk,
+        '--require-run-id',
+        '--skip-verify',
+        'REQUIRE_RUN_ID_OK'
+    ) -ExtraEnv $envMap
+    if ($requireRunIdOkResult.ExitCode -ne 0) { throw "require-run-id with valid run-id failed unexpectedly: $($requireRunIdOkResult.Combined)" }
+    if (Test-Path (Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireRunIdOk "run.json")))) {
+        throw "require-run-id should not implicitly create run.json"
+    }
+
+    $maxIterationsOk = "20260420-020321-JST"
+    $maxIterationsOkResult = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $maxIterationsOk,
+        '--max-iterations', '3',
+        '--skip-verify',
+        'MAX_ITERATIONS_OK'
+    ) -ExtraEnv $envMap
+    if ($maxIterationsOkResult.ExitCode -ne 0) { throw "max-iterations valid case failed unexpectedly: $($maxIterationsOkResult.Combined)" }
+    $maxIterationsOkReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $maxIterationsOk "reports"))
+    $maxIterationsOkReportPath = (Get-ChildItem -Path $maxIterationsOkReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $maxIterationsOkReportPath -ExpectedStatus 'verify_skipped' | Out-Null
+
+    foreach ($invalidValue in @('0', '-1', 'abc', '11')) {
+        $invalidMaxReport = Join-Path $tempRoot ("max-iterations-" + ($invalidValue -replace '[^A-Za-z0-9-]', '_') + ".report.json")
+        $invalidMax = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+            '--report-path', $invalidMaxReport,
+            '--log-path', (Join-Path $tempRoot ("max-iterations-" + ($invalidValue -replace '[^A-Za-z0-9-]', '_') + ".jsonl")),
+            '--max-iterations', $invalidValue,
+            '--skip-verify',
+            'MAX_ITERATIONS_BAD'
+        ) -ExtraEnv $envMap
+        if ($invalidMax.ExitCode -eq 0) { throw "max-iterations invalid case unexpectedly succeeded for $invalidValue" }
+        if ($invalidMax.Combined -notmatch [regex]::Escape('--max-iterations must be an integer between 1 and 10')) {
+            throw ("max-iterations validation message missing for {0}: {1}" -f $invalidValue, $invalidMax.Combined)
+        }
+    }
+
+    $invalidMaxEmptyCliReport = Join-Path $tempRoot "max-iterations-empty-cli.report.json"
+    $invalidMaxEmptyCliLog = Join-Path $tempRoot "max-iterations-empty-cli.jsonl"
+    $invalidMaxEmptyCliLauncher = Join-Path $tempRoot "max-iterations-empty-cli.ps1"
+    Set-Content -Path $invalidMaxEmptyCliLauncher -Value @"
+& '$wrapperPath' --report-path '$invalidMaxEmptyCliReport' --log-path '$invalidMaxEmptyCliLog' --max-iterations '' --skip-verify 'MAX_ITERATIONS_BAD'
+exit `$LASTEXITCODE
+"@
+    $invalidMaxEmptyCli = Invoke-WindowsPowerShellFile -ScriptPath $invalidMaxEmptyCliLauncher -Arguments @() -ExtraEnv $envMap
+    if ($invalidMaxEmptyCli.ExitCode -eq 0) { throw "empty --max-iterations case unexpectedly succeeded" }
+    if ($invalidMaxEmptyCli.Combined -notmatch [regex]::Escape('--max-iterations must be an integer between 1 and 10')) {
+        throw "empty --max-iterations validation message missing: $($invalidMaxEmptyCli.Combined)"
+    }
+
+    $invalidMaxNativeReport = Join-Path $tempRoot "max-iterations-native-empty.report.json"
+    $invalidMaxNativeLog = Join-Path $tempRoot "max-iterations-native-empty.jsonl"
+    $invalidMaxNativeLauncher = Join-Path $tempRoot "max-iterations-native-empty.ps1"
+    Set-Content -Path $invalidMaxNativeLauncher -Value @"
+& '$wrapperPath' -ReportPath '$invalidMaxNativeReport' -LogPath '$invalidMaxNativeLog' -MaxIterations '' -SkipVerify 'MAX_ITERATIONS_BAD'
+exit `$LASTEXITCODE
+"@
+    $invalidMaxNative = Invoke-WindowsPowerShellFile -ScriptPath $invalidMaxNativeLauncher -Arguments @() -ExtraEnv $envMap
+    if ($invalidMaxNative.ExitCode -eq 0) { throw "native -MaxIterations empty case unexpectedly succeeded" }
+    if ($invalidMaxNative.Combined -notmatch [regex]::Escape('--max-iterations must be an integer between 1 and 10')) {
+        throw "native -MaxIterations empty validation message missing: $($invalidMaxNative.Combined)"
+    }
 
     $allowedOkRunId = "20260420-020307-JST"
     $allowedOk = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(

@@ -35,12 +35,52 @@ Both are validated by schema / validator.
 - 複数の `codex-task` report JSON を参照できます。
 - task type、workflow level、preset、runtime、agents used、changed files、validation summary、safety summary、evaluation path などを保持します。
 - `codex-task` report JSON の置き換えではありません。
+- `validation.commands` は single command 前提ではなく、`output schema validation`、`verify`、`evaluation validation`、`clean git check` など複数の観測結果を保持できます。
+- `run.json.evaluation_path` は `evaluation.json` への summary link です。
+- `run.json.primary_failure_category` は valid な `evaluation.json.primary_failure_category` からだけコピーされる summary field です。
 
 ### `evaluation.json`
 
 - agent / reviewer による成果評価・失敗解釈・改善候補の正本です。
 - 観測事実は `run.json` / `codex-task` report JSON / logs から参照します。
 - agent が exit code や changed files などの実行事実を後書きする場所ではありません。
+- runner は evaluation result を自動判断しません。
+- runner が行うのは `evaluation.json` の template 作成、存在確認、JSON / schema validation、`run_id` 一致確認、manifest summary field 更新だけです。
+
+## Runner Completion Options
+
+### `--evaluation-template`
+
+- `.codex/runs/<run_id>/evaluation.json` の初期 template を作るだけです。
+- 評価済みを意味しません。
+- baseline では `--run-id` と `--record-run-manifest` が必要です。
+- 既存 `evaluation.json` がある場合は上書きせず、`run.json.evaluation_path` だけ更新してよいものとします。
+
+### `--require-evaluation`
+
+- Codex 実行後の最終 gate として `evaluation.json` の存在、valid JSON、`spec/evaluation.schema.json` への適合、`evaluation.run_id` と `--run-id` の一致を要求します。
+- runner は evaluation result を解釈しません。
+- valid evaluation のときだけ `run.json.primary_failure_category` を summary copy します。
+- baseline では `--run-id` と `--record-run-manifest` が必要です。
+
+### `--require-clean-git`
+
+- Codex 実行前の source dirty を検出します。
+- `.codex/runs/` は generated artifact として dirty 判定から除外します。
+- dirty の場合は Codex を実行せず、manifest 有効時は `run.json.validation.commands` に `clean git check` を記録します。
+- dirty source changes は `changed_files` に記録してよいものとします。
+
+### `--require-run-id`
+
+- `--run-id` 指定漏れを防ぐ precondition です。
+- run id を自動生成しません。
+- `--record-run-manifest` を暗黙に有効化しません。
+
+### `--max-iterations`
+
+- repair loop workflow 向けの予約 option です。
+- 現時点の `codex-task` では parse / validation だけを行い、Codex の自動再実行は行いません。
+- `--max-iterations` は repair-loop workflows 向け reserved contract であり、現状は no-op です。
 
 ### `REPORT.md`
 
