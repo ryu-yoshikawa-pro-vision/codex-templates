@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Codex Harness Run Manifest",
+  "description": "Aggregate run manifest for runner, wrapper, and hook observations. This is not a replacement for codex-task report JSON. Failure interpretation remains canonical in evaluation.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "task_type",
+    "workflow_level",
+    "preset",
+    "runtime",
+    "agents_used",
+    "repo",
+    "branch",
+    "base_branch",
+    "codex_task_reports",
+    "changed_files",
+    "validation",
+    "safety",
+    "evaluation_path",
+    "status",
+    "primary_failure_category"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "enum": [
+        1
+      ],
+      "description": "Schema version for the run manifest."
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Run identifier for the aggregate manifest."
+    },
+    "task_type": {
+      "type": "string",
+      "enum": [
+        "plan",
+        "review",
+        "implementation",
+        "investigation",
+        "repair"
+      ],
+      "description": "High-level task classification for the run."
+    },
+    "workflow_level": {
+      "type": "string",
+      "enum": [
+        "lightweight",
+        "standard",
+        "strict"
+      ],
+      "description": "Workflow rigor level selected for the run."
+    },
+    "preset": {
+      "type": "string",
+      "enum": [
+        "safe",
+        "readonly",
+        "auto-net"
+      ],
+      "description": "Wrapper preset used for the run."
+    },
+    "runtime": {
+      "type": "string",
+      "enum": [
+        "host",
+        "docker",
+        "sdk"
+      ],
+      "description": "Runtime used for the run. The sdk value is reserved for future experimental work and does not imply an SDK runner exists in this implementation."
+    },
+    "agents_used": {
+      "type": "array",
+      "description": "Agents that participated in the run.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "repo": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Repository identifier if known."
+    },
+    "branch": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Working branch observed by the runner or wrapper."
+    },
+    "base_branch": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Base branch observed or configured for the run."
+    },
+    "codex_task_reports": {
+      "type": "array",
+      "description": "Paths to low-level codex-task report JSON artifacts referenced by this run manifest.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "changed_files": {
+      "type": "array",
+      "description": "Observed changed files for the run. Agents do not hand-write this field.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "commands"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "not_run",
+            "passed",
+            "failed",
+            "skipped",
+            "blocked"
+          ],
+          "description": "Aggregate validation status for the run."
+        },
+        "commands": {
+          "type": "array",
+          "description": "Observed validation command records. These are runner, wrapper, or hook observations rather than agent-authored interpretation.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "command",
+              "exit_code",
+              "status",
+              "evidence"
+            ],
+            "properties": {
+              "command": {
+                "type": "string",
+                "minLength": 1
+              },
+              "exit_code": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "not_run",
+                  "passed",
+                  "failed",
+                  "skipped",
+                  "blocked"
+                ]
+              },
+              "evidence": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "network",
+        "delete_attempt_blocked",
+        "git_mutation_attempt_blocked",
+        "scope_violation"
+      ],
+      "properties": {
+        "network": {
+          "type": "boolean",
+          "description": "Whether network access was enabled or observed for the run."
+        },
+        "delete_attempt_blocked": {
+          "type": "boolean",
+          "description": "Whether a delete attempt was blocked by wrapper, rules, or hooks."
+        },
+        "git_mutation_attempt_blocked": {
+          "type": "boolean",
+          "description": "Whether a git mutation attempt was blocked by wrapper, rules, or hooks."
+        },
+        "scope_violation": {
+          "type": "boolean",
+          "description": "Whether scope-violation evidence was observed for the run."
+        }
+      }
+    },
+    "evaluation_path": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Path to the evaluation.json artifact used as the source of truth for failure interpretation."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "completed",
+        "failed",
+        "cancelled"
+      ],
+      "description": "Runner lifecycle status. completed means artifact generation finished; it does not imply task success."
+    },
+    "primary_failure_category": {
+      "enum": [
+        null,
+        "instruction_gap",
+        "scope_creep",
+        "missing_context",
+        "missing_validation",
+        "unsafe_action_blocked",
+        "bad_subagent_delegation",
+        "flaky_or_env_issue",
+        "review_gap",
+        "repair_loop_stalled",
+        "artifact_contract_gap"
+      ],
+      "description": "Copied summary field from evaluation.json.primary_failure_category. Before evaluation.json exists, this should remain null."
+    }
+  }
+}

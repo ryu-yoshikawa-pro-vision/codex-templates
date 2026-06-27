@@ -38,6 +38,37 @@ def assert_contains(rel, patterns):
             raise SystemExit(f"Pattern '{pattern}' not found in {rel}")
 
 
+def ensure(condition, message):
+    if not condition:
+        raise SystemExit(message)
+
+
+def expect_required_fields(schema, fields, label):
+    required = schema.get("required", [])
+    missing = [field for field in fields if field not in required]
+    ensure(not missing, f"{label} missing required fields: {missing}")
+
+
+def expect_property_keys(schema, fields, label):
+    properties = schema.get("properties", {})
+    missing = [field for field in fields if field not in properties]
+    ensure(not missing, f"{label} missing properties: {missing}")
+
+
+def expect_enum_contains(values, expected, label):
+    missing = [value for value in expected if value not in values]
+    ensure(not missing, f"{label} missing enum values: {missing}")
+
+
+def expect_enum_set(values, expected, label):
+    actual_set = set(values)
+    expected_set = set(expected)
+    ensure(
+        actual_set == expected_set,
+        f"{label} enum mismatch: expected {sorted(expected_set, key=lambda x: str(x))}, got {sorted(actual_set, key=lambda x: str(x))}",
+    )
+
+
 workflow = read_spec("spec/workflow.json")
 routing = read_spec("spec/routing.json")
 safety = read_spec("spec/safety-policy.json")
@@ -118,6 +149,322 @@ assert_contains(
         naming["plan_docs"]["pattern"],
         naming["report_docs"]["pattern"],
         naming["history_docs"]["pattern"],
+    ],
+)
+
+required_paths = [
+    "spec/evaluation.schema.json",
+    "spec/run-manifest.schema.json",
+    "spec/artifact-responsibility.json",
+    "spec/failure-taxonomy.json",
+    "template/.codex/templates/RUN_MANIFEST.json",
+    "template/.codex/templates/EVALUATION.md",
+    "template/docs/reference/run-artifacts.md",
+    "template/docs/reference/failure-taxonomy.md",
+    "template/docs/reference/evaluation.md",
+    "template/docs/reference/change-scope-policy.md",
+]
+for rel in required_paths:
+    assert_exists(rel)
+
+evaluation_schema = read_spec("spec/evaluation.schema.json")
+run_manifest_schema = read_spec("spec/run-manifest.schema.json")
+artifact_responsibility = read_spec("spec/artifact-responsibility.json")
+failure_taxonomy = read_spec("spec/failure-taxonomy.json")
+run_manifest_template = read_spec("template/.codex/templates/RUN_MANIFEST.json")
+
+ensure(
+    artifact_responsibility.get("catalog_type") == "static_artifact_responsibility_catalog",
+    "spec/artifact-responsibility.json catalog_type is out of contract",
+)
+ensure(
+    failure_taxonomy.get("catalog_type") == "static_failure_taxonomy_catalog",
+    "spec/failure-taxonomy.json catalog_type is out of contract",
+)
+
+taxonomy_entries = failure_taxonomy.get("categories")
+ensure(isinstance(taxonomy_entries, list) and taxonomy_entries, "spec/failure-taxonomy.json categories must be a non-empty array")
+
+taxonomy_categories = []
+for index, item in enumerate(taxonomy_entries, start=1):
+    ensure(isinstance(item, dict), f"spec/failure-taxonomy.json categories[{index}] must be an object")
+    category = item.get("category")
+    ensure(isinstance(category, str) and category, f"spec/failure-taxonomy.json categories[{index}].category must be a non-empty string")
+    taxonomy_categories.append(category)
+
+ensure(
+    len(taxonomy_categories) == len(set(taxonomy_categories)),
+    "spec/failure-taxonomy.json categories must not contain duplicates",
+)
+
+required_categories = [
+    "instruction_gap",
+    "scope_creep",
+    "missing_context",
+    "missing_validation",
+    "unsafe_action_blocked",
+    "bad_subagent_delegation",
+    "flaky_or_env_issue",
+    "review_gap",
+    "repair_loop_stalled",
+    "artifact_contract_gap",
+]
+expect_enum_contains(taxonomy_categories, required_categories, "spec/failure-taxonomy.json categories")
+
+evaluation_props = evaluation_schema.get("properties", {})
+expect_required_fields(
+    evaluation_schema,
+    [
+        "schema_version",
+        "run_id",
+        "result",
+        "primary_failure_category",
+        "failure_categories",
+        "dimensions",
+        "findings",
+        "improvement_candidates",
+    ],
+    "spec/evaluation.schema.json",
+)
+expect_property_keys(
+    evaluation_schema,
+    [
+        "schema_version",
+        "run_id",
+        "result",
+        "primary_failure_category",
+        "failure_categories",
+        "dimensions",
+        "findings",
+        "improvement_candidates",
+    ],
+    "spec/evaluation.schema.json",
+)
+expect_enum_contains(
+    evaluation_props["result"]["enum"],
+    ["pass", "partial", "fail", "not_evaluated"],
+    "spec/evaluation.schema.json result",
+)
+expect_enum_set(
+    evaluation_props["primary_failure_category"]["enum"],
+    taxonomy_categories + [None],
+    "spec/evaluation.schema.json primary_failure_category",
+)
+expect_enum_set(
+    evaluation_props["failure_categories"]["items"]["enum"],
+    taxonomy_categories,
+    "spec/evaluation.schema.json failure_categories items",
+)
+
+dimension_names = [
+    "task_completion",
+    "scope_control",
+    "validation_confidence",
+    "safety_compliance",
+    "reviewability",
+    "maintainability",
+    "reproducibility",
+]
+dimensions_schema = evaluation_props["dimensions"]
+expect_required_fields(dimensions_schema, dimension_names, "spec/evaluation.schema.json dimensions")
+expect_property_keys(dimensions_schema, dimension_names, "spec/evaluation.schema.json dimensions")
+for name in dimension_names:
+    dimension_schema = dimensions_schema["properties"][name]
+    expect_required_fields(dimension_schema, ["rating", "evidence"], f"spec/evaluation.schema.json dimensions.{name}")
+    expect_property_keys(dimension_schema, ["rating", "evidence"], f"spec/evaluation.schema.json dimensions.{name}")
+    expect_enum_contains(
+        dimension_schema["properties"]["rating"]["enum"],
+        ["pass", "warn", "fail", "not_evaluated"],
+        f"spec/evaluation.schema.json dimensions.{name}.rating",
+    )
+
+findings_item = evaluation_props["findings"]["items"]
+expect_required_fields(
+    findings_item,
+    ["category", "severity", "evidence", "detail"],
+    "spec/evaluation.schema.json findings item",
+)
+expect_property_keys(
+    findings_item,
+    ["category", "severity", "evidence", "detail"],
+    "spec/evaluation.schema.json findings item",
+)
+expect_enum_set(
+    findings_item["properties"]["category"]["enum"],
+    taxonomy_categories,
+    "spec/evaluation.schema.json findings.category",
+)
+expect_enum_contains(
+    findings_item["properties"]["severity"]["enum"],
+    ["low", "medium", "high", "critical"],
+    "spec/evaluation.schema.json findings.severity",
+)
+
+improvement_item = evaluation_props["improvement_candidates"]["items"]
+expect_required_fields(
+    improvement_item,
+    ["target", "evidence", "expected_impact", "recommendation"],
+    "spec/evaluation.schema.json improvement_candidates item",
+)
+expect_property_keys(
+    improvement_item,
+    ["target", "evidence", "expected_impact", "recommendation"],
+    "spec/evaluation.schema.json improvement_candidates item",
+)
+
+run_manifest_props = run_manifest_schema.get("properties", {})
+expect_required_fields(
+    run_manifest_schema,
+    [
+        "schema_version",
+        "run_id",
+        "task_type",
+        "workflow_level",
+        "preset",
+        "runtime",
+        "agents_used",
+        "repo",
+        "branch",
+        "base_branch",
+        "codex_task_reports",
+        "changed_files",
+        "validation",
+        "safety",
+        "evaluation_path",
+        "status",
+        "primary_failure_category",
+    ],
+    "spec/run-manifest.schema.json",
+)
+expect_property_keys(
+    run_manifest_schema,
+    [
+        "schema_version",
+        "run_id",
+        "task_type",
+        "workflow_level",
+        "preset",
+        "runtime",
+        "agents_used",
+        "repo",
+        "branch",
+        "base_branch",
+        "codex_task_reports",
+        "changed_files",
+        "validation",
+        "safety",
+        "evaluation_path",
+        "status",
+        "primary_failure_category",
+    ],
+    "spec/run-manifest.schema.json",
+)
+expect_enum_contains(
+    run_manifest_props["task_type"]["enum"],
+    ["plan", "review", "implementation", "investigation", "repair"],
+    "spec/run-manifest.schema.json task_type",
+)
+expect_enum_contains(
+    run_manifest_props["workflow_level"]["enum"],
+    ["lightweight", "standard", "strict"],
+    "spec/run-manifest.schema.json workflow_level",
+)
+expect_enum_contains(
+    run_manifest_props["preset"]["enum"],
+    ["safe", "readonly", "auto-net"],
+    "spec/run-manifest.schema.json preset",
+)
+expect_enum_contains(
+    run_manifest_props["runtime"]["enum"],
+    ["host", "docker", "sdk"],
+    "spec/run-manifest.schema.json runtime",
+)
+expect_enum_contains(
+    run_manifest_props["status"]["enum"],
+    ["pending", "running", "completed", "failed", "cancelled"],
+    "spec/run-manifest.schema.json status",
+)
+validation_schema = run_manifest_props["validation"]
+expect_required_fields(validation_schema, ["status", "commands"], "spec/run-manifest.schema.json validation")
+expect_property_keys(validation_schema, ["status", "commands"], "spec/run-manifest.schema.json validation")
+expect_enum_contains(
+    validation_schema["properties"]["status"]["enum"],
+    ["not_run", "passed", "failed", "skipped", "blocked"],
+    "spec/run-manifest.schema.json validation.status",
+)
+validation_command_item = validation_schema["properties"]["commands"]["items"]
+expect_required_fields(
+    validation_command_item,
+    ["command", "exit_code", "status", "evidence"],
+    "spec/run-manifest.schema.json validation.commands item",
+)
+expect_property_keys(
+    validation_command_item,
+    ["command", "exit_code", "status", "evidence"],
+    "spec/run-manifest.schema.json validation.commands item",
+)
+expect_enum_contains(
+    validation_command_item["properties"]["status"]["enum"],
+    ["not_run", "passed", "failed", "skipped", "blocked"],
+    "spec/run-manifest.schema.json validation.commands[].status",
+)
+
+safety_schema = run_manifest_props["safety"]
+expect_required_fields(
+    safety_schema,
+    ["network", "delete_attempt_blocked", "git_mutation_attempt_blocked", "scope_violation"],
+    "spec/run-manifest.schema.json safety",
+)
+expect_property_keys(
+    safety_schema,
+    ["network", "delete_attempt_blocked", "git_mutation_attempt_blocked", "scope_violation"],
+    "spec/run-manifest.schema.json safety",
+)
+expect_enum_set(
+    run_manifest_props["primary_failure_category"]["enum"],
+    taxonomy_categories + [None],
+    "spec/run-manifest.schema.json primary_failure_category",
+)
+
+template_keys = set(run_manifest_template.keys())
+schema_required = set(run_manifest_schema.get("required", []))
+missing_template_keys = sorted(schema_required - template_keys)
+ensure(not missing_template_keys, f"template/.codex/templates/RUN_MANIFEST.json missing required keys: {missing_template_keys}")
+ensure(run_manifest_template.get("schema_version") == 1, "template/.codex/templates/RUN_MANIFEST.json schema_version must be 1")
+ensure(run_manifest_template.get("run_id") != "", "template/.codex/templates/RUN_MANIFEST.json run_id must not be empty")
+ensure(run_manifest_template.get("status") == "pending", "template/.codex/templates/RUN_MANIFEST.json status must default to pending")
+ensure(run_manifest_template.get("primary_failure_category") is None, "template/.codex/templates/RUN_MANIFEST.json primary_failure_category must default to null")
+ensure(
+    isinstance(run_manifest_template.get("validation"), dict)
+    and run_manifest_template["validation"].get("status") == "not_run"
+    and isinstance(run_manifest_template["validation"].get("commands"), list)
+    and len(run_manifest_template["validation"]["commands"]) == 0,
+    "template/.codex/templates/RUN_MANIFEST.json validation defaults are out of contract",
+)
+ensure(
+    isinstance(run_manifest_template.get("safety"), dict)
+    and set(run_manifest_template["safety"].keys()) == {
+        "network",
+        "delete_attempt_blocked",
+        "git_mutation_attempt_blocked",
+        "scope_violation",
+    },
+    "template/.codex/templates/RUN_MANIFEST.json safety keys are out of contract",
+)
+
+assert_contains(
+    "template/.codex/templates/EVALUATION.md",
+    [
+        "evaluation.json",
+        "spec/failure-taxonomy.json",
+        "<run_id>",
+        "not_evaluated",
+        "rating",
+        "evidence",
+        "improvement_candidates",
+        "Do not hand-write",
+        "changed_files",
+        "exit code",
     ],
 )
 

@@ -18,11 +18,17 @@
 - `.codex/runs/<run_id>/` の運用例として standard implementation、PR review、auto-net investigation の examples を追加。
 - `examples/runs/README.md` に run examples の入口を追加。
 - Codex harness の契約整理として `spec/artifact-responsibility.json`、`spec/failure-taxonomy.json`、`template/docs/reference/run-artifacts.md`、`template/docs/reference/failure-taxonomy.md`、`template/docs/reference/evaluation.md`、`template/docs/reference/change-scope-policy.md` を追加。
+- Codex harness の schema validation support として `spec/evaluation.schema.json`、`spec/run-manifest.schema.json`、`template/.codex/templates/RUN_MANIFEST.json`、`template/.codex/templates/EVALUATION.md` を追加。
 
 ### Changed
 
 - `template/docs/reference/codex-safety-harness.md` に `apply_patch` の operation policy 表を追加。
 - `template/docs/guides/quickstart.md` から consumer update guide へ誘導するように更新。
+- `tools/validate-spec.sh`、`tools/validate-spec.ps1`、`template/scripts/verify` を拡張し、新規 schema / template / static catalog / reference docs の整合性を検証するように更新。
+
+### Migration notes
+
+- 既存 consumer repo が更新後の `template/scripts/verify` を取り込む場合は、`.codex/templates/RUN_MANIFEST.json`、`.codex/templates/EVALUATION.md`、`docs/reference/run-artifacts.md`、`docs/reference/failure-taxonomy.md`、`docs/reference/evaluation.md`、`docs/reference/change-scope-policy.md` も同期対象に含める。
 
 ## 0.3.0 - 2026-06-27
 

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "run_id": "<run_id>",
+  "task_type": "implementation",
+  "workflow_level": "standard",
+  "preset": "safe",
+  "runtime": "host",
+  "agents_used": [],
+  "repo": null,
+  "branch": null,
+  "base_branch": null,
+  "codex_task_reports": [],
+  "changed_files": [],
+  "validation": {
+    "status": "not_run",
+    "commands": []
+  },
+  "safety": {
+    "network": false,
+    "delete_attempt_blocked": false,
+    "git_mutation_attempt_blocked": false,
+    "scope_violation": false
+  },
+  "evaluation_path": null,
+  "status": "pending",
+  "primary_failure_category": null
+}

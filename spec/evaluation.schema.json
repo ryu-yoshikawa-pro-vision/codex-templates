@@ -1,0 +1,339 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Codex Harness Evaluation",
+  "description": "Canonical evaluation artifact for one run. Observed execution facts are referenced from run.json, codex-task report JSON, or logs; the agent or reviewer records interpretation here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "result",
+    "primary_failure_category",
+    "failure_categories",
+    "dimensions",
+    "findings",
+    "improvement_candidates"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "enum": [
+        1
+      ],
+      "description": "Schema version for the evaluation artifact."
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Run identifier shared with run.json and run-local artifacts."
+    },
+    "result": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "partial",
+        "fail",
+        "not_evaluated"
+      ],
+      "description": "Overall outcome judgement for the run."
+    },
+    "primary_failure_category": {
+      "enum": [
+        null,
+        "instruction_gap",
+        "scope_creep",
+        "missing_context",
+        "missing_validation",
+        "unsafe_action_blocked",
+        "bad_subagent_delegation",
+        "flaky_or_env_issue",
+        "review_gap",
+        "repair_loop_stalled",
+        "artifact_contract_gap"
+      ],
+      "description": "Primary failure category selected from spec/failure-taxonomy.json. Null is allowed before evaluation is complete or when failure classification is unnecessary. For result=fail or result=partial, a non-null value is usually expected."
+    },
+    "failure_categories": {
+      "type": "array",
+      "description": "Failure categories chosen from spec/failure-taxonomy.json. When primary_failure_category is non-null, it should also appear in this array.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "instruction_gap",
+          "scope_creep",
+          "missing_context",
+          "missing_validation",
+          "unsafe_action_blocked",
+          "bad_subagent_delegation",
+          "flaky_or_env_issue",
+          "review_gap",
+          "repair_loop_stalled",
+          "artifact_contract_gap"
+        ]
+      }
+    },
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_completion",
+        "scope_control",
+        "validation_confidence",
+        "safety_compliance",
+        "reviewability",
+        "maintainability",
+        "reproducibility"
+      ],
+      "properties": {
+        "task_completion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rating",
+            "evidence"
+          ],
+          "properties": {
+            "rating": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "warn",
+                "fail",
+                "not_evaluated"
+              ]
+            },
+            "evidence": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Evidence supporting the rating. Even when not_evaluated, record why the dimension was not evaluated."
+            }
+          }
+        },
+        "scope_control": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rating",
+            "evidence"
+          ],
+          "properties": {
+            "rating": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "warn",
+                "fail",
+                "not_evaluated"
+              ]
+            },
+            "evidence": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Evidence supporting the rating. Even when not_evaluated, record why the dimension was not evaluated."
+            }
+          }
+        },
+        "validation_confidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rating",
+            "evidence"
+          ],
+          "properties": {
+            "rating": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "warn",
+                "fail",
+                "not_evaluated"
+              ]
+            },
+            "evidence": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Evidence supporting the rating. Even when not_evaluated, record why the dimension was not evaluated."
+            }
+          }
+        },
+        "safety_compliance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rating",
+            "evidence"
+          ],
+          "properties": {
+            "rating": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "warn",
+                "fail",
+                "not_evaluated"
+              ]
+            },
+            "evidence": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Evidence supporting the rating. Even when not_evaluated, record why the dimension was not evaluated."
+            }
+          }
+        },
+        "reviewability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rating",
+            "evidence"
+          ],
+          "properties": {
+            "rating": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "warn",
+                "fail",
+                "not_evaluated"
+              ]
+            },
+            "evidence": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Evidence supporting the rating. Even when not_evaluated, record why the dimension was not evaluated."
+            }
+          }
+        },
+        "maintainability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rating",
+            "evidence"
+          ],
+          "properties": {
+            "rating": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "warn",
+                "fail",
+                "not_evaluated"
+              ]
+            },
+            "evidence": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Evidence supporting the rating. Even when not_evaluated, record why the dimension was not evaluated."
+            }
+          }
+        },
+        "reproducibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rating",
+            "evidence"
+          ],
+          "properties": {
+            "rating": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "warn",
+                "fail",
+                "not_evaluated"
+              ]
+            },
+            "evidence": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Evidence supporting the rating. Even when not_evaluated, record why the dimension was not evaluated."
+            }
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "description": "Concrete issues or observations supported by evidence.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "category",
+          "severity",
+          "evidence",
+          "detail"
+        ],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "instruction_gap",
+              "scope_creep",
+              "missing_context",
+              "missing_validation",
+              "unsafe_action_blocked",
+              "bad_subagent_delegation",
+              "flaky_or_env_issue",
+              "review_gap",
+              "repair_loop_stalled",
+              "artifact_contract_gap"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "improvement_candidates": {
+      "type": "array",
+      "description": "Harness improvement suggestions supported by evidence and expected impact.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target",
+          "evidence",
+          "expected_impact",
+          "recommendation"
+        ],
+        "properties": {
+          "target": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_impact": {
+            "type": "string",
+            "minLength": 1
+          },
+          "recommendation": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
