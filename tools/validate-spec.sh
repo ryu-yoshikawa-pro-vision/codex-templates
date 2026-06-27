@@ -437,7 +437,8 @@ ensure(run_manifest_template.get("primary_failure_category") is None, "template/
 ensure(
     isinstance(run_manifest_template.get("validation"), dict)
     and run_manifest_template["validation"].get("status") == "not_run"
-    and isinstance(run_manifest_template["validation"].get("commands"), list),
+    and isinstance(run_manifest_template["validation"].get("commands"), list)
+    and len(run_manifest_template["validation"]["commands"]) == 0,
     "template/.codex/templates/RUN_MANIFEST.json validation defaults are out of contract",
 )
 ensure(
