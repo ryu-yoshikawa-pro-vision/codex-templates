@@ -25,38 +25,38 @@
 ```json
 {
   "schema_version": 1,
-  "run_id": "",
+  "run_id": "<run_id>",
   "result": "not_evaluated",
   "primary_failure_category": null,
   "failure_categories": [],
   "dimensions": {
     "task_completion": {
       "rating": "not_evaluated",
-      "evidence": ""
+      "evidence": "<task completion has not been evaluated yet>"
     },
     "scope_control": {
       "rating": "not_evaluated",
-      "evidence": ""
+      "evidence": "<scope control has not been evaluated yet>"
     },
     "validation_confidence": {
       "rating": "not_evaluated",
-      "evidence": ""
+      "evidence": "<validation confidence has not been evaluated yet>"
     },
     "safety_compliance": {
       "rating": "not_evaluated",
-      "evidence": ""
+      "evidence": "<safety compliance has not been evaluated yet>"
     },
     "reviewability": {
       "rating": "not_evaluated",
-      "evidence": ""
+      "evidence": "<reviewability has not been evaluated yet>"
     },
     "maintainability": {
       "rating": "not_evaluated",
-      "evidence": ""
+      "evidence": "<maintainability has not been evaluated yet>"
     },
     "reproducibility": {
       "rating": "not_evaluated",
-      "evidence": ""
+      "evidence": "<reproducibility has not been evaluated yet>"
     }
   },
   "findings": [],

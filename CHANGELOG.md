@@ -26,6 +26,10 @@
 - `template/docs/guides/quickstart.md` から consumer update guide へ誘導するように更新。
 - `tools/validate-spec.sh`、`tools/validate-spec.ps1`、`template/scripts/verify` を拡張し、新規 schema / template / static catalog / reference docs の整合性を検証するように更新。
 
+### Migration notes
+
+- 既存 consumer repo が更新後の `template/scripts/verify` を取り込む場合は、`.codex/templates/RUN_MANIFEST.json`、`.codex/templates/EVALUATION.md`、`docs/reference/run-artifacts.md`、`docs/reference/failure-taxonomy.md`、`docs/reference/evaluation.md`、`docs/reference/change-scope-policy.md` も同期対象に含める。
+
 ## 0.3.0 - 2026-06-27
 
 ### Changed
@@ -48,4 +52,3 @@
 - 既存 consumer repo へ template 更新を反映する場合は、まず dry-run で削除対象を確認する。
 - `sync-template` で既存 destination を上書きする場合は、`--force` / `-Force` に加えて明示確認フラグを指定する。
 - consumer repo へ template 更新を反映する場合は、`docs/PROJECT_CONTEXT.md` など consumer 固有ファイルを機械的に上書きしない。
-- 既存 consumer repo が更新後の `template/scripts/verify` を取り込む場合は、`.codex/templates/RUN_MANIFEST.json`、`.codex/templates/EVALUATION.md`、`docs/reference/run-artifacts.md`、`docs/reference/failure-taxonomy.md`、`docs/reference/evaluation.md`、`docs/reference/change-scope-policy.md` も同期対象に含める。

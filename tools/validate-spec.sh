@@ -431,6 +431,7 @@ schema_required = set(run_manifest_schema.get("required", []))
 missing_template_keys = sorted(schema_required - template_keys)
 ensure(not missing_template_keys, f"template/.codex/templates/RUN_MANIFEST.json missing required keys: {missing_template_keys}")
 ensure(run_manifest_template.get("schema_version") == 1, "template/.codex/templates/RUN_MANIFEST.json schema_version must be 1")
+ensure(run_manifest_template.get("run_id") != "", "template/.codex/templates/RUN_MANIFEST.json run_id must not be empty")
 ensure(run_manifest_template.get("status") == "pending", "template/.codex/templates/RUN_MANIFEST.json status must default to pending")
 ensure(run_manifest_template.get("primary_failure_category") is None, "template/.codex/templates/RUN_MANIFEST.json primary_failure_category must default to null")
 ensure(
@@ -455,6 +456,8 @@ assert_contains(
     [
         "evaluation.json",
         "spec/failure-taxonomy.json",
+        "<run_id>",
+        "not_evaluated",
         "rating",
         "evidence",
         "improvement_candidates",

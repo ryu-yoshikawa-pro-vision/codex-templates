@@ -384,6 +384,7 @@ $requiredManifestKeys = @(Normalize-ToArray $runManifestSchema.required)
 $missingTemplateKeys = @($requiredManifestKeys | Where-Object { $_ -notin $templateKeys })
 Assert-Condition ($missingTemplateKeys.Count -eq 0) "template/.codex/templates/RUN_MANIFEST.json missing required keys: $($missingTemplateKeys -join ', ')"
 Assert-Condition ($runManifestTemplate.schema_version -eq 1) "template/.codex/templates/RUN_MANIFEST.json schema_version must be 1"
+Assert-Condition ($runManifestTemplate.run_id -ne "") "template/.codex/templates/RUN_MANIFEST.json run_id must not be empty"
 Assert-Condition ($runManifestTemplate.status -eq "pending") "template/.codex/templates/RUN_MANIFEST.json status must default to pending"
 Assert-Condition ($null -eq $runManifestTemplate.primary_failure_category) "template/.codex/templates/RUN_MANIFEST.json primary_failure_category must default to null"
 Assert-Condition (($runManifestTemplate.validation -is [pscustomobject]) -and ($runManifestTemplate.validation.status -eq "not_run") -and (@(Normalize-ToArray $runManifestTemplate.validation.commands).Count -eq 0)) "template/.codex/templates/RUN_MANIFEST.json validation defaults are out of contract"
@@ -395,6 +396,8 @@ Assert-Condition (-not (Compare-Object -ReferenceObject $expectedSafetyKeys -Dif
 Assert-Contains -RelativePath "template/.codex/templates/EVALUATION.md" -Patterns @(
     "evaluation.json",
     "spec/failure-taxonomy.json",
+    "<run_id>",
+    "not_evaluated",
     "rating",
     "evidence",
     "improvement_candidates",
