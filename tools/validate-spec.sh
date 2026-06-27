@@ -214,7 +214,7 @@ ensure(
     "spec/change-scope-policy.json path_normalization.case_sensitive is out of contract",
 )
 
-expect_enum_contains(
+expect_enum_set(
     change_scope_policy.get("changed_file_kinds", []),
     [
         "modified",
@@ -227,7 +227,7 @@ expect_enum_contains(
     ],
     "spec/change-scope-policy.json changed_file_kinds",
 )
-expect_enum_contains(
+expect_enum_set(
     change_scope_policy.get("generated_artifact_exclusions", []),
     [".codex/runs/"],
     "spec/change-scope-policy.json generated_artifact_exclusions",

@@ -247,7 +247,7 @@ Assert-Condition ($pathNormalization.absolute_paths_for_comparison -eq $false) "
 Assert-Condition ($pathNormalization.prevent_repo_escape -eq $true) "spec/change-scope-policy.json path_normalization.prevent_repo_escape is out of contract"
 Assert-Condition ($pathNormalization.case_sensitive -eq $true) "spec/change-scope-policy.json path_normalization.case_sensitive is out of contract"
 
-Expect-EnumContains -Values $changeScopePolicy.changed_file_kinds -Expected @(
+Expect-EnumSet -Values $changeScopePolicy.changed_file_kinds -Expected @(
     "modified",
     "added",
     "untracked",
@@ -256,7 +256,7 @@ Expect-EnumContains -Values $changeScopePolicy.changed_file_kinds -Expected @(
     "renamed_new",
     "copied_new"
 ) -Label "spec/change-scope-policy.json changed_file_kinds"
-Expect-EnumContains -Values $changeScopePolicy.generated_artifact_exclusions -Expected @(".codex/runs/") -Label "spec/change-scope-policy.json generated_artifact_exclusions"
+Expect-EnumSet -Values $changeScopePolicy.generated_artifact_exclusions -Expected @(".codex/runs/") -Label "spec/change-scope-policy.json generated_artifact_exclusions"
 
 Assert-Condition ($changeScopePolicy.allowed_files.meaning -eq "maximum_change_boundary") "spec/change-scope-policy.json allowed_files.meaning is out of contract"
 Assert-Condition ($changeScopePolicy.allowed_files.match_mode -eq "exact_path") "spec/change-scope-policy.json allowed_files.match_mode is out of contract"
