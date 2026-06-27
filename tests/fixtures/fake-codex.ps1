@@ -7,6 +7,28 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Normalize-FakeWritePath {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $normalized = $Path -replace '\\', '/'
+    if ([string]::IsNullOrWhiteSpace($normalized)) {
+        throw "Unsafe FAKE_CODEX_WRITE_FILES path: $Path"
+    }
+    if ([System.IO.Path]::IsPathRooted($normalized) -or
+        $normalized -match '^[A-Za-z]:/' -or
+        $normalized.StartsWith('//', [System.StringComparison]::Ordinal)) {
+        throw "Unsafe FAKE_CODEX_WRITE_FILES path: $Path"
+    }
+
+    foreach ($segment in $normalized.Split('/', [System.StringSplitOptions]::None)) {
+        if ($segment -eq '..') {
+            throw "Unsafe FAKE_CODEX_WRITE_FILES path: $Path"
+        }
+    }
+
+    return $normalized
+}
+
 function Get-Decision {
     param([string[]]$Tokens)
 
@@ -92,7 +114,13 @@ function Invoke-FakeExec {
             if ([string]::IsNullOrWhiteSpace($path)) {
                 continue
             }
-            $normalized = $path -replace '\\', '/'
+            try {
+                $normalized = Normalize-FakeWritePath -Path $path
+            }
+            catch {
+                Write-Error $_.Exception.Message
+                exit 10
+            }
             $target = Join-Path $workdir ($normalized -replace '/', [System.IO.Path]::DirectorySeparatorChar)
             $parent = Split-Path -Parent $target
             if (-not [string]::IsNullOrWhiteSpace($parent) -and -not (Test-Path $parent)) {

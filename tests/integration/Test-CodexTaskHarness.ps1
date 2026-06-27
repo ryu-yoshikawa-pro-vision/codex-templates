@@ -375,6 +375,7 @@ try {
 
     foreach ($invalidValue in @('..\outside.md', 'C:\tmp\outside.md', '*.md')) {
         $invalidAllowedReport = Join-Path $tempRoot "invalid-allowed.report.json"
+        Remove-Item -Force $invalidAllowedReport -ErrorAction SilentlyContinue
         $invalidAllowed = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
             '--report-path', $invalidAllowedReport,
             '--log-path', (Join-Path $tempRoot "invalid-allowed.jsonl"),
@@ -386,6 +387,7 @@ try {
         Assert-ReportStatus -Path $invalidAllowedReport -ExpectedStatus 'invalid_args' | Out-Null
 
         $invalidExpectedReport = Join-Path $tempRoot "invalid-expected.report.json"
+        Remove-Item -Force $invalidExpectedReport -ErrorAction SilentlyContinue
         $invalidExpected = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
             '--report-path', $invalidExpectedReport,
             '--log-path', (Join-Path $tempRoot "invalid-expected.jsonl"),

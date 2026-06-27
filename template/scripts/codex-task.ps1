@@ -212,7 +212,21 @@ function Get-SortedUniqueStrings {
     if ($null -eq $Values -or @($Values).Count -eq 0) {
         return @()
     }
-    return @($Values | Sort-Object -Unique)
+
+    $set = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($value in @($Values)) {
+        if ($null -ne $value) {
+            [void]$set.Add([string]$value)
+        }
+    }
+
+    $list = [System.Collections.Generic.List[string]]::new()
+    foreach ($value in $set) {
+        $list.Add($value)
+    }
+
+    $list.Sort([System.StringComparer]::Ordinal)
+    return @($list)
 }
 
 function Get-CodexCommand {
@@ -482,7 +496,7 @@ function Get-GitChangedFiles {
             }
         }
 
-        return @($paths | Sort-Object -Unique)
+        return @(Get-SortedUniqueStrings -Values @($paths))
     }
     finally {
         $buffer.Dispose()
@@ -498,20 +512,20 @@ function Invoke-ScopeChecks {
     )
 
     if (@($State.allowed_files).Count -gt 0) {
-        $allowedLookup = @{}
+        $allowedLookup = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
         foreach ($path in @($State.allowed_files)) {
-            $allowedLookup[$path] = $true
+            [void]$allowedLookup.Add($path)
         }
 
         $violations = New-Object System.Collections.Generic.List[string]
         foreach ($path in @($State.changed_files)) {
-            if (-not $allowedLookup.ContainsKey($path)) {
+            if (-not $allowedLookup.Contains($path)) {
                 $violations.Add($path)
             }
         }
 
         if ($violations.Count -gt 0) {
-            $orderedViolations = @($violations | Sort-Object -Unique)
+            $orderedViolations = @(Get-SortedUniqueStrings -Values @($violations))
             $evidence = "changed files outside allowed_files: " + ($orderedViolations -join ', ')
             $Report.status = "scope_violation"
             $State.validation_status = "blocked"
@@ -531,20 +545,20 @@ function Invoke-ScopeChecks {
     }
 
     if (@($State.expected_changed_files).Count -gt 0) {
-        $changedLookup = @{}
+        $changedLookup = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
         foreach ($path in @($State.changed_files)) {
-            $changedLookup[$path] = $true
+            [void]$changedLookup.Add($path)
         }
 
         $missingExpected = New-Object System.Collections.Generic.List[string]
         foreach ($path in @($State.expected_changed_files)) {
-            if (-not $changedLookup.ContainsKey($path)) {
+            if (-not $changedLookup.Contains($path)) {
                 $missingExpected.Add($path)
             }
         }
 
         if ($missingExpected.Count -gt 0) {
-            $orderedMissing = @($missingExpected | Sort-Object -Unique)
+            $orderedMissing = @(Get-SortedUniqueStrings -Values @($missingExpected))
             $evidence = "expected files were not changed: " + ($orderedMissing -join ', ')
             $Report.status = "expected_changes_missing"
             $State.validation_status = "failed"

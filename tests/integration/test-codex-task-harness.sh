@@ -238,6 +238,8 @@ assert_status "$expected_missing_report" expected_changes_missing
 assert_manifest_state "$template_root/.codex/runs/$expected_missing_run_id/run.json" failed failed false "" "expected changed files check" failed
 
 for invalid_value in "../outside.md" "/tmp/outside.md" "*.md"; do
+  rm -f "$temp_root/invalid-allowed.report.json" "$temp_root/invalid-expected.report.json"
+
   set +e
   bash "$wrapper" --report-path "$temp_root/invalid-allowed.report.json" --log-path "$temp_root/invalid-allowed.jsonl" --allowed-files "$invalid_value" --skip-verify "INVALID_ALLOWED" >"$temp_root/invalid-allowed.out" 2>&1
   code=$?

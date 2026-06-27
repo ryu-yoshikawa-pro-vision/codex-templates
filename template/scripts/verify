@@ -178,6 +178,7 @@ check_template_contract() {
   contains "TASK-006B" docs/reference/change-scope-policy.md || return 1
   contains "exact path" docs/reference/change-scope-policy.md || return 1
   contains "--run-id" docs/reference/change-scope-policy.md || return 1
+  contains "--record-run-manifest" docs/reference/change-scope-policy.md || return 1
   contains "run.json" docs/reference/change-scope-policy.md || return 1
   contains "primary_failure_category" docs/reference/failure-taxonomy.md || return 1
   contains "failure_categories" docs/reference/failure-taxonomy.md || return 1

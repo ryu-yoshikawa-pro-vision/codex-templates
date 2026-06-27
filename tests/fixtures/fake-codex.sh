@@ -1,17 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+validate_fake_write_path() {
+  local raw="$1"
+  local normalized="${raw//\\//}"
+
+  if [[ -z "$normalized" ]]; then
+    return 1
+  fi
+  if [[ "$normalized" == /* || "$normalized" =~ ^[A-Za-z]:/ || "$normalized" =~ ^// ]]; then
+    return 1
+  fi
+  if [[ "$normalized" == ".." || "$normalized" == ../* || "$normalized" == */../* || "$normalized" == */.. ]]; then
+    return 1
+  fi
+
+  printf '%s' "$normalized"
+}
+
 apply_fake_changes() {
   local workdir="$1"
   local raw_list="${FAKE_CODEX_WRITE_FILES:-}"
   [[ -n "$raw_list" ]] || return 0
 
   local IFS=','
-  local path
+  local path normalized target
   for path in $raw_list; do
     [[ -n "$path" ]] || continue
-    local normalized="${path//\\//}"
-    local target="$workdir/$normalized"
+    normalized="$(validate_fake_write_path "$path")" || {
+      echo "Unsafe FAKE_CODEX_WRITE_FILES path: $path" >&2
+      exit 10
+    }
+    target="$workdir/$normalized"
     mkdir -p "$(dirname "$target")"
     printf '\nFAKE_CODEX_CHANGE\n' >> "$target"
   done
