@@ -240,18 +240,22 @@ function Invoke-OutputSchemaValidation {
     $outputPath = Join-Path $repoRoot $OutputRelativePath
 
     $pythonPath = $null
+    $pythonArgs = @()
     foreach ($candidate in @("python", "py")) {
         $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
         if (-not $cmd) {
             continue
         }
-        $args = @("--version")
+        $probeArgs = @("--version")
+        $runArgs = @()
         if ($candidate -eq "py") {
-            $args = @("-3", "--version")
+            $probeArgs = @("-3", "--version")
+            $runArgs = @("-3")
         }
-        & $cmd.Path @args *> $null
+        & $cmd.Path @probeArgs *> $null
         if ($LASTEXITCODE -eq 0) {
             $pythonPath = $cmd.Path
+            $pythonArgs = $runArgs
             break
         }
     }
@@ -259,7 +263,7 @@ function Invoke-OutputSchemaValidation {
         throw "python3 or python is required"
     }
 
-    & $pythonPath $validator $schemaPath $outputPath
+    & $pythonPath @pythonArgs $validator $schemaPath $outputPath
     if ($LASTEXITCODE -ne 0) {
         throw "Schema validation failed for $OutputRelativePath"
     }
@@ -776,8 +780,14 @@ foreach ($candidate in $candidates) {
     }
     $sourceRuns = @(Normalize-ToArray $candidate.source_runs)
     Assert-Condition ($sourceRuns.Count -gt 0) "candidate[$candidateIndex].source_runs must be a non-empty array"
+    Assert-Condition (
+        @($sourceRuns | Where-Object { ($_ -is [string]) -and -not [string]::IsNullOrWhiteSpace($_) }).Count -eq $sourceRuns.Count
+    ) "candidate[$candidateIndex].source_runs must contain only non-empty strings"
     $evidence = @(Normalize-ToArray $candidate.evidence)
     Assert-Condition ($evidence.Count -gt 0) "candidate[$candidateIndex].evidence must be a non-empty array"
+    Assert-Condition (
+        @($evidence | Where-Object { ($_ -is [string]) -and -not [string]::IsNullOrWhiteSpace($_) }).Count -eq $evidence.Count
+    ) "candidate[$candidateIndex].evidence must contain only non-empty strings"
     Assert-Condition ($candidate.failure_category -in $taxonomyCategories) "candidate[$candidateIndex].failure_category must exist in spec/failure-taxonomy.json"
     Assert-Condition ($candidate.strictness -in @("normal", "strict", "blocked")) "candidate[$candidateIndex].strictness must be one of normal|strict|blocked"
     Assert-Condition ($candidate.status -in @("proposed", "accepted", "rejected", "deferred", "implemented")) "candidate[$candidateIndex].status must be one of proposed|accepted|rejected|deferred|implemented"

@@ -12,18 +12,22 @@ $taxonomyPath = Join-Path $sourceRepoRoot "spec/failure-taxonomy.json"
 $candidatesPath = Join-Path $templateRoot "examples/harness-improvement/harness-improvement-candidates.json"
 
 $pythonPath = $null
+$pythonArgs = @()
 foreach ($candidate in @("python", "py")) {
     $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
     if (-not $cmd) {
         continue
     }
-    $args = @("--version")
+    $probeArgs = @("--version")
+    $runArgs = @()
     if ($candidate -eq "py") {
-        $args = @("-3", "--version")
+        $probeArgs = @("-3", "--version")
+        $runArgs = @("-3")
     }
-    & $cmd.Path @args *> $null
+    & $cmd.Path @probeArgs *> $null
     if ($LASTEXITCODE -eq 0) {
         $pythonPath = $cmd.Path
+        $pythonArgs = $runArgs
         break
     }
 }
@@ -53,12 +57,12 @@ foreach ($path in $requiredPaths) {
     }
 }
 
-& $pythonPath $validator $evaluationSchema (Join-Path $templateRoot "examples/repair-loop/iteration-1-evaluation.json")
+& $pythonPath @pythonArgs $validator $evaluationSchema (Join-Path $templateRoot "examples/repair-loop/iteration-1-evaluation.json")
 if ($LASTEXITCODE -ne 0) {
     throw "Schema validation failed for iteration-1-evaluation.json"
 }
 
-& $pythonPath $validator $evaluationSchema (Join-Path $templateRoot "examples/repair-loop/iteration-2-evaluation.json")
+& $pythonPath @pythonArgs $validator $evaluationSchema (Join-Path $templateRoot "examples/repair-loop/iteration-2-evaluation.json")
 if ($LASTEXITCODE -ne 0) {
     throw "Schema validation failed for iteration-2-evaluation.json"
 }
@@ -82,8 +86,19 @@ foreach ($candidate in $candidates) {
     if ($candidate.failure_category -notin $categories) {
         throw "candidate[$index] has invalid failure_category"
     }
-    if (@($candidate.evidence).Count -eq 0) {
+    $sourceRuns = @($candidate.source_runs)
+    if ($sourceRuns.Count -eq 0) {
+        throw "candidate[$index].source_runs must be a non-empty array"
+    }
+    if (@($sourceRuns | Where-Object { ($_ -is [string]) -and -not [string]::IsNullOrWhiteSpace($_) }).Count -ne $sourceRuns.Count) {
+        throw "candidate[$index].source_runs must contain only non-empty strings"
+    }
+    $evidence = @($candidate.evidence)
+    if ($evidence.Count -eq 0) {
         throw "candidate[$index] must include evidence"
+    }
+    if (@($evidence | Where-Object { ($_ -is [string]) -and -not [string]::IsNullOrWhiteSpace($_) }).Count -ne $evidence.Count) {
+        throw "candidate[$index].evidence must contain only non-empty strings"
     }
 }
 

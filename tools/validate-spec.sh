@@ -993,8 +993,16 @@ for index, candidate in enumerate(candidates, start=1):
         f"candidate[{index}].source_runs must be a non-empty array",
     )
     ensure(
+        all(isinstance(run_id, str) and run_id.strip() for run_id in candidate["source_runs"]),
+        f"candidate[{index}].source_runs must contain only non-empty strings",
+    )
+    ensure(
         isinstance(candidate["evidence"], list) and len(candidate["evidence"]) > 0,
         f"candidate[{index}].evidence must be a non-empty array",
+    )
+    ensure(
+        all(isinstance(item, str) and item.strip() for item in candidate["evidence"]),
+        f"candidate[{index}].evidence must contain only non-empty strings",
     )
     ensure(
         candidate["failure_category"] in taxonomy_categories,
