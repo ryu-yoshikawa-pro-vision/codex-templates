@@ -69,7 +69,7 @@
       "type": "string",
       "enum": [
         "host",
-        "docker",
+        "docker-sandbox",
         "sdk"
       ],
       "description": "Runtime used for the run. The sdk value is reserved for future experimental work and does not imply an SDK runner exists in this implementation."

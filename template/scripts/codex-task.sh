@@ -9,6 +9,9 @@ mkdir -p "$artifacts_dir" "$reports_dir" "$logs_dir"
 
 preset="safe"
 runtime="host"
+task_type="implementation"
+workflow_level="standard"
+record_run_manifest=0
 prompt_file=""
 output_schema=""
 verify_command=""
@@ -28,9 +31,17 @@ report_path="$reports_dir/codex-task-${timestamp}.report.json"
 log_path="$logs_dir/codex-task-${timestamp}.jsonl"
 
 report_status="pending"
+run_status="pending"
 prompt_source=""
 codex_exit_code="null"
 verify_exit_code="null"
+validation_status="not_run"
+validation_command=""
+validation_command_exit_code="null"
+validation_command_status=""
+validation_command_evidence=""
+manifest_path=""
+manifest_started=0
 
 json_escape() {
   local s="$1"
@@ -109,6 +120,85 @@ git_dirty() {
   printf 'false'
 }
 
+to_repo_relative_path() {
+  local candidate="$1"
+  local normalized_candidate normalized_root
+  normalized_candidate="$(normalized_path "$candidate")"
+  normalized_root="$(normalized_path "$repo_root")"
+  if [[ "$normalized_candidate" == "$normalized_root" ]]; then
+    printf '.'
+    return
+  fi
+  if [[ "$normalized_candidate" == "$normalized_root/"* ]]; then
+    printf '%s' "${normalized_candidate#"$normalized_root"/}" | tr '\\' '/'
+    return
+  fi
+  printf '%s' "$candidate" | tr '\\' '/'
+}
+
+write_run_manifest() {
+  (( record_run_manifest )) || return 0
+  (( manifest_started )) || return 0
+  [[ -n "$manifest_path" ]] || return 0
+
+  local branch report_ref network_enabled validation_commands_json
+  branch="$(git_branch)"
+  report_ref="$(to_repo_relative_path "$report_path")"
+  network_enabled=false
+  if [[ "$preset" == "auto-net" ]] || (( allow_search )); then
+    network_enabled=true
+  fi
+
+  if [[ -n "$validation_command_status" ]]; then
+    validation_commands_json=$(cat <<EOF
+[
+      {
+        "command": "$(json_escape "$validation_command")",
+        "exit_code": $validation_command_exit_code,
+        "status": "$(json_escape "$validation_command_status")",
+        "evidence": "$(json_escape "$validation_command_evidence")"
+      }
+    ]
+EOF
+)
+  else
+    validation_commands_json="[]"
+  fi
+
+  ensure_parent_dir "$manifest_path"
+  cat > "$manifest_path" <<EOF
+{
+  "schema_version": 1,
+  "run_id": "$(json_escape "$run_id")",
+  "task_type": "$(json_escape "$task_type")",
+  "workflow_level": "$(json_escape "$workflow_level")",
+  "preset": "$(json_escape "$preset")",
+  "runtime": "$(json_escape "$runtime")",
+  "agents_used": [],
+  "repo": null,
+  "branch": $(if [[ -n "$branch" ]]; then printf '"%s"' "$(json_escape "$branch")"; else printf 'null'; fi),
+  "base_branch": null,
+  "codex_task_reports": [
+    "$(json_escape "$report_ref")"
+  ],
+  "changed_files": [],
+  "validation": {
+    "status": "$(json_escape "$validation_status")",
+    "commands": $validation_commands_json
+  },
+  "safety": {
+    "network": $network_enabled,
+    "delete_attempt_blocked": false,
+    "git_mutation_attempt_blocked": false,
+    "scope_violation": false
+  },
+  "evaluation_path": null,
+  "status": "$(json_escape "$run_status")",
+  "primary_failure_category": null
+}
+EOF
+}
+
 path_under_root() {
   local candidate root
   candidate="$(normalized_path "$1")"
@@ -163,8 +253,10 @@ fail_with_status() {
   local status="$1"
   local message="$2"
   report_status="$status"
+  run_status="failed"
   write_log "task_failed" ",\"status\":\"$(json_escape "$status")\",\"message\":\"$(json_escape "$message")\""
   write_report
+  write_run_manifest
   printf '%s\n' "$message" >&2
   exit 1
 }
@@ -186,6 +278,16 @@ parse_args() {
       --runtime)
         [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--runtime requires a value"
         runtime="$2"
+        shift 2
+        ;;
+      --task-type)
+        [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--task-type requires a value"
+        task_type="$2"
+        shift 2
+        ;;
+      --workflow-level)
+        [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--workflow-level requires a value"
+        workflow_level="$2"
         shift 2
         ;;
       --prompt-file)
@@ -237,6 +339,10 @@ parse_args() {
         run_id="$2"
         shift 2
         ;;
+      --record-run-manifest)
+        record_run_manifest=1
+        shift
+        ;;
       --dangerously-bypass-approvals-and-sandbox)
         block_unsafe_argument "$1" "dangerous bypass is prohibited"
         ;;
@@ -276,6 +382,10 @@ parse_args() {
 }
 
 apply_run_paths() {
+  if (( record_run_manifest )) && [[ -z "$run_id" ]]; then
+    fail_with_status "invalid_args" "--record-run-manifest requires --run-id"
+  fi
+
   if [[ -n "$run_id" ]]; then
     validate_run_id
     local run_root="$repo_root/.codex/runs/$run_id"
@@ -294,11 +404,26 @@ apply_run_paths() {
     if [[ -z "$explicit_log_path" ]]; then
       log_path="$run_root/logs/codex-task-${timestamp}.jsonl"
     fi
+    if (( record_run_manifest )); then
+      manifest_path="$run_root/run.json"
+    fi
   fi
 
   if [[ -n "$explicit_log_path" ]]; then
     log_path="$explicit_log_path"
   fi
+}
+
+validate_metadata() {
+  case "$task_type" in
+    plan|review|implementation|investigation|repair) ;;
+    *) fail_with_status "invalid_args" "Invalid --task-type: $task_type" ;;
+  esac
+
+  case "$workflow_level" in
+    lightweight|standard|strict) ;;
+    *) fail_with_status "invalid_args" "Invalid --workflow-level: $workflow_level" ;;
+  esac
 }
 
 default_verify_command() {
@@ -339,6 +464,8 @@ run_schema_check() {
 }
 
 main() {
+  local prompt="" cwd sandbox_mode codex_bin used_verify container_output container_schema container_cwd
+
   write_log "wrapper_start" ",\"runtime\":\"$(json_escape "$runtime")\",\"preset\":\"$(json_escape "$preset")\",\"run_id\":\"$(json_escape "$run_id")\""
 
   case "$preset" in
@@ -351,7 +478,19 @@ main() {
     *) fail_with_status "invalid_args" "Unsupported runtime: $runtime" ;;
   esac
 
-  local prompt="" cwd sandbox_mode codex_bin used_verify container_output container_schema container_cwd
+  validate_metadata
+
+  cwd="$(pwd -P)"
+  if [[ "$cwd" != "$repo_root" && "$cwd" != "$repo_root/"* ]]; then
+    cwd="$repo_root"
+  fi
+  cwd_for_report="$cwd"
+
+  if (( record_run_manifest )); then
+    manifest_started=1
+    run_status="running"
+    write_run_manifest
+  fi
 
   if [[ -n "$prompt_file" ]]; then
     [[ -f "$prompt_file" ]] || fail_with_status "invalid_args" "Prompt file not found: $prompt_file"
@@ -368,12 +507,6 @@ main() {
   if [[ -n "$output_schema" && ! -f "$output_schema" ]]; then
     fail_with_status "invalid_args" "Output schema not found: $output_schema"
   fi
-
-  cwd="$(pwd -P)"
-  if [[ "$cwd" != "$repo_root" && "$cwd" != "$repo_root/"* ]]; then
-    cwd="$repo_root"
-  fi
-  cwd_for_report="$cwd"
 
   if (( ! skip_preflight )); then
     write_log "preflight_start"
@@ -468,7 +601,9 @@ main() {
   write_log "codex_exec_exit" ",\"exit_code\":$codex_exit_code"
   if [[ "$codex_exit_code" != "0" ]]; then
     report_status="codex_failed"
+    run_status="failed"
     write_report
+    write_run_manifest
     exit "$codex_exit_code"
   fi
 
@@ -479,15 +614,25 @@ main() {
       write_log "schema_ok"
     else
       report_status="invalid_output"
+      validation_status="failed"
+      validation_command="output schema validation"
+      validation_command_exit_code=1
+      validation_command_status="failed"
+      validation_command_evidence="output schema validation failed"
+      run_status="failed"
       write_log "schema_failed"
       write_report
+      write_run_manifest
       exit 1
     fi
   fi
 
   if (( skip_verify )); then
     report_status="verify_skipped"
+    validation_status="skipped"
+    run_status="completed"
     write_report
+    write_run_manifest
     exit 0
   fi
 
@@ -498,8 +643,11 @@ main() {
 
   if [[ -z "$used_verify" ]]; then
     report_status="verify_skipped"
+    validation_status="skipped"
+    run_status="completed"
     write_log "verify_skipped"
     write_report
+    write_run_manifest
     exit 0
   fi
 
@@ -509,15 +657,27 @@ main() {
   verify_exit_code=$?
   set -e
   write_log "verify_exit" ",\"exit_code\":$verify_exit_code"
+  validation_command="$used_verify"
+  validation_command_exit_code="$verify_exit_code"
 
   if [[ "$verify_exit_code" != "0" ]]; then
     report_status="verify_failed"
+    validation_status="failed"
+    validation_command_status="failed"
+    validation_command_evidence="verify command failed"
+    run_status="failed"
     write_report
+    write_run_manifest
     exit "$verify_exit_code"
   fi
 
   report_status="ok"
+  validation_status="passed"
+  validation_command_status="passed"
+  validation_command_evidence="verify command completed successfully"
+  run_status="completed"
   write_report
+  write_run_manifest
 }
 
 parse_args "$@"

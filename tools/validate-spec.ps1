@@ -361,7 +361,7 @@ Expect-PropertyKeys -Schema $runManifestSchema -Fields @(
 Expect-EnumContains -Values $runManifestSchema.properties.task_type.enum -Expected @("plan", "review", "implementation", "investigation", "repair") -Label "spec/run-manifest.schema.json task_type"
 Expect-EnumContains -Values $runManifestSchema.properties.workflow_level.enum -Expected @("lightweight", "standard", "strict") -Label "spec/run-manifest.schema.json workflow_level"
 Expect-EnumContains -Values $runManifestSchema.properties.preset.enum -Expected @("safe", "readonly", "auto-net") -Label "spec/run-manifest.schema.json preset"
-Expect-EnumContains -Values $runManifestSchema.properties.runtime.enum -Expected @("host", "docker", "sdk") -Label "spec/run-manifest.schema.json runtime"
+Expect-EnumContains -Values $runManifestSchema.properties.runtime.enum -Expected @("host", "docker-sandbox", "sdk") -Label "spec/run-manifest.schema.json runtime"
 Expect-EnumContains -Values $runManifestSchema.properties.status.enum -Expected @("pending", "running", "completed", "failed", "cancelled") -Label "spec/run-manifest.schema.json status"
 Expect-EnumSet -Values $runManifestSchema.properties.primary_failure_category.enum -Expected ($taxonomyCategories + @($null)) -Label "spec/run-manifest.schema.json primary_failure_category"
 

@@ -376,7 +376,7 @@ expect_enum_contains(
 )
 expect_enum_contains(
     run_manifest_props["runtime"]["enum"],
-    ["host", "docker", "sdk"],
+    ["host", "docker-sandbox", "sdk"],
     "spec/run-manifest.schema.json runtime",
 )
 expect_enum_contains(

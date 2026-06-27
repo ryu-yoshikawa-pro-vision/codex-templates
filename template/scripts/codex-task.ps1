@@ -6,6 +6,12 @@ param(
     [ValidateSet("host", "docker-sandbox")]
     [string]$Runtime,
 
+    [string]$TaskType,
+
+    [string]$WorkflowLevel,
+
+    [switch]$RecordRunManifest,
+
     [string]$PromptFile,
 
     [string]$OutputFile,
@@ -272,6 +278,64 @@ function Write-TaskReport {
     ($Report | ConvertTo-Json -Depth 6) | Set-Content -Path $Path
 }
 
+function Write-RunManifest {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][hashtable]$State,
+        [Parameter(Mandatory = $true)][hashtable]$Report,
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    $parent = Split-Path -Parent $Path
+    if (-not [string]::IsNullOrWhiteSpace($parent) -and -not (Test-Path $parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+
+    $validationCommands = @()
+    if (-not [string]::IsNullOrWhiteSpace($State.validation_command_status)) {
+        $validationCommands = @(
+            [ordered]@{
+                command = $State.validation_command
+                exit_code = $State.validation_command_exit_code
+                status = $State.validation_command_status
+                evidence = $State.validation_command_evidence
+            }
+        )
+    }
+
+    $manifest = [ordered]@{
+        schema_version = 1
+        run_id = $State.run_id
+        task_type = $State.task_type
+        workflow_level = $State.workflow_level
+        preset = $State.preset
+        runtime = $State.runtime
+        agents_used = @()
+        repo = $null
+        branch = Get-GitBranch -RepoRoot $RepoRoot
+        base_branch = $null
+        codex_task_reports = @(
+            Convert-ToRepoRelativePath -RepoRoot $RepoRoot -Path $State.report_path
+        )
+        changed_files = @()
+        validation = [ordered]@{
+            status = $State.validation_status
+            commands = $validationCommands
+        }
+        safety = [ordered]@{
+            network = ($State.preset -eq "auto-net" -or $State.allow_search)
+            delete_attempt_blocked = $false
+            git_mutation_attempt_blocked = $false
+            scope_violation = $false
+        }
+        evaluation_path = $null
+        status = $State.run_status
+        primary_failure_category = $null
+    }
+
+    ($manifest | ConvertTo-Json -Depth 8) | Set-Content -Path $Path
+}
+
 function Fail-Task {
     param(
         [string]$Status,
@@ -284,6 +348,10 @@ function Fail-Task {
     $Report.status = $Status
     Write-TaskLog -Path $LogPath -Event "task_failed" -Data @{ status = $Status; message = $Message }
     Write-TaskReport -Path $ReportPath -Report $Report
+    if ($script:state -and $script:state.record_run_manifest -and $script:state.manifest_started -and -not [string]::IsNullOrWhiteSpace($script:state.manifest_path)) {
+        $script:state.run_status = "failed"
+        Write-RunManifest -Path $script:state.manifest_path -State $script:state -Report $Report -RepoRoot $script:repoRoot
+    }
     throw $Message
 }
 
@@ -312,6 +380,9 @@ foreach ($dir in @($artifactsDir, $reportsDir)) {
 $state = [ordered]@{
     preset = "safe"
     runtime = "host"
+    task_type = "implementation"
+    workflow_level = "standard"
+    record_run_manifest = $false
     run_id = $null
     prompt_file = $null
     prompt = $null
@@ -326,6 +397,14 @@ $state = [ordered]@{
     explicit_output_file = $false
     explicit_report_path = $false
     explicit_log_path = $false
+    manifest_path = $null
+    manifest_started = $false
+    run_status = "pending"
+    validation_status = "not_run"
+    validation_command = $null
+    validation_command_exit_code = $null
+    validation_command_status = $null
+    validation_command_evidence = $null
 }
 
 $report = [ordered]@{
@@ -348,6 +427,9 @@ $report = [ordered]@{
 $normalizedArguments = New-Object System.Collections.Generic.List[string]
 if ($PSBoundParameters.ContainsKey('Preset')) { $normalizedArguments.Add('--preset'); $normalizedArguments.Add($Preset) }
 if ($PSBoundParameters.ContainsKey('Runtime')) { $normalizedArguments.Add('--runtime'); $normalizedArguments.Add($Runtime) }
+if ($PSBoundParameters.ContainsKey('TaskType')) { $normalizedArguments.Add('--task-type'); $normalizedArguments.Add($TaskType) }
+if ($PSBoundParameters.ContainsKey('WorkflowLevel')) { $normalizedArguments.Add('--workflow-level'); $normalizedArguments.Add($WorkflowLevel) }
+if ($RecordRunManifest) { $normalizedArguments.Add('--record-run-manifest') }
 if ($PSBoundParameters.ContainsKey('PromptFile')) { $normalizedArguments.Add('--prompt-file'); $normalizedArguments.Add($PromptFile) }
 if ($PSBoundParameters.ContainsKey('OutputFile')) { $normalizedArguments.Add('--output-file'); $normalizedArguments.Add($OutputFile) }
 if ($PSBoundParameters.ContainsKey('OutputSchema')) { $normalizedArguments.Add('--output-schema'); $normalizedArguments.Add($OutputSchema) }
@@ -362,6 +444,26 @@ if ($Arguments) {
     foreach ($arg in $Arguments) {
         $normalizedArguments.Add($arg)
     }
+}
+
+function Convert-ToRepoRelativePath {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    if (-not (Test-IsPathUnderRoot -Path $Path -Root $RepoRoot)) {
+        return ($Path -replace '\\', '/')
+    }
+
+    $fullRoot = [System.IO.Path]::GetFullPath($RepoRoot).TrimEnd('\', '/')
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    if ($fullPath.TrimEnd('\', '/') -eq $fullRoot) {
+        return "."
+    }
+
+    $relative = $fullPath.Substring($fullRoot.Length).TrimStart('\', '/')
+    return ($relative -replace '\\', '/')
 }
 $Arguments = $normalizedArguments.ToArray()
 
@@ -379,6 +481,16 @@ while ($i -lt $Arguments.Count) {
             $i++
             if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--runtime requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
             $state.runtime = $Arguments[$i]
+        }
+        '--task-type' {
+            $i++
+            if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--task-type requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
+            $state.task_type = $Arguments[$i]
+        }
+        '--workflow-level' {
+            $i++
+            if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--workflow-level requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
+            $state.workflow_level = $Arguments[$i]
         }
         '--prompt-file' {
             $i++
@@ -421,6 +533,7 @@ while ($i -lt $Arguments.Count) {
             if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--run-id requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
             $state.run_id = $Arguments[$i]
         }
+        '--record-run-manifest' { $state.record_run_manifest = $true }
         '--dangerously-bypass-approvals-and-sandbox' { Block-UnsafeArgument -Token $token -Reason "dangerous bypass is prohibited" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
         { $_ -like '--config*' -or $_ -like '-c*' } { Block-UnsafeArgument -Token $token -Reason "user config overrides are blocked; wrapper injects fixed safety settings" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
         { $_ -like '--sandbox*' -or $_ -like '-s*' } { Block-UnsafeArgument -Token $token -Reason "sandbox mode is fixed by wrapper" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
@@ -440,6 +553,10 @@ while ($i -lt $Arguments.Count) {
     $i++
 }
 
+if ($state.record_run_manifest -and [string]::IsNullOrWhiteSpace($state.run_id)) {
+    Fail-Task -Status "invalid_args" -Message "--record-run-manifest requires --run-id" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+}
+
 if (-not [string]::IsNullOrWhiteSpace($state.run_id)) {
     if (-not (Test-RunId -RunId $state.run_id)) {
         Fail-Task -Status "invalid_args" -Message "Invalid --run-id: expected YYYYMMDD-HHMMSS-JST" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
@@ -457,6 +574,9 @@ if (-not [string]::IsNullOrWhiteSpace($state.run_id)) {
     }
     if (-not $state.explicit_log_path) {
         $state.log_path = Get-DefaultLogPath -RepoRoot $repoRoot -Timestamp $timestamp -RunId $state.run_id
+    }
+    if ($state.record_run_manifest) {
+        $state.manifest_path = Join-Path $runRoot "run.json"
     }
 }
 
@@ -482,6 +602,26 @@ if ($state.preset -notin @("safe", "readonly", "auto-net")) {
 
 if ($state.runtime -notin @("host", "docker-sandbox")) {
     Fail-Task -Status "invalid_args" -Message "Unsupported runtime: $($state.runtime)" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+}
+
+if ($state.task_type -notin @("plan", "review", "implementation", "investigation", "repair")) {
+    Fail-Task -Status "invalid_args" -Message "Invalid --task-type: $($state.task_type)" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+}
+
+if ($state.workflow_level -notin @("lightweight", "standard", "strict")) {
+    Fail-Task -Status "invalid_args" -Message "Invalid --workflow-level: $($state.workflow_level)" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+}
+
+$cwd = (Get-Location).Path
+if (-not (Test-IsPathUnderRoot -Path $cwd -Root $repoRoot)) {
+    $cwd = $repoRoot
+}
+$report.cwd = $cwd
+
+if ($state.record_run_manifest) {
+    $state.manifest_started = $true
+    $state.run_status = "running"
+    Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
 }
 
 $prompt = if ($state.prompt_file) {
@@ -510,12 +650,6 @@ foreach ($path in @($state.output_file, $state.report_path)) {
 if ($state.output_schema -and -not (Test-Path $state.output_schema)) {
     Fail-Task -Status "invalid_args" -Message "Output schema not found: $($state.output_schema)" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
 }
-
-$cwd = (Get-Location).Path
-if (-not (Test-IsPathUnderRoot -Path $cwd -Root $repoRoot)) {
-    $cwd = $repoRoot
-}
-$report.cwd = $cwd
 
 if (-not $state.skip_preflight) {
     Write-TaskLog -Path $state.log_path -Event "preflight_start" -Data @{}
@@ -628,6 +762,10 @@ Write-TaskLog -Path $state.log_path -Event "codex_exec_exit" -Data @{ exit_code 
 if ($report.codex_exit_code -ne 0) {
     $report.status = "codex_failed"
     Write-TaskReport -Path $state.report_path -Report $report
+    $state.run_status = "failed"
+    if ($state.record_run_manifest) {
+        Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
+    }
     exit $report.codex_exit_code
 }
 
@@ -651,7 +789,16 @@ if ($state.output_schema) {
         $report.status = "invalid_output"
         $message = if ($_.Exception.Message -eq 'schema validation failed') { 'schema validation failed' } else { $_.Exception.Message }
         Write-TaskLog -Path $state.log_path -Event "schema_failed" -Data @{ message = $message }
+        $state.validation_status = "failed"
+        $state.validation_command = "output schema validation"
+        $state.validation_command_exit_code = 1
+        $state.validation_command_status = "failed"
+        $state.validation_command_evidence = "output schema validation failed"
         Write-TaskReport -Path $state.report_path -Report $report
+        $state.run_status = "failed"
+        if ($state.record_run_manifest) {
+            Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
+        }
         exit 1
     }
 }
@@ -659,6 +806,11 @@ if ($state.output_schema) {
 if ($state.skip_verify) {
     $report.status = "verify_skipped"
     Write-TaskReport -Path $state.report_path -Report $report
+    $state.validation_status = "skipped"
+    $state.run_status = "completed"
+    if ($state.record_run_manifest) {
+        Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
+    }
     exit 0
 }
 
@@ -676,6 +828,11 @@ if ([string]::IsNullOrWhiteSpace($verifyCommand)) {
     $report.status = "verify_skipped"
     Write-TaskLog -Path $state.log_path -Event "verify_skipped" -Data @{}
     Write-TaskReport -Path $state.report_path -Report $report
+    $state.validation_status = "skipped"
+    $state.run_status = "completed"
+    if ($state.record_run_manifest) {
+        Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
+    }
     exit 0
 }
 
@@ -688,13 +845,29 @@ catch {
     Write-TaskLog -Path $state.log_path -Event "verify_failed_to_start" -Data @{ message = $_.Exception.Message }
 }
 Write-TaskLog -Path $state.log_path -Event "verify_exit" -Data @{ exit_code = $report.verify_exit_code }
+$state.validation_command = $verifyCommand
+$state.validation_command_exit_code = $report.verify_exit_code
 
 if ($report.verify_exit_code -ne 0) {
     $report.status = "verify_failed"
     Write-TaskReport -Path $state.report_path -Report $report
+    $state.validation_status = "failed"
+    $state.validation_command_status = "failed"
+    $state.validation_command_evidence = "verify command failed"
+    $state.run_status = "failed"
+    if ($state.record_run_manifest) {
+        Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
+    }
     exit $report.verify_exit_code
 }
 
 $report.status = "ok"
 Write-TaskReport -Path $state.report_path -Report $report
+$state.validation_status = "passed"
+$state.validation_command_status = "passed"
+$state.validation_command_evidence = "verify command completed successfully"
+$state.run_status = "completed"
+if ($state.record_run_manifest) {
+    Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
+}
 exit 0
