@@ -155,16 +155,24 @@ assert_contains(
 required_paths = [
     "spec/evaluation.schema.json",
     "spec/run-manifest.schema.json",
+    "spec/hook-observation.schema.json",
+    "spec/subagent-run.schema.json",
     "spec/artifact-responsibility.json",
     "spec/change-scope-policy.json",
     "spec/failure-taxonomy.json",
     "template/.codex/templates/RUN_MANIFEST.json",
     "template/.codex/templates/EVALUATION.md",
     "template/.codex/templates/evaluation.schema.json",
+    "template/.codex/templates/hook-observation.schema.json",
+    "template/.codex/templates/subagent-run.schema.json",
     "template/docs/reference/run-artifacts.md",
     "template/docs/reference/failure-taxonomy.md",
     "template/docs/reference/evaluation.md",
     "template/docs/reference/change-scope-policy.md",
+    "template/docs/reference/hook-observation.md",
+    "template/docs/reference/subagent-observation.md",
+    "template/.codex/hooks/observe.sh",
+    "template/.codex/hooks/observe.ps1",
 ]
 for rel in required_paths:
     assert_exists(rel)
@@ -172,6 +180,10 @@ for rel in required_paths:
 evaluation_schema = read_spec("spec/evaluation.schema.json")
 bundled_evaluation_schema = read_spec("template/.codex/templates/evaluation.schema.json")
 run_manifest_schema = read_spec("spec/run-manifest.schema.json")
+hook_observation_schema = read_spec("spec/hook-observation.schema.json")
+bundled_hook_observation_schema = read_spec("template/.codex/templates/hook-observation.schema.json")
+subagent_run_schema = read_spec("spec/subagent-run.schema.json")
+bundled_subagent_run_schema = read_spec("template/.codex/templates/subagent-run.schema.json")
 artifact_responsibility = read_spec("spec/artifact-responsibility.json")
 change_scope_policy = read_spec("spec/change-scope-policy.json")
 failure_taxonomy = read_spec("spec/failure-taxonomy.json")
@@ -409,6 +421,281 @@ expect_enum_set(
 ensure(
     bundled_evaluation_schema == evaluation_schema,
     "template/.codex/templates/evaluation.schema.json must stay in sync with spec/evaluation.schema.json",
+)
+
+hook_props = hook_observation_schema.get("properties", {})
+ensure(
+    hook_observation_schema.get("additionalProperties") is False,
+    "spec/hook-observation.schema.json additionalProperties must be false",
+)
+expect_required_fields(
+    hook_observation_schema,
+    [
+        "schema_version",
+        "event_id",
+        "run_id",
+        "timestamp",
+        "source",
+        "event",
+        "severity",
+        "blocking",
+        "tool",
+        "cwd",
+        "input_summary",
+        "decision",
+        "evidence",
+        "metadata",
+    ],
+    "spec/hook-observation.schema.json",
+)
+expect_property_keys(
+    hook_observation_schema,
+    [
+        "schema_version",
+        "event_id",
+        "run_id",
+        "timestamp",
+        "source",
+        "event",
+        "severity",
+        "blocking",
+        "tool",
+        "cwd",
+        "input_summary",
+        "decision",
+        "evidence",
+        "metadata",
+    ],
+    "spec/hook-observation.schema.json",
+)
+expect_enum_set(
+    hook_props["schema_version"]["enum"],
+    [1],
+    "spec/hook-observation.schema.json schema_version",
+)
+expect_enum_set(
+    hook_props["source"]["enum"],
+    ["codex_hook", "codex_task", "codex_safe", "subagent", "manual", "unknown"],
+    "spec/hook-observation.schema.json source",
+)
+expect_enum_set(
+    hook_props["event"]["enum"],
+    ["PreToolUse", "PostToolUse", "SubagentStart", "SubagentStop", "Stop", "WrapperStart", "WrapperStop", "SafetyBlocked", "ObservationError"],
+    "spec/hook-observation.schema.json event",
+)
+expect_enum_set(
+    hook_props["severity"]["enum"],
+    ["debug", "info", "warning", "error", "critical"],
+    "spec/hook-observation.schema.json severity",
+)
+ensure(
+    hook_props["blocking"].get("type") == "boolean",
+    "spec/hook-observation.schema.json blocking type is out of contract",
+)
+ensure(
+    set(hook_props["tool"].get("type", [])) == {"object", "null"},
+    "spec/hook-observation.schema.json tool type is out of contract",
+)
+expect_property_keys(
+    hook_props["tool"],
+    ["name", "operation", "target"],
+    "spec/hook-observation.schema.json tool",
+)
+decision_schema = hook_props["decision"]
+expect_required_fields(
+    decision_schema,
+    ["action", "reason"],
+    "spec/hook-observation.schema.json decision",
+)
+expect_property_keys(
+    decision_schema,
+    ["action", "reason"],
+    "spec/hook-observation.schema.json decision",
+)
+expect_enum_set(
+    decision_schema["properties"]["action"]["enum"],
+    ["allow", "observe", "block", "skip", "error"],
+    "spec/hook-observation.schema.json decision.action",
+)
+evidence_item = hook_props["evidence"]["items"]
+expect_required_fields(
+    evidence_item,
+    ["kind", "value"],
+    "spec/hook-observation.schema.json evidence item",
+)
+expect_property_keys(
+    evidence_item,
+    ["kind", "value"],
+    "spec/hook-observation.schema.json evidence item",
+)
+expect_enum_set(
+    evidence_item["properties"]["kind"]["enum"],
+    ["path", "command", "pattern", "policy", "status", "message", "other"],
+    "spec/hook-observation.schema.json evidence.kind",
+)
+ensure(
+    hook_props["metadata"].get("type") == "object",
+    "spec/hook-observation.schema.json metadata type is out of contract",
+)
+ensure(
+    bundled_hook_observation_schema == hook_observation_schema,
+    "template/.codex/templates/hook-observation.schema.json must stay in sync with spec/hook-observation.schema.json",
+)
+
+subagent_props = subagent_run_schema.get("properties", {})
+ensure(
+    subagent_run_schema.get("additionalProperties") is False,
+    "spec/subagent-run.schema.json additionalProperties must be false",
+)
+expect_required_fields(
+    subagent_run_schema,
+    [
+        "schema_version",
+        "subagent_run_id",
+        "parent_run_id",
+        "agent",
+        "role",
+        "mode",
+        "purpose",
+        "sandbox",
+        "allowed_files",
+        "input_files",
+        "changed_files",
+        "scope",
+        "started_at",
+        "ended_at",
+        "status",
+        "summary",
+        "parent_decision",
+        "used_in_final_plan",
+        "evidence",
+        "metadata",
+    ],
+    "spec/subagent-run.schema.json",
+)
+expect_property_keys(
+    subagent_run_schema,
+    [
+        "schema_version",
+        "subagent_run_id",
+        "parent_run_id",
+        "agent",
+        "role",
+        "mode",
+        "purpose",
+        "sandbox",
+        "allowed_files",
+        "input_files",
+        "changed_files",
+        "scope",
+        "started_at",
+        "ended_at",
+        "status",
+        "summary",
+        "parent_decision",
+        "used_in_final_plan",
+        "evidence",
+        "metadata",
+    ],
+    "spec/subagent-run.schema.json",
+)
+expect_enum_set(
+    subagent_props["schema_version"]["enum"],
+    [1],
+    "spec/subagent-run.schema.json schema_version",
+)
+agent_schema = subagent_props["agent"]
+expect_required_fields(
+    agent_schema,
+    ["name", "model"],
+    "spec/subagent-run.schema.json agent",
+)
+expect_property_keys(
+    agent_schema,
+    ["name", "model"],
+    "spec/subagent-run.schema.json agent",
+)
+expect_enum_set(
+    subagent_props["role"]["enum"],
+    ["planner", "investigator", "reviewer", "implementation_worker", "validator", "other"],
+    "spec/subagent-run.schema.json role",
+)
+expect_enum_set(
+    subagent_props["mode"]["enum"],
+    ["read_only", "writable", "hybrid", "unknown"],
+    "spec/subagent-run.schema.json mode",
+)
+sandbox_schema = subagent_props["sandbox"]
+expect_required_fields(
+    sandbox_schema,
+    ["type", "network"],
+    "spec/subagent-run.schema.json sandbox",
+)
+expect_property_keys(
+    sandbox_schema,
+    ["type", "network"],
+    "spec/subagent-run.schema.json sandbox",
+)
+expect_enum_set(
+    sandbox_schema["properties"]["type"]["enum"],
+    ["read-only", "workspace-write", "danger-full-access", "unknown"],
+    "spec/subagent-run.schema.json sandbox.type",
+)
+scope_schema = subagent_props["scope"]
+expect_required_fields(
+    scope_schema,
+    ["declared", "compliant", "violations"],
+    "spec/subagent-run.schema.json scope",
+)
+expect_property_keys(
+    scope_schema,
+    ["declared", "compliant", "violations"],
+    "spec/subagent-run.schema.json scope",
+)
+expect_enum_set(
+    subagent_props["status"]["enum"],
+    ["pending", "running", "completed", "failed", "cancelled", "blocked", "not_run"],
+    "spec/subagent-run.schema.json status",
+)
+parent_decision_schema = subagent_props["parent_decision"]
+expect_required_fields(
+    parent_decision_schema,
+    ["action", "reason"],
+    "spec/subagent-run.schema.json parent_decision",
+)
+expect_property_keys(
+    parent_decision_schema,
+    ["action", "reason"],
+    "spec/subagent-run.schema.json parent_decision",
+)
+expect_enum_set(
+    parent_decision_schema["properties"]["action"]["enum"],
+    ["accepted", "partially_accepted", "rejected", "deferred", "not_reviewed"],
+    "spec/subagent-run.schema.json parent_decision.action",
+)
+subagent_evidence_item = subagent_props["evidence"]["items"]
+expect_required_fields(
+    subagent_evidence_item,
+    ["kind", "value"],
+    "spec/subagent-run.schema.json evidence item",
+)
+expect_property_keys(
+    subagent_evidence_item,
+    ["kind", "value"],
+    "spec/subagent-run.schema.json evidence item",
+)
+expect_enum_set(
+    subagent_evidence_item["properties"]["kind"]["enum"],
+    ["path", "summary", "finding", "validation", "review_comment", "other"],
+    "spec/subagent-run.schema.json evidence.kind",
+)
+ensure(
+    subagent_props["metadata"].get("type") == "object",
+    "spec/subagent-run.schema.json metadata type is out of contract",
+)
+ensure(
+    bundled_subagent_run_schema == subagent_run_schema,
+    "template/.codex/templates/subagent-run.schema.json must stay in sync with spec/subagent-run.schema.json",
 )
 
 dimension_names = [

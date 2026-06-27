@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Codex Hook Observation Event",
+  "description": "Observation event for Codex hooks, wrappers, or related tooling. This schema is for evidence and tracing only; it does not replace safety policy decisions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "run_id",
+    "timestamp",
+    "source",
+    "event",
+    "severity",
+    "blocking",
+    "tool",
+    "cwd",
+    "input_summary",
+    "decision",
+    "evidence",
+    "metadata"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "enum": [
+        1
+      ],
+      "description": "Schema version for the observation event."
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for one observation event."
+    },
+    "run_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "Run identifier when available. Null is allowed for standalone hook execution."
+    },
+    "timestamp": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Timestamp for the observation event. ISO 8601 / RFC3339 is recommended."
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "codex_hook",
+        "codex_task",
+        "codex_safe",
+        "subagent",
+        "manual",
+        "unknown"
+      ],
+      "description": "Primary source that emitted the observation."
+    },
+    "event": {
+      "type": "string",
+      "enum": [
+        "PreToolUse",
+        "PostToolUse",
+        "SubagentStart",
+        "SubagentStop",
+        "Stop",
+        "WrapperStart",
+        "WrapperStop",
+        "SafetyBlocked",
+        "ObservationError"
+      ],
+      "description": "Observation event type."
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "debug",
+        "info",
+        "warning",
+        "error",
+        "critical"
+      ],
+      "description": "Severity for the observation event."
+    },
+    "blocking": {
+      "type": "boolean",
+      "description": "Whether the observed event blocked execution."
+    },
+    "tool": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "description": "Observed tool metadata when relevant."
+    },
+    "cwd": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "Working directory at the time of observation, if known."
+    },
+    "input_summary": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Sanitized summary of tool input. Do not store secrets, tokens, API keys, or raw prompts."
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "reason"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "observe",
+            "block",
+            "skip",
+            "error"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "description": "Supplemental evidence for the observation event.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "value"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "path",
+              "command",
+              "pattern",
+              "policy",
+              "status",
+              "message",
+              "other"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Free-form observation metadata. Keep it minimal and sanitized."
+    }
+  }
+}

@@ -91,6 +91,9 @@ Both are validated by schema / validator.
 
 - runner / Codex / hooks による低レベルイベントログです。
 - 集計の正本というより、追跡・デバッグ用です。
+- `hook-observation JSONL` は observation event 単位の補助 artifact です。
+- observation event は evidence であり、評価判断の source of truth ではありません。
+- run manifest への observation summary 統合は後続 PR で扱います。
 
 ### `failure-taxonomy.json`
 
@@ -101,6 +104,9 @@ Both are validated by schema / validator.
 
 - subagent 実行記録です。
 - 開始・終了・許可範囲などの観測事実と、summary / parent decision などの判断情報を分けて扱います。
+- `allowed_files`、`changed_files`、`scope.compliant` により、writable subagent が宣言した境界を守ったかを追跡します。
+- `subagent-run.json` は evidence 補助であり、最終 interpretation の source of truth ではありません。
+- run manifest への自動統合は後続 PR で扱います。
 
 ## Status / Result Enum
 
@@ -139,3 +145,4 @@ evaluation.result = partial
 - `run.json` は aggregate manifest であり、単発の `codex-task` report JSON を上書きしません。
 - `evaluation.json` は実行結果の説明責任を持ちますが、実行事実を再生成しません。
 - JSONL logs は後から評価の evidence をたどるための補助であり、summary field の正本ではありません。
+- `hook-observation JSONL` と `subagent-run.json` は観測 / evidence の補助であり、評価判断の source of truth は引き続き `evaluation.json` です。

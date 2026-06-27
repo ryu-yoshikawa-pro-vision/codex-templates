@@ -84,10 +84,14 @@ check_template_contract() {
   [[ -f .codex/templates/RUN_MANIFEST.json ]] || return 1
   [[ -f .codex/templates/EVALUATION.md ]] || return 1
   [[ -f .codex/templates/evaluation.schema.json ]] || return 1
+  [[ -f .codex/templates/hook-observation.schema.json ]] || return 1
+  [[ -f .codex/templates/subagent-run.schema.json ]] || return 1
   [[ -f .codex/rules/10-readonly-allow.rules ]] || return 1
   [[ -f .codex/rules-auto-net/10-auto-net-allow.rules ]] || return 1
   [[ -f .codex/rules-auto-net/20-auto-net-risky-forbidden.rules ]] || return 1
   [[ -f .codex/rules-auto-net/30-auto-net-forbidden.rules ]] || return 1
+  [[ -f .codex/hooks/observe.sh ]] || return 1
+  [[ -f .codex/hooks/observe.ps1 ]] || return 1
   [[ -f scripts/codex-task.ps1 ]] || return 1
   [[ -f scripts/codex-task.sh ]] || return 1
   [[ -f scripts/codex-sandbox.ps1 ]] || return 1
@@ -103,6 +107,8 @@ check_template_contract() {
   [[ -f docs/reference/failure-taxonomy.md ]] || return 1
   [[ -f docs/reference/evaluation.md ]] || return 1
   [[ -f docs/reference/change-scope-policy.md ]] || return 1
+  [[ -f docs/reference/hook-observation.md ]] || return 1
+  [[ -f docs/reference/subagent-observation.md ]] || return 1
   has_change_scope_catalog || return 1
   contains ".agents/skills/feature-plan/SKILL.md" AGENTS.md || return 1
   contains ".agents/skills/code-review/SKILL.md" AGENTS.md || return 1
@@ -172,6 +178,8 @@ check_template_contract() {
   contains "evaluation.json" docs/reference/run-artifacts.md || return 1
   contains "codex-task" docs/reference/run-artifacts.md || return 1
   contains "Source-of-Truth" docs/reference/run-artifacts.md || return 1
+  contains "hook-observation JSONL" docs/reference/run-artifacts.md || return 1
+  contains "subagent-run.json" docs/reference/run-artifacts.md || return 1
   contains "--allowed-files" scripts/codex-task.sh || return 1
   contains "--expected-changed-files" scripts/codex-task.sh || return 1
   contains "--evaluation-template" scripts/codex-task.sh || return 1
@@ -210,6 +218,19 @@ check_template_contract() {
   contains "scope check" docs/reference/change-scope-policy.md || return 1
   contains "--require-clean-git" docs/reference/change-scope-policy.md || return 1
   contains "spec/change-scope-policy.json" docs/reference/change-scope-policy.md || return 1
+  contains "JSONL" docs/reference/hook-observation.md || return 1
+  contains "CODEX_OBSERVATION_LOG" docs/reference/hook-observation.md || return 1
+  contains "blocking" docs/reference/hook-observation.md || return 1
+  contains "SubagentStart" docs/reference/hook-observation.md || return 1
+  contains "Observation hook must not weaken safety hooks." docs/reference/hook-observation.md || return 1
+  contains "Observation hook failure must not stop Codex execution." docs/reference/hook-observation.md || return 1
+  contains "Observation events are not the source of truth for evaluation decisions." docs/reference/hook-observation.md || return 1
+  contains "implementation_worker" docs/reference/subagent-observation.md || return 1
+  contains "allowed_files" docs/reference/subagent-observation.md || return 1
+  contains "changed_files" docs/reference/subagent-observation.md || return 1
+  contains "parent_decision" docs/reference/subagent-observation.md || return 1
+  contains "used_in_final_plan" docs/reference/subagent-observation.md || return 1
+  contains "Subagent logs are evidence, not final evaluation judgement." docs/reference/subagent-observation.md || return 1
 }
 
 check_execpolicy_baseline() {

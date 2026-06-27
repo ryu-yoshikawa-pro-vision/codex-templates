@@ -303,16 +303,24 @@ Assert-Contains -RelativePath "template/docs/reference/naming-conventions.md" -P
 $requiredPaths = @(
     "spec/evaluation.schema.json",
     "spec/run-manifest.schema.json",
+    "spec/hook-observation.schema.json",
+    "spec/subagent-run.schema.json",
     "spec/artifact-responsibility.json",
     "spec/change-scope-policy.json",
     "spec/failure-taxonomy.json",
     "template/.codex/templates/RUN_MANIFEST.json",
     "template/.codex/templates/EVALUATION.md",
     "template/.codex/templates/evaluation.schema.json",
+    "template/.codex/templates/hook-observation.schema.json",
+    "template/.codex/templates/subagent-run.schema.json",
     "template/docs/reference/run-artifacts.md",
     "template/docs/reference/failure-taxonomy.md",
     "template/docs/reference/evaluation.md",
-    "template/docs/reference/change-scope-policy.md"
+    "template/docs/reference/change-scope-policy.md",
+    "template/docs/reference/hook-observation.md",
+    "template/docs/reference/subagent-observation.md",
+    "template/.codex/hooks/observe.sh",
+    "template/.codex/hooks/observe.ps1"
 )
 
 foreach ($path in $requiredPaths) {
@@ -322,6 +330,10 @@ foreach ($path in $requiredPaths) {
 $evaluationSchema = Read-SpecFile -RelativePath "spec/evaluation.schema.json"
 $bundledEvaluationSchema = Read-SpecFile -RelativePath "template/.codex/templates/evaluation.schema.json"
 $runManifestSchema = Read-SpecFile -RelativePath "spec/run-manifest.schema.json"
+$hookObservationSchema = Read-SpecFile -RelativePath "spec/hook-observation.schema.json"
+$bundledHookObservationSchema = Read-SpecFile -RelativePath "template/.codex/templates/hook-observation.schema.json"
+$subagentRunSchema = Read-SpecFile -RelativePath "spec/subagent-run.schema.json"
+$bundledSubagentRunSchema = Read-SpecFile -RelativePath "template/.codex/templates/subagent-run.schema.json"
 $artifactResponsibility = Read-SpecFile -RelativePath "spec/artifact-responsibility.json"
 $changeScopePolicy = Read-SpecFile -RelativePath "spec/change-scope-policy.json"
 $failureTaxonomy = Read-SpecFile -RelativePath "spec/failure-taxonomy.json"
@@ -427,6 +439,131 @@ Expect-EnumSet -Values $evaluationSchema.properties.primary_failure_category.enu
 Expect-EnumSet -Values $evaluationSchema.properties.failure_categories.items.enum -Expected $taxonomyCategories -Label "spec/evaluation.schema.json failure_categories items"
 if (-not (Test-JsonStructureEqual -Left $bundledEvaluationSchema -Right $evaluationSchema)) {
     throw "template/.codex/templates/evaluation.schema.json must stay in sync with spec/evaluation.schema.json"
+}
+
+Assert-Condition ($hookObservationSchema.additionalProperties -eq $false) "spec/hook-observation.schema.json additionalProperties must be false"
+Expect-RequiredFields -Schema $hookObservationSchema -Fields @(
+    "schema_version",
+    "event_id",
+    "run_id",
+    "timestamp",
+    "source",
+    "event",
+    "severity",
+    "blocking",
+    "tool",
+    "cwd",
+    "input_summary",
+    "decision",
+    "evidence",
+    "metadata"
+) -Label "spec/hook-observation.schema.json"
+Expect-PropertyKeys -Schema $hookObservationSchema -Fields @(
+    "schema_version",
+    "event_id",
+    "run_id",
+    "timestamp",
+    "source",
+    "event",
+    "severity",
+    "blocking",
+    "tool",
+    "cwd",
+    "input_summary",
+    "decision",
+    "evidence",
+    "metadata"
+) -Label "spec/hook-observation.schema.json"
+Expect-EnumSet -Values $hookObservationSchema.properties.schema_version.enum -Expected @(1) -Label "spec/hook-observation.schema.json schema_version"
+Expect-EnumSet -Values $hookObservationSchema.properties.source.enum -Expected @("codex_hook", "codex_task", "codex_safe", "subagent", "manual", "unknown") -Label "spec/hook-observation.schema.json source"
+Expect-EnumSet -Values $hookObservationSchema.properties.event.enum -Expected @("PreToolUse", "PostToolUse", "SubagentStart", "SubagentStop", "Stop", "WrapperStart", "WrapperStop", "SafetyBlocked", "ObservationError") -Label "spec/hook-observation.schema.json event"
+Expect-EnumSet -Values $hookObservationSchema.properties.severity.enum -Expected @("debug", "info", "warning", "error", "critical") -Label "spec/hook-observation.schema.json severity"
+Assert-Condition ($hookObservationSchema.properties.blocking.type -eq "boolean") "spec/hook-observation.schema.json blocking type is out of contract"
+Expect-EnumSet -Values $hookObservationSchema.properties.tool.type -Expected @("object", "null") -Label "spec/hook-observation.schema.json tool.type"
+Expect-PropertyKeys -Schema $hookObservationSchema.properties.tool -Fields @("name", "operation", "target") -Label "spec/hook-observation.schema.json tool"
+$hookDecisionSchema = $hookObservationSchema.properties.decision
+Expect-RequiredFields -Schema $hookDecisionSchema -Fields @("action", "reason") -Label "spec/hook-observation.schema.json decision"
+Expect-PropertyKeys -Schema $hookDecisionSchema -Fields @("action", "reason") -Label "spec/hook-observation.schema.json decision"
+Expect-EnumSet -Values $hookDecisionSchema.properties.action.enum -Expected @("allow", "observe", "block", "skip", "error") -Label "spec/hook-observation.schema.json decision.action"
+$hookEvidenceItem = $hookObservationSchema.properties.evidence.items
+Expect-RequiredFields -Schema $hookEvidenceItem -Fields @("kind", "value") -Label "spec/hook-observation.schema.json evidence item"
+Expect-PropertyKeys -Schema $hookEvidenceItem -Fields @("kind", "value") -Label "spec/hook-observation.schema.json evidence item"
+Expect-EnumSet -Values $hookEvidenceItem.properties.kind.enum -Expected @("path", "command", "pattern", "policy", "status", "message", "other") -Label "spec/hook-observation.schema.json evidence.kind"
+Assert-Condition ($hookObservationSchema.properties.metadata.type -eq "object") "spec/hook-observation.schema.json metadata type is out of contract"
+if (-not (Test-JsonStructureEqual -Left $bundledHookObservationSchema -Right $hookObservationSchema)) {
+    throw "template/.codex/templates/hook-observation.schema.json must stay in sync with spec/hook-observation.schema.json"
+}
+
+Assert-Condition ($subagentRunSchema.additionalProperties -eq $false) "spec/subagent-run.schema.json additionalProperties must be false"
+Expect-RequiredFields -Schema $subagentRunSchema -Fields @(
+    "schema_version",
+    "subagent_run_id",
+    "parent_run_id",
+    "agent",
+    "role",
+    "mode",
+    "purpose",
+    "sandbox",
+    "allowed_files",
+    "input_files",
+    "changed_files",
+    "scope",
+    "started_at",
+    "ended_at",
+    "status",
+    "summary",
+    "parent_decision",
+    "used_in_final_plan",
+    "evidence",
+    "metadata"
+) -Label "spec/subagent-run.schema.json"
+Expect-PropertyKeys -Schema $subagentRunSchema -Fields @(
+    "schema_version",
+    "subagent_run_id",
+    "parent_run_id",
+    "agent",
+    "role",
+    "mode",
+    "purpose",
+    "sandbox",
+    "allowed_files",
+    "input_files",
+    "changed_files",
+    "scope",
+    "started_at",
+    "ended_at",
+    "status",
+    "summary",
+    "parent_decision",
+    "used_in_final_plan",
+    "evidence",
+    "metadata"
+) -Label "spec/subagent-run.schema.json"
+Expect-EnumSet -Values $subagentRunSchema.properties.schema_version.enum -Expected @(1) -Label "spec/subagent-run.schema.json schema_version"
+$agentSchema = $subagentRunSchema.properties.agent
+Expect-RequiredFields -Schema $agentSchema -Fields @("name", "model") -Label "spec/subagent-run.schema.json agent"
+Expect-PropertyKeys -Schema $agentSchema -Fields @("name", "model") -Label "spec/subagent-run.schema.json agent"
+Expect-EnumSet -Values $subagentRunSchema.properties.role.enum -Expected @("planner", "investigator", "reviewer", "implementation_worker", "validator", "other") -Label "spec/subagent-run.schema.json role"
+Expect-EnumSet -Values $subagentRunSchema.properties.mode.enum -Expected @("read_only", "writable", "hybrid", "unknown") -Label "spec/subagent-run.schema.json mode"
+$sandboxSchema = $subagentRunSchema.properties.sandbox
+Expect-RequiredFields -Schema $sandboxSchema -Fields @("type", "network") -Label "spec/subagent-run.schema.json sandbox"
+Expect-PropertyKeys -Schema $sandboxSchema -Fields @("type", "network") -Label "spec/subagent-run.schema.json sandbox"
+Expect-EnumSet -Values $sandboxSchema.properties.type.enum -Expected @("read-only", "workspace-write", "danger-full-access", "unknown") -Label "spec/subagent-run.schema.json sandbox.type"
+$scopeSchema = $subagentRunSchema.properties.scope
+Expect-RequiredFields -Schema $scopeSchema -Fields @("declared", "compliant", "violations") -Label "spec/subagent-run.schema.json scope"
+Expect-PropertyKeys -Schema $scopeSchema -Fields @("declared", "compliant", "violations") -Label "spec/subagent-run.schema.json scope"
+Expect-EnumSet -Values $subagentRunSchema.properties.status.enum -Expected @("pending", "running", "completed", "failed", "cancelled", "blocked", "not_run") -Label "spec/subagent-run.schema.json status"
+$parentDecisionSchema = $subagentRunSchema.properties.parent_decision
+Expect-RequiredFields -Schema $parentDecisionSchema -Fields @("action", "reason") -Label "spec/subagent-run.schema.json parent_decision"
+Expect-PropertyKeys -Schema $parentDecisionSchema -Fields @("action", "reason") -Label "spec/subagent-run.schema.json parent_decision"
+Expect-EnumSet -Values $parentDecisionSchema.properties.action.enum -Expected @("accepted", "partially_accepted", "rejected", "deferred", "not_reviewed") -Label "spec/subagent-run.schema.json parent_decision.action"
+$subagentEvidenceItem = $subagentRunSchema.properties.evidence.items
+Expect-RequiredFields -Schema $subagentEvidenceItem -Fields @("kind", "value") -Label "spec/subagent-run.schema.json evidence item"
+Expect-PropertyKeys -Schema $subagentEvidenceItem -Fields @("kind", "value") -Label "spec/subagent-run.schema.json evidence item"
+Expect-EnumSet -Values $subagentEvidenceItem.properties.kind.enum -Expected @("path", "summary", "finding", "validation", "review_comment", "other") -Label "spec/subagent-run.schema.json evidence.kind"
+Assert-Condition ($subagentRunSchema.properties.metadata.type -eq "object") "spec/subagent-run.schema.json metadata type is out of contract"
+if (-not (Test-JsonStructureEqual -Left $bundledSubagentRunSchema -Right $subagentRunSchema)) {
+    throw "template/.codex/templates/subagent-run.schema.json must stay in sync with spec/subagent-run.schema.json"
 }
 
 $dimensionNames = @(

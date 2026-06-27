@@ -14,6 +14,9 @@
 
 ### Added
 
+- Hook observation JSONL の schema と optional observation hook baseline を追加。
+- Subagent run logging の schema と reference docs を追加。
+- Observation / subagent schema の bundled template copy と validator sync check を追加。
 - consumer repo 更新の詳細手順を `template/docs/guides/consumer-update.md` に追加。
 - `.codex/runs/<run_id>/` の運用例として standard implementation、PR review、auto-net investigation の examples を追加。
 - `examples/runs/README.md` に run examples の入口を追加。
