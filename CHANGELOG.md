@@ -10,6 +10,19 @@
 - Minor: consumer-facing file、workflow、safety rule、guide、配布手順を追加・拡張する。
 - Patch: 誤字、説明補足、validator の非破壊的修正、source repo 内部の保守。
 
+## Unreleased
+
+### Added
+
+- consumer repo 更新の詳細手順を `template/docs/guides/consumer-update.md` に追加。
+- `.codex/runs/<run_id>/` の運用例として standard implementation、PR review、auto-net investigation の examples を追加。
+- `examples/runs/README.md` に run examples の入口を追加。
+
+### Changed
+
+- `template/docs/reference/codex-safety-harness.md` に `apply_patch` の operation policy 表を追加。
+- `template/docs/guides/quickstart.md` から consumer update guide へ誘導するように更新。
+
 ## 0.3.0 - 2026-06-27
 
 ### Changed

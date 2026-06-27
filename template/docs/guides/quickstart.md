@@ -21,15 +21,16 @@
 
 ## 既存 consumer repo の更新
 
-既存 repo へ template 更新を取り込む場合は、consumer 固有情報を守ることを優先する。
+既存 repo へ template 更新を取り込む場合は、consumer 固有情報を守ることを優先する。詳細手順は `docs/guides/consumer-update.md` を参照する。
 
 1. 現在の `template/codex-project.toml` または repo 内 metadata から `template_version` を確認する。
 2. source repo の `CHANGELOG.md` と `MIGRATION.md` を確認する。
 3. consumer repo 側で更新用ブランチを切る。
-4. template 差分を同期する。
+4. template 差分を一時ディレクトリへ同期し、差分を確認する。
 5. `docs/PROJECT_CONTEXT.md`、`docs/adr/`、`docs/plans/`、`docs/reports/`、`.codex/runs/` は機械的に上書きしない。
-6. `bash scripts/verify` または PowerShell 版 verify を実行する。
-7. PR で差分を確認し、プロジェクト固有の運用・品質ゲート・安全制約が失われていないことをレビューする。
+6. 必要な template 差分だけを反映する。
+7. `bash scripts/verify` または PowerShell 版 verify を実行する。
+8. PR で差分を確認し、プロジェクト固有の運用・品質ゲート・安全制約が失われていないことをレビューする。
 
 ## mode 選択の目安
 
