@@ -2,7 +2,11 @@
 
 ## 目的
 
-この文書は、`--allowed-files` / `--expected-changed-files` を後段で実装する前提となる変更範囲ポリシーを定義します。Initial implementation A では reviewable な Markdown contract として扱い、runner 実装や validator 実装は行いません。
+この文書は、`--allowed-files` / `--expected-changed-files` を後段で実装する前提となる変更範囲ポリシーを定義します。
+
+- `template/docs/reference/change-scope-policy.md` は consumer-facing reference です。
+- `spec/change-scope-policy.json` は source repo 側の source-of-truth catalog であり、validator の検証対象です。
+- 後続の runner implementation は、JSON catalog とこの Markdown contract の両方に従います。
 
 ## Path Normalization
 
@@ -55,6 +59,7 @@
 
 ## Deferred JSON Catalog
 
-- `spec/change-scope-policy.json` は今回追加しません。
-- Initial implementation B または TASK-005 の実装時に追加要否を判断します。
-- 今回は Markdown doc として方針をレビュー可能にします。
+- TASK-005 で `spec/change-scope-policy.json` を追加しました。
+- Markdown doc は consumer-facing reference、JSON catalog は source repo の validator 対象です。
+- validator は catalog type、schema version、path normalization、changed file kinds、artifact exclusion、`allowed_files` / `expected_changed_files` の意味差分を確認します。
+- runner enforcement、glob matching、changed files collection は JSON catalog 上で deferred として明記し、今回の PR では実装しません。

@@ -21,12 +21,14 @@
 - Codex harness の schema validation support として `spec/evaluation.schema.json`、`spec/run-manifest.schema.json`、`template/.codex/templates/RUN_MANIFEST.json`、`template/.codex/templates/EVALUATION.md` を追加。
 - `codex-task` に `--task-type`、`--workflow-level`、`--record-run-manifest` を追加。
 - `codex-task --record-run-manifest --run-id <run_id>` で `.codex/runs/<run_id>/run.json` を生成する baseline support を追加。
+- `spec/change-scope-policy.json` を追加し、`--allowed-files` / `--expected-changed-files` 実装前の変更範囲ポリシーを機械検証できるようにした。
 
 ### Changed
 
 - `template/docs/reference/codex-safety-harness.md` に `apply_patch` の operation policy 表を追加。
 - `template/docs/guides/quickstart.md` から consumer update guide へ誘導するように更新。
 - `tools/validate-spec.sh`、`tools/validate-spec.ps1`、`template/scripts/verify` を拡張し、新規 schema / template / static catalog / reference docs の整合性を検証するように更新。
+- `template/docs/reference/change-scope-policy.md` を更新し、Markdown contract と JSON catalog の責務を明確化した。
 - `run.json` を low-level `codex-task-*.report.json` の置き換えではなく aggregate manifest として扱うように `codex-task` wrapper と integration test を更新。
 - `spec/run-manifest.schema.json`、validator、wrapper runtime record を `host | docker-sandbox | sdk` に揃えた。
 

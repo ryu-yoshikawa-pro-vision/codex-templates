@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "catalog_type": "static_change_scope_policy_catalog",
+  "notes": "This catalog fixes the change scope contract before runner enforcement. Validators check catalog presence and invariants, while runner enforcement, glob matching, and changed_files collection remain deferred.",
+  "path_normalization": {
+    "canonical_format": "repo_relative_posix",
+    "windows_separator_normalization": true,
+    "absolute_paths_for_comparison": false,
+    "prevent_repo_escape": true,
+    "case_sensitive": true
+  },
+  "changed_file_kinds": [
+    "modified",
+    "added",
+    "untracked",
+    "deleted",
+    "renamed_old",
+    "renamed_new",
+    "copied_new"
+  ],
+  "generated_artifact_exclusions": [
+    ".codex/runs/"
+  ],
+  "allowed_files": {
+    "meaning": "maximum_change_boundary",
+    "match_mode": "exact_path",
+    "glob_support": "deferred",
+    "scope_violation_when_not_allowed": true
+  },
+  "expected_changed_files": {
+    "meaning": "expected_required_changes",
+    "must_be_subset_of_allowed_files": "recommended",
+    "missing_expected_change_severity": "warning_or_failure_candidate"
+  },
+  "deleted_files": {
+    "included_in_changed_files": true,
+    "requires_allowed_path": true
+  },
+  "renamed_files": {
+    "evaluate_old_path": true,
+    "evaluate_new_path": true,
+    "new_path_requires_allowed_path": true
+  },
+  "copied_files": {
+    "evaluate_new_path": true,
+    "new_path_requires_allowed_path": true
+  },
+  "run_artifacts": {
+    "path_prefix": ".codex/runs/",
+    "excluded_from_scope_check": true,
+    "may_be_recorded_in_manifest": true,
+    "must_not_be_mixed_with_source_changes": true
+  },
+  "deferred": {
+    "runner_enforcement": true,
+    "glob_matching": true,
+    "changed_files_collection": true
+  }
+}

@@ -2,6 +2,7 @@
 set -u -o pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+source_repo_root="$(cd "$repo_root/.." && pwd -P)"
 cd "$repo_root"
 
 pass_count=0
@@ -52,6 +53,19 @@ contains() {
   fi
 }
 
+has_change_scope_catalog() {
+  if [[ -f "spec/change-scope-policy.json" ]]; then
+    return 0
+  fi
+
+  if [[ -d "$source_repo_root/spec" && -d "$source_repo_root/template" ]]; then
+    [[ -f "$source_repo_root/spec/change-scope-policy.json" ]]
+    return
+  fi
+
+  return 0
+}
+
 check_template_contract() {
   [[ -f AGENTS.md ]] || return 1
   [[ -f PLANS.md ]] || return 1
@@ -88,6 +102,7 @@ check_template_contract() {
   [[ -f docs/reference/failure-taxonomy.md ]] || return 1
   [[ -f docs/reference/evaluation.md ]] || return 1
   [[ -f docs/reference/change-scope-policy.md ]] || return 1
+  has_change_scope_catalog || return 1
   contains ".agents/skills/feature-plan/SKILL.md" AGENTS.md || return 1
   contains ".agents/skills/code-review/SKILL.md" AGENTS.md || return 1
   contains "docs/reference/codex-safety-harness.md" AGENTS.md || return 1
@@ -165,6 +180,9 @@ check_template_contract() {
   contains "allowed_files" docs/reference/change-scope-policy.md || return 1
   contains "expected_changed_files" docs/reference/change-scope-policy.md || return 1
   contains ".codex/runs/" docs/reference/change-scope-policy.md || return 1
+  contains "repo root" docs/reference/change-scope-policy.md || return 1
+  contains "scope check" docs/reference/change-scope-policy.md || return 1
+  contains "spec/change-scope-policy.json" docs/reference/change-scope-policy.md || return 1
 }
 
 check_execpolicy_baseline() {
