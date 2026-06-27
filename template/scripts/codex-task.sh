@@ -41,6 +41,7 @@ validation_command_exit_code="null"
 validation_command_status=""
 validation_command_evidence=""
 manifest_path=""
+manifest_started=0
 
 json_escape() {
   local s="$1"
@@ -137,6 +138,7 @@ to_repo_relative_path() {
 
 write_run_manifest() {
   (( record_run_manifest )) || return 0
+  (( manifest_started )) || return 0
   [[ -n "$manifest_path" ]] || return 0
 
   local branch report_ref network_enabled validation_commands_json
@@ -485,6 +487,7 @@ main() {
   cwd_for_report="$cwd"
 
   if (( record_run_manifest )); then
+    manifest_started=1
     run_status="running"
     write_run_manifest
   fi
@@ -611,6 +614,11 @@ main() {
       write_log "schema_ok"
     else
       report_status="invalid_output"
+      validation_status="failed"
+      validation_command="output schema validation"
+      validation_command_exit_code=1
+      validation_command_status="failed"
+      validation_command_evidence="output schema validation failed"
       run_status="failed"
       write_log "schema_failed"
       write_report

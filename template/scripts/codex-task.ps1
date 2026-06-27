@@ -348,7 +348,7 @@ function Fail-Task {
     $Report.status = $Status
     Write-TaskLog -Path $LogPath -Event "task_failed" -Data @{ status = $Status; message = $Message }
     Write-TaskReport -Path $ReportPath -Report $Report
-    if ($script:state -and $script:state.record_run_manifest -and -not [string]::IsNullOrWhiteSpace($script:state.manifest_path)) {
+    if ($script:state -and $script:state.record_run_manifest -and $script:state.manifest_started -and -not [string]::IsNullOrWhiteSpace($script:state.manifest_path)) {
         $script:state.run_status = "failed"
         Write-RunManifest -Path $script:state.manifest_path -State $script:state -Report $Report -RepoRoot $script:repoRoot
     }
@@ -398,6 +398,7 @@ $state = [ordered]@{
     explicit_report_path = $false
     explicit_log_path = $false
     manifest_path = $null
+    manifest_started = $false
     run_status = "pending"
     validation_status = "not_run"
     validation_command = $null
@@ -618,6 +619,7 @@ if (-not (Test-IsPathUnderRoot -Path $cwd -Root $repoRoot)) {
 $report.cwd = $cwd
 
 if ($state.record_run_manifest) {
+    $state.manifest_started = $true
     $state.run_status = "running"
     Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot
 }
@@ -787,6 +789,11 @@ if ($state.output_schema) {
         $report.status = "invalid_output"
         $message = if ($_.Exception.Message -eq 'schema validation failed') { 'schema validation failed' } else { $_.Exception.Message }
         Write-TaskLog -Path $state.log_path -Event "schema_failed" -Data @{ message = $message }
+        $state.validation_status = "failed"
+        $state.validation_command = "output schema validation"
+        $state.validation_command_exit_code = 1
+        $state.validation_command_status = "failed"
+        $state.validation_command_evidence = "output schema validation failed"
         Write-TaskReport -Path $state.report_path -Report $report
         $state.run_status = "failed"
         if ($state.record_run_manifest) {
