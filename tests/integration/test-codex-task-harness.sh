@@ -385,6 +385,10 @@ set -e
 grep -q -- "--require-evaluation requires --run-id and --record-run-manifest" "$temp_root/require-evaluation-no-manifest.out"
 assert_status "$temp_root/require-evaluation-no-manifest.report.json" invalid_args
 
+bash "$wrapper" --require-clean-git --skip-verify "CLEAN_GIT_OK"
+clean_git_report="$(find "$template_root/.codex/reports" -type f -name 'codex-task-*.report.json' | sort | tail -n 1)"
+assert_status "$clean_git_report" verify_skipped
+
 clean_git_run_id="20260420-020217-JST"
 bash "$wrapper" --run-id "$clean_git_run_id" --require-clean-git --skip-verify "CLEAN_GIT_OK"
 clean_git_report="$(find "$template_root/.codex/runs/$clean_git_run_id/reports" -type f -name 'codex-task-*.report.json' | sort | tail -n 1)"
@@ -441,6 +445,13 @@ for invalid_value in 0 -1 abc 11; do
   [[ $code -ne 0 ]]
   grep -q -- "--max-iterations must be an integer between 1 and 10" "$temp_root/max-iterations-$invalid_value.out"
 done
+
+set +e
+bash "$wrapper" --report-path "$temp_root/max-iterations-empty.report.json" --log-path "$temp_root/max-iterations-empty.jsonl" --max-iterations "" --skip-verify "MAX_ITERATIONS_BAD" >"$temp_root/max-iterations-empty.out" 2>&1
+code=$?
+set -e
+[[ $code -ne 0 ]]
+grep -q -- "--max-iterations must be an integer between 1 and 10" "$temp_root/max-iterations-empty.out"
 
 allowed_ok_run_id="20260420-020207-JST"
 FAKE_CODEX_WRITE_FILES="README.md" bash "$wrapper" --run-id "$allowed_ok_run_id" --record-run-manifest --allowed-files README.md --skip-verify "ALLOWED_OK"

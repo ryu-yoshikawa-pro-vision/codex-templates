@@ -1119,9 +1119,12 @@ if ($state.require_run_id -and [string]::IsNullOrWhiteSpace($state.run_id)) {
     Fail-Task -Status "invalid_args" -Message "--require-run-id requires --run-id" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
 }
 
-if (-not [string]::IsNullOrWhiteSpace([string]$state.max_iterations)) {
+if ($null -ne $state.max_iterations) {
     $parsedMaxIterations = 0
-    if (-not [int]::TryParse([string]$state.max_iterations, [ref]$parsedMaxIterations) -or $parsedMaxIterations -lt 1 -or $parsedMaxIterations -gt 10) {
+    if ([string]::IsNullOrWhiteSpace([string]$state.max_iterations) -or
+        -not [int]::TryParse([string]$state.max_iterations, [ref]$parsedMaxIterations) -or
+        $parsedMaxIterations -lt 1 -or
+        $parsedMaxIterations -gt 10) {
         Fail-Task -Status "invalid_args" -Message "--max-iterations must be an integer between 1 and 10" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
     }
     $state.max_iterations = $parsedMaxIterations
@@ -1170,7 +1173,6 @@ $logParent = Split-Path -Parent $state.log_path
 if (-not (Test-Path $logParent)) {
     New-Item -ItemType Directory -Path $logParent -Force | Out-Null
 }
-Write-TaskLog -Path $state.log_path -Event "wrapper_start" -Data @{ runtime = $state.runtime; preset = $state.preset; run_id = $state.run_id }
 
 if ($state.preset -notin @("safe", "readonly", "auto-net")) {
     Fail-Task -Status "invalid_args" -Message "Unsupported preset: $($state.preset)" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
@@ -1201,6 +1203,7 @@ if ($state.record_run_manifest) {
 }
 
 Invoke-CleanGitPrecondition -State $state -Report $report -RepoRoot $repoRoot
+Write-TaskLog -Path $state.log_path -Event "wrapper_start" -Data @{ runtime = $state.runtime; preset = $state.preset; run_id = $state.run_id }
 Initialize-EvaluationTemplate -State $state -RepoRoot $repoRoot
 if ($state.record_run_manifest) {
     Write-RunManifest -Path $state.manifest_path -State $state -Report $report -RepoRoot $repoRoot

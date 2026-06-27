@@ -41,7 +41,7 @@ function Test-PythonAvailable {
 function Invoke-WindowsPowerShellFile {
     param(
         [Parameter(Mandatory = $true)][string]$ScriptPath,
-        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [AllowEmptyCollection()][AllowEmptyString()][string[]]$Arguments = @(),
         [hashtable]$ExtraEnv
     )
 
@@ -525,6 +525,16 @@ try {
     if ($requireEvaluationNoManifest.Combined -notmatch [regex]::Escape('--require-evaluation requires --run-id and --record-run-manifest')) { throw "require-evaluation manifest requirement message missing: $($requireEvaluationNoManifest.Combined)" }
     Assert-ReportStatus -Path $requireEvaluationNoManifestReport -ExpectedStatus 'invalid_args' | Out-Null
 
+    $cleanGitReportNoRunId = Join-Path $templateRoot ".codex\\reports"
+    $cleanGitNoRunId = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--require-clean-git',
+        '--skip-verify',
+        'CLEAN_GIT_OK'
+    ) -ExtraEnv $envMap
+    if ($cleanGitNoRunId.ExitCode -ne 0) { throw "clean git no-run-id case failed unexpectedly: $($cleanGitNoRunId.Combined)" }
+    $cleanGitNoRunIdReportPath = (Get-ChildItem -Path $cleanGitReportNoRunId -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $cleanGitNoRunIdReportPath -ExpectedStatus 'verify_skipped' | Out-Null
+
     $cleanGitRunId = "20260420-020317-JST"
     $cleanGit = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
         '--run-id', $cleanGitRunId,
@@ -618,6 +628,32 @@ try {
         if ($invalidMax.Combined -notmatch [regex]::Escape('--max-iterations must be an integer between 1 and 10')) {
             throw ("max-iterations validation message missing for {0}: {1}" -f $invalidValue, $invalidMax.Combined)
         }
+    }
+
+    $invalidMaxEmptyCliReport = Join-Path $tempRoot "max-iterations-empty-cli.report.json"
+    $invalidMaxEmptyCliLog = Join-Path $tempRoot "max-iterations-empty-cli.jsonl"
+    $invalidMaxEmptyCliLauncher = Join-Path $tempRoot "max-iterations-empty-cli.ps1"
+    Set-Content -Path $invalidMaxEmptyCliLauncher -Value @"
+& '$wrapperPath' --report-path '$invalidMaxEmptyCliReport' --log-path '$invalidMaxEmptyCliLog' --max-iterations '' --skip-verify 'MAX_ITERATIONS_BAD'
+exit `$LASTEXITCODE
+"@
+    $invalidMaxEmptyCli = Invoke-WindowsPowerShellFile -ScriptPath $invalidMaxEmptyCliLauncher -Arguments @() -ExtraEnv $envMap
+    if ($invalidMaxEmptyCli.ExitCode -eq 0) { throw "empty --max-iterations case unexpectedly succeeded" }
+    if ($invalidMaxEmptyCli.Combined -notmatch [regex]::Escape('--max-iterations must be an integer between 1 and 10')) {
+        throw "empty --max-iterations validation message missing: $($invalidMaxEmptyCli.Combined)"
+    }
+
+    $invalidMaxNativeReport = Join-Path $tempRoot "max-iterations-native-empty.report.json"
+    $invalidMaxNativeLog = Join-Path $tempRoot "max-iterations-native-empty.jsonl"
+    $invalidMaxNativeLauncher = Join-Path $tempRoot "max-iterations-native-empty.ps1"
+    Set-Content -Path $invalidMaxNativeLauncher -Value @"
+& '$wrapperPath' -ReportPath '$invalidMaxNativeReport' -LogPath '$invalidMaxNativeLog' -MaxIterations '' -SkipVerify 'MAX_ITERATIONS_BAD'
+exit `$LASTEXITCODE
+"@
+    $invalidMaxNative = Invoke-WindowsPowerShellFile -ScriptPath $invalidMaxNativeLauncher -Arguments @() -ExtraEnv $envMap
+    if ($invalidMaxNative.ExitCode -eq 0) { throw "native -MaxIterations empty case unexpectedly succeeded" }
+    if ($invalidMaxNative.Combined -notmatch [regex]::Escape('--max-iterations must be an integer between 1 and 10')) {
+        throw "native -MaxIterations empty validation message missing: $($invalidMaxNative.Combined)"
     }
 
     $allowedOkRunId = "20260420-020307-JST"

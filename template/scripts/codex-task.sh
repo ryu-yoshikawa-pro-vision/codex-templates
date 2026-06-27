@@ -20,6 +20,7 @@ prompt_file=""
 output_schema=""
 verify_command=""
 max_iterations=""
+max_iterations_provided=0
 allow_search=0
 skip_preflight=0
 skip_verify=0
@@ -820,6 +821,7 @@ parse_args() {
       --max-iterations)
         [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--max-iterations requires a value"
         max_iterations="$2"
+        max_iterations_provided=1
         shift 2
         ;;
       --run-id)
@@ -898,8 +900,8 @@ apply_run_paths() {
   if (( require_run_id )) && [[ -z "$run_id" ]]; then
     fail_with_status "invalid_args" "--require-run-id requires --run-id"
   fi
-  if [[ -n "$max_iterations" ]]; then
-    if [[ ! "$max_iterations" =~ ^[0-9]+$ ]] || (( max_iterations < 1 || max_iterations > 10 )); then
+  if (( max_iterations_provided )); then
+    if [[ ! "$max_iterations" =~ ^([1-9]|10)$ ]]; then
       fail_with_status "invalid_args" "--max-iterations must be an integer between 1 and 10"
     fi
   fi
@@ -989,8 +991,6 @@ run_schema_check() {
 main() {
   local prompt="" cwd sandbox_mode codex_bin used_verify container_output container_schema container_cwd
 
-  write_log "wrapper_start" ",\"runtime\":\"$(json_escape "$runtime")\",\"preset\":\"$(json_escape "$preset")\",\"run_id\":\"$(json_escape "$run_id")\""
-
   case "$preset" in
     safe|readonly|auto-net) ;;
     *) fail_with_status "invalid_args" "Unsupported preset: $preset" ;;
@@ -1016,6 +1016,7 @@ main() {
   fi
 
   check_clean_git_precondition
+  write_log "wrapper_start" ",\"runtime\":\"$(json_escape "$runtime")\",\"preset\":\"$(json_escape "$preset")\",\"run_id\":\"$(json_escape "$run_id")\""
   create_evaluation_template_if_needed
   write_run_manifest
 
