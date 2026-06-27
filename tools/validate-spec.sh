@@ -156,6 +156,7 @@ required_paths = [
     "spec/evaluation.schema.json",
     "spec/run-manifest.schema.json",
     "spec/artifact-responsibility.json",
+    "spec/change-scope-policy.json",
     "spec/failure-taxonomy.json",
     "template/.codex/templates/RUN_MANIFEST.json",
     "template/.codex/templates/EVALUATION.md",
@@ -170,6 +171,7 @@ for rel in required_paths:
 evaluation_schema = read_spec("spec/evaluation.schema.json")
 run_manifest_schema = read_spec("spec/run-manifest.schema.json")
 artifact_responsibility = read_spec("spec/artifact-responsibility.json")
+change_scope_policy = read_spec("spec/change-scope-policy.json")
 failure_taxonomy = read_spec("spec/failure-taxonomy.json")
 run_manifest_template = read_spec("template/.codex/templates/RUN_MANIFEST.json")
 
@@ -180,6 +182,91 @@ ensure(
 ensure(
     failure_taxonomy.get("catalog_type") == "static_failure_taxonomy_catalog",
     "spec/failure-taxonomy.json catalog_type is out of contract",
+)
+ensure(
+    change_scope_policy.get("catalog_type") == "static_change_scope_policy_catalog",
+    "spec/change-scope-policy.json catalog_type is out of contract",
+)
+ensure(
+    change_scope_policy.get("schema_version") == 1,
+    "spec/change-scope-policy.json schema_version is out of contract",
+)
+
+path_normalization = change_scope_policy.get("path_normalization", {})
+ensure(
+    path_normalization.get("canonical_format") == "repo_relative_posix",
+    "spec/change-scope-policy.json path_normalization.canonical_format is out of contract",
+)
+ensure(
+    path_normalization.get("windows_separator_normalization") is True,
+    "spec/change-scope-policy.json path_normalization.windows_separator_normalization is out of contract",
+)
+ensure(
+    path_normalization.get("absolute_paths_for_comparison") is False,
+    "spec/change-scope-policy.json path_normalization.absolute_paths_for_comparison is out of contract",
+)
+ensure(
+    path_normalization.get("prevent_repo_escape") is True,
+    "spec/change-scope-policy.json path_normalization.prevent_repo_escape is out of contract",
+)
+
+expect_enum_contains(
+    change_scope_policy.get("changed_file_kinds", []),
+    [
+        "modified",
+        "added",
+        "untracked",
+        "deleted",
+        "renamed_old",
+        "renamed_new",
+        "copied_new",
+    ],
+    "spec/change-scope-policy.json changed_file_kinds",
+)
+expect_enum_contains(
+    change_scope_policy.get("generated_artifact_exclusions", []),
+    [".codex/runs/"],
+    "spec/change-scope-policy.json generated_artifact_exclusions",
+)
+
+allowed_files = change_scope_policy.get("allowed_files", {})
+ensure(
+    allowed_files.get("meaning") == "maximum_change_boundary",
+    "spec/change-scope-policy.json allowed_files.meaning is out of contract",
+)
+ensure(
+    allowed_files.get("match_mode") == "exact_path",
+    "spec/change-scope-policy.json allowed_files.match_mode is out of contract",
+)
+
+expected_changed_files = change_scope_policy.get("expected_changed_files", {})
+ensure(
+    expected_changed_files.get("meaning") == "expected_required_changes",
+    "spec/change-scope-policy.json expected_changed_files.meaning is out of contract",
+)
+
+run_artifacts = change_scope_policy.get("run_artifacts", {})
+ensure(
+    run_artifacts.get("path_prefix") == ".codex/runs/",
+    "spec/change-scope-policy.json run_artifacts.path_prefix is out of contract",
+)
+ensure(
+    run_artifacts.get("excluded_from_scope_check") is True,
+    "spec/change-scope-policy.json run_artifacts.excluded_from_scope_check is out of contract",
+)
+ensure(
+    run_artifacts.get("may_be_recorded_in_manifest") is True,
+    "spec/change-scope-policy.json run_artifacts.may_be_recorded_in_manifest is out of contract",
+)
+
+deferred = change_scope_policy.get("deferred", {})
+ensure(
+    deferred.get("runner_enforcement") is True,
+    "spec/change-scope-policy.json deferred.runner_enforcement is out of contract",
+)
+ensure(
+    deferred.get("changed_files_collection") is True,
+    "spec/change-scope-policy.json deferred.changed_files_collection is out of contract",
 )
 
 taxonomy_entries = failure_taxonomy.get("categories")
