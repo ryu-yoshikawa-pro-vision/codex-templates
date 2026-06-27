@@ -19,3 +19,5 @@ jobs:
         run: bash template/scripts/verify
       - name: Run integration tests
         run: bash tests/integration/test-codex-safety-harness.sh
+      - name: Run observation baseline tests
+        run: bash tests/integration/test-observation-baseline.sh
