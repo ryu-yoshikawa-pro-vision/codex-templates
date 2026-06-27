@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "catalog_type": "static_failure_taxonomy_catalog",
+  "validation_status": "not_executable_in_initial_implementation_a",
+  "initial_implementation": "A",
+  "notes": "This catalog is a reviewable static contract for Initial implementation A. The final primary_failure_category is still selected by an agent or reviewer.",
+  "categories": [
+    {
+      "category": "instruction_gap",
+      "meaning": "The instruction was ambiguous enough that Codex could not reliably decide what to do.",
+      "improvement_target": "AGENTS.md, skills",
+      "runner_can_suggest": false,
+      "agent_judgement_required": true,
+      "notes": "Use when the main issue is unclear or conflicting instruction rather than execution failure."
+    },
+    {
+      "category": "scope_creep",
+      "meaning": "The implementation changed files or behavior outside the intended scope.",
+      "improvement_target": "worker policy, allowed files",
+      "runner_can_suggest": true,
+      "agent_judgement_required": false,
+      "notes": "Runner can suggest this from changed file evidence, but the final category is still chosen by an agent or reviewer."
+    },
+    {
+      "category": "missing_context",
+      "meaning": "Required files, architecture notes, or background context were not read before acting.",
+      "improvement_target": "planning skill",
+      "runner_can_suggest": false,
+      "agent_judgement_required": true,
+      "notes": "Use when the failure comes from acting without necessary repository context."
+    },
+    {
+      "category": "missing_validation",
+      "meaning": "Required verification was missing, skipped without acceptable reason, or did not pass.",
+      "improvement_target": "codex-task, validation plan",
+      "runner_can_suggest": true,
+      "agent_judgement_required": false,
+      "notes": "Runner can often detect this from verify command status, but the final classification still belongs to an agent or reviewer."
+    },
+    {
+      "category": "unsafe_action_blocked",
+      "meaning": "A risky operation was blocked by rules, hooks, or prompt policy.",
+      "improvement_target": "rules, hooks, prompt policy",
+      "runner_can_suggest": true,
+      "agent_judgement_required": false,
+      "notes": "This category can often be suggested from hook or wrapper evidence."
+    },
+    {
+      "category": "bad_subagent_delegation",
+      "meaning": "The subagent delegation itself was inappropriate for the task or scope.",
+      "improvement_target": "subagent policy",
+      "runner_can_suggest": false,
+      "agent_judgement_required": true,
+      "notes": "Use when the delegation plan, scope control, or role choice was the main failure point."
+    },
+    {
+      "category": "flaky_or_env_issue",
+      "meaning": "Environment differences, missing tools, or unstable behavior prevented reliable execution.",
+      "improvement_target": "sandbox, setup docs",
+      "runner_can_suggest": true,
+      "agent_judgement_required": false,
+      "notes": "Suitable when the main blocker is environmental rather than instruction or implementation quality."
+    },
+    {
+      "category": "review_gap",
+      "meaning": "The review missed an important correctness, safety, or regression concern.",
+      "improvement_target": "CODE_REVIEW.md, review skill",
+      "runner_can_suggest": false,
+      "agent_judgement_required": true,
+      "notes": "Use when the failure is due to incomplete review coverage rather than implementation execution."
+    },
+    {
+      "category": "repair_loop_stalled",
+      "meaning": "The repair loop did not converge and kept repeating without resolving the issue.",
+      "improvement_target": "stop condition, repair skill",
+      "runner_can_suggest": false,
+      "agent_judgement_required": true,
+      "notes": "Use when repeated attempts fail to narrow or resolve the problem."
+    },
+    {
+      "category": "artifact_contract_gap",
+      "meaning": "The artifact responsibility, structure, or source-of-truth relationship was too unclear to evaluate the run reliably.",
+      "improvement_target": "run artifact docs, schema",
+      "runner_can_suggest": false,
+      "agent_judgement_required": true,
+      "notes": "Use only when the run cannot be evaluated because artifact schema, responsibility boundaries, or source-of-truth relationships are unclear. Do not use this as a generic implementation failure category."
+    }
+  ]
+}
