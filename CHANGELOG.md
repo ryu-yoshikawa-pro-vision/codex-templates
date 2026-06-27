@@ -14,6 +14,9 @@
 
 ### Added
 
+- Repair loop skill と reference docs を追加し、Review -> Repair -> Validate の bounded workflow を標準化。
+- Harness improvement skill と reference docs を追加し、評価結果からハーネス改善候補へ変換する workflow を標準化。
+- Repair loop / harness improvement の examples と validation tests を追加。
 - Hook observation JSONL の schema と optional observation hook baseline を追加。
 - Subagent run logging の schema と reference docs を追加。
 - Observation / subagent schema の bundled template copy と validator sync check を追加。
@@ -46,6 +49,7 @@
 
 ### Migration notes
 
+- 既存 consumer repo が repair / improvement workflow を取り込む場合は、`.agents/skills/repair-loop/`、`.agents/skills/harness-improvement/`、`docs/reference/repair-loop.md`、`docs/reference/harness-improvement-loop.md`、`examples/repair-loop/`、`examples/harness-improvement/`、`scripts/verify` を同期対象に含める。
 - 既存 consumer repo が更新後の `template/scripts/verify` を取り込む場合は、`.codex/templates/RUN_MANIFEST.json`、`.codex/templates/EVALUATION.md`、`docs/reference/run-artifacts.md`、`docs/reference/failure-taxonomy.md`、`docs/reference/evaluation.md`、`docs/reference/change-scope-policy.md` も同期対象に含める。
 - 既存 consumer repo が `codex-task` 更新を取り込む場合は、`scripts/codex-task.sh`、`scripts/codex-task.ps1`、`.codex/templates/RUN_MANIFEST.json`、`codex-project.toml` を合わせて同期する。
 - 既存 consumer repo が runner completion milestone を取り込む場合は、`docs/reference/run-artifacts.md`、`docs/reference/change-scope-policy.md`、`.codex/templates/EVALUATION.md`、`scripts/verify` も同期対象に含める。

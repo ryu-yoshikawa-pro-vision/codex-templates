@@ -6,6 +6,10 @@
       "CODE_REVIEW.md",
       ".agents/skills/feature-plan/SKILL.md",
       ".agents/skills/code-review/SKILL.md",
+      ".agents/skills/repair-loop/SKILL.md",
+      ".agents/skills/harness-improvement/SKILL.md",
+      "docs/reference/repair-loop.md",
+      "docs/reference/harness-improvement-loop.md",
       "docs/reference/codex-safety-harness.md",
       "docs/reference/codex-implementation-harness.md",
       "Report file",
@@ -62,6 +66,10 @@
     "template/.agents/skills/feature-plan/SKILL.md",
     "template/.agents/skills/feature-plan/references/planning-workflow.md",
     "template/.agents/skills/code-review/SKILL.md",
-    "template/.agents/skills/code-review/references/review-workflow.md"
+    "template/.agents/skills/code-review/references/review-workflow.md",
+    "template/.agents/skills/repair-loop/SKILL.md",
+    "template/.agents/skills/repair-loop/references/repair-workflow.md",
+    "template/.agents/skills/harness-improvement/SKILL.md",
+    "template/.agents/skills/harness-improvement/references/improvement-workflow.md"
   ]
 }

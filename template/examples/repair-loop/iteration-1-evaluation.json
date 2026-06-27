@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "run_id": "20260628-010000-JST",
+  "result": "partial",
+  "primary_failure_category": "missing_validation",
+  "failure_categories": [
+    "missing_validation"
+  ],
+  "dimensions": {
+    "task_completion": {
+      "rating": "warn",
+      "evidence": "Iteration 1 fixed the review finding, but required validation still reports a missing command coverage gap."
+    },
+    "scope_control": {
+      "rating": "pass",
+      "evidence": "Changed files stayed within the declared repair-loop scope."
+    },
+    "validation_confidence": {
+      "rating": "fail",
+      "evidence": "The iteration still left one required validation command failing."
+    },
+    "safety_compliance": {
+      "rating": "pass",
+      "evidence": "No unsafe or destructive action was required in iteration 1."
+    },
+    "reviewability": {
+      "rating": "pass",
+      "evidence": "The iteration record captures findings, changed files, validation output, and next action."
+    },
+    "maintainability": {
+      "rating": "warn",
+      "evidence": "The fix is directionally correct, but a follow-up iteration is needed to remove the remaining validation gap."
+    },
+    "reproducibility": {
+      "rating": "pass",
+      "evidence": "Run id, evaluation artifact, and validation commands were recorded for replay."
+    }
+  },
+  "findings": [
+    {
+      "category": "missing_validation",
+      "severity": "medium",
+      "evidence": "bash template/scripts/verify still reports one missing repair-loop phrase check.",
+      "detail": "Iteration 1 resolved the implementation issue but did not complete the required validation coverage."
+    }
+  ],
+  "improvement_candidates": [
+    {
+      "target": "docs/reference/",
+      "evidence": "Iteration 1 showed that the repair-loop stop condition wording was easy to omit.",
+      "expected_impact": "Reduce repeated partial evaluations caused by missing workflow wording.",
+      "recommendation": "Add a repair-loop example that explicitly maps findings, validation, and stop conditions."
+    }
+  ]
+}

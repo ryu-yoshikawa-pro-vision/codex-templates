@@ -16,12 +16,17 @@ fi
 "$python_cmd" - "$repo_root" <<'PY'
 import json
 import pathlib
+import subprocess
 import sys
 
 repo_root = pathlib.Path(sys.argv[1])
 
 
 def read_spec(rel):
+    return json.loads((repo_root / rel).read_text(encoding="utf-8"))
+
+
+def read_json(rel):
     return json.loads((repo_root / rel).read_text(encoding="utf-8"))
 
 
@@ -66,6 +71,17 @@ def expect_enum_set(values, expected, label):
     ensure(
         actual_set == expected_set,
         f"{label} enum mismatch: expected {sorted(expected_set, key=lambda x: str(x))}, got {sorted(actual_set, key=lambda x: str(x))}",
+    )
+
+
+def run_schema_validation(schema_rel, output_rel):
+    subprocess.check_call(
+        [
+            sys.executable,
+            str(repo_root / "template/scripts/validate-output-schema.py"),
+            str(repo_root / schema_rel),
+            str(repo_root / output_rel),
+        ]
     )
 
 
@@ -912,6 +928,103 @@ assert_contains(
         "changed_files",
         "exit code",
     ],
+)
+
+run_schema_validation("spec/evaluation.schema.json", "template/examples/repair-loop/iteration-1-evaluation.json")
+run_schema_validation("spec/evaluation.schema.json", "template/examples/repair-loop/iteration-2-evaluation.json")
+
+candidates_doc = read_json("template/examples/harness-improvement/harness-improvement-candidates.json")
+ensure(
+    isinstance(candidates_doc, dict),
+    "template/examples/harness-improvement/harness-improvement-candidates.json must be a JSON object",
+)
+candidates = candidates_doc.get("candidates")
+ensure(
+    isinstance(candidates, list),
+    "template/examples/harness-improvement/harness-improvement-candidates.json candidates must be an array",
+)
+ensure(
+    len(candidates) >= 3,
+    "template/examples/harness-improvement/harness-improvement-candidates.json must contain at least three candidates",
+)
+
+candidate_required_fields = [
+    "candidate_id",
+    "target",
+    "failure_category",
+    "source_runs",
+    "evidence",
+    "expected_impact",
+    "risk",
+    "recommended_change",
+    "strictness",
+    "status",
+    "owner_decision",
+]
+strictness_values = set()
+
+for index, candidate in enumerate(candidates, start=1):
+    ensure(
+        isinstance(candidate, dict),
+        f"candidate[{index}] must be an object",
+    )
+    missing = [field for field in candidate_required_fields if field not in candidate]
+    ensure(
+        not missing,
+        f"candidate[{index}] missing required fields: {missing}",
+    )
+    for field in [
+        "candidate_id",
+        "target",
+        "failure_category",
+        "expected_impact",
+        "risk",
+        "recommended_change",
+        "strictness",
+        "status",
+        "owner_decision",
+    ]:
+        ensure(
+            isinstance(candidate[field], str) and candidate[field].strip(),
+            f"candidate[{index}].{field} must be a non-empty string",
+        )
+    ensure(
+        isinstance(candidate["source_runs"], list) and len(candidate["source_runs"]) > 0,
+        f"candidate[{index}].source_runs must be a non-empty array",
+    )
+    ensure(
+        all(isinstance(run_id, str) and run_id.strip() for run_id in candidate["source_runs"]),
+        f"candidate[{index}].source_runs must contain only non-empty strings",
+    )
+    ensure(
+        isinstance(candidate["evidence"], list) and len(candidate["evidence"]) > 0,
+        f"candidate[{index}].evidence must be a non-empty array",
+    )
+    ensure(
+        all(isinstance(item, str) and item.strip() for item in candidate["evidence"]),
+        f"candidate[{index}].evidence must contain only non-empty strings",
+    )
+    ensure(
+        candidate["failure_category"] in taxonomy_categories,
+        f"candidate[{index}].failure_category must exist in spec/failure-taxonomy.json",
+    )
+    ensure(
+        candidate["strictness"] in {"normal", "strict", "blocked"},
+        f"candidate[{index}].strictness must be one of normal|strict|blocked",
+    )
+    ensure(
+        candidate["status"] in {"proposed", "accepted", "rejected", "deferred", "implemented"},
+        f"candidate[{index}].status must be one of proposed|accepted|rejected|deferred|implemented",
+    )
+    ensure(
+        candidate["owner_decision"] in {"not_reviewed", "approved", "rejected", "needs_more_evidence"},
+        f"candidate[{index}].owner_decision must be one of not_reviewed|approved|rejected|needs_more_evidence",
+    )
+    strictness_values.add(candidate["strictness"])
+
+ensure(
+    strictness_values == {"normal", "strict", "blocked"},
+    "harness-improvement candidates must include normal, strict, and blocked strictness values",
 )
 
 print("PASS: spec validation")

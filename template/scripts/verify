@@ -101,6 +101,10 @@ check_template_contract() {
   [[ -f scripts/validate-output-schema.py ]] || return 1
   [[ -f .agents/skills/feature-plan/references/planning-workflow.md ]] || return 1
   [[ -f .agents/skills/code-review/references/review-workflow.md ]] || return 1
+  [[ -f .agents/skills/repair-loop/SKILL.md ]] || return 1
+  [[ -f .agents/skills/repair-loop/references/repair-workflow.md ]] || return 1
+  [[ -f .agents/skills/harness-improvement/SKILL.md ]] || return 1
+  [[ -f .agents/skills/harness-improvement/references/improvement-workflow.md ]] || return 1
   [[ -f docs/reference/codex-safety-harness.md ]] || return 1
   [[ -f docs/reference/codex-implementation-harness.md ]] || return 1
   [[ -f docs/reference/run-artifacts.md ]] || return 1
@@ -109,9 +113,22 @@ check_template_contract() {
   [[ -f docs/reference/change-scope-policy.md ]] || return 1
   [[ -f docs/reference/hook-observation.md ]] || return 1
   [[ -f docs/reference/subagent-observation.md ]] || return 1
+  [[ -f docs/reference/repair-loop.md ]] || return 1
+  [[ -f docs/reference/harness-improvement-loop.md ]] || return 1
+  [[ -f examples/repair-loop/README.md ]] || return 1
+  [[ -f examples/repair-loop/iteration-1-evaluation.json ]] || return 1
+  [[ -f examples/repair-loop/iteration-2-evaluation.json ]] || return 1
+  [[ -f examples/repair-loop/repair-summary.md ]] || return 1
+  [[ -f examples/harness-improvement/README.md ]] || return 1
+  [[ -f examples/harness-improvement/harness-improvement-candidates.json ]] || return 1
+  [[ -f examples/harness-improvement/harness-improvement-review.md ]] || return 1
   has_change_scope_catalog || return 1
   contains ".agents/skills/feature-plan/SKILL.md" AGENTS.md || return 1
   contains ".agents/skills/code-review/SKILL.md" AGENTS.md || return 1
+  contains ".agents/skills/repair-loop/SKILL.md" AGENTS.md || return 1
+  contains ".agents/skills/harness-improvement/SKILL.md" AGENTS.md || return 1
+  contains "docs/reference/repair-loop.md" AGENTS.md || return 1
+  contains "docs/reference/harness-improvement-loop.md" AGENTS.md || return 1
   contains "docs/reference/codex-safety-harness.md" AGENTS.md || return 1
   contains "docs/reference/codex-implementation-harness.md" AGENTS.md || return 1
   contains "Report file" AGENTS.md || return 1
@@ -157,6 +174,36 @@ check_template_contract() {
   contains "Open questions" .agents/skills/code-review/references/review-workflow.md || return 1
   contains "Failure modes" .agents/skills/code-review/references/review-workflow.md || return 1
   contains "Report file generation policy" .agents/skills/code-review/references/review-workflow.md || return 1
+  contains "使う場面" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "Do not use" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "Inputs" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "Entry conditions" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "Iteration model" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "Finding triage" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "Repair planning" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "Scope control" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "Validation per iteration" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "Stop conditions" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "Escalation to human decision" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "Evaluation connection" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "Failure taxonomy connection" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "Observation / subagent evidence" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "Report file generation policy" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "Failure modes" .agents/skills/repair-loop/references/repair-workflow.md || return 1
+  contains "使う場面" .agents/skills/harness-improvement/references/improvement-workflow.md || return 1
+  contains "Do not use" .agents/skills/harness-improvement/references/improvement-workflow.md || return 1
+  contains "Inputs" .agents/skills/harness-improvement/references/improvement-workflow.md || return 1
+  contains "Candidate model" .agents/skills/harness-improvement/references/improvement-workflow.md || return 1
+  contains "Evidence requirements" .agents/skills/harness-improvement/references/improvement-workflow.md || return 1
+  contains "Target areas" .agents/skills/harness-improvement/references/improvement-workflow.md || return 1
+  contains "Classification" .agents/skills/harness-improvement/references/improvement-workflow.md || return 1
+  contains "Prioritization" .agents/skills/harness-improvement/references/improvement-workflow.md || return 1
+  contains "Safety strictness" .agents/skills/harness-improvement/references/improvement-workflow.md || return 1
+  contains "Separation from implementation work" .agents/skills/harness-improvement/references/improvement-workflow.md || return 1
+  contains "Output format" .agents/skills/harness-improvement/references/improvement-workflow.md || return 1
+  contains "Review requirements" .agents/skills/harness-improvement/references/improvement-workflow.md || return 1
+  contains "Examples" .agents/skills/harness-improvement/references/improvement-workflow.md || return 1
+  contains "Failure modes" .agents/skills/harness-improvement/references/improvement-workflow.md || return 1
   contains "sandbox_mode = \"workspace-write\"" .codex/config.toml || return 1
   contains "approval_policy = \"untrusted\"" .codex/config.toml || return 1
   contains "web_search = \"cached\"" .codex/config.toml || return 1
@@ -231,6 +278,22 @@ check_template_contract() {
   contains "parent_decision" docs/reference/subagent-observation.md || return 1
   contains "used_in_final_plan" docs/reference/subagent-observation.md || return 1
   contains "Subagent logs are evidence, not final evaluation judgement." docs/reference/subagent-observation.md || return 1
+  contains "Review -> Repair -> Validate" docs/reference/repair-loop.md || return 1
+  contains "max iteration" docs/reference/repair-loop.md || return 1
+  contains "stop condition" docs/reference/repair-loop.md || return 1
+  contains "allowed_files" docs/reference/repair-loop.md || return 1
+  contains "unsafe" docs/reference/repair-loop.md || return 1
+  contains "scope violation" docs/reference/repair-loop.md || return 1
+  contains "evaluation.json" docs/reference/repair-loop.md || return 1
+  contains "failure taxonomy" docs/reference/repair-loop.md || return 1
+  contains "harness improvement" docs/reference/harness-improvement-loop.md || return 1
+  contains "improvement candidate" docs/reference/harness-improvement-loop.md || return 1
+  contains "expected_impact" docs/reference/harness-improvement-loop.md || return 1
+  contains "strictness" docs/reference/harness-improvement-loop.md || return 1
+  contains "safety layer" docs/reference/harness-improvement-loop.md || return 1
+  contains "separate follow-up" docs/reference/harness-improvement-loop.md || return 1
+  contains "evaluation.json" docs/reference/harness-improvement-loop.md || return 1
+  contains "failure taxonomy" docs/reference/harness-improvement-loop.md || return 1
 }
 
 check_execpolicy_baseline() {
