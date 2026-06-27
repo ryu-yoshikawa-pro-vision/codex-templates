@@ -141,6 +141,53 @@ evaluation.json:
 
 `repair loop` のように複数回 `codex-task` を実行する場合、`run.json` は複数の `codex-task` report JSON を配列で参照する。
 
+### 5.4 `run.json` と `evaluation.json` の同期ルール
+
+`run.json` と `evaluation.json` が同じ解釈情報を持つ場合、正本を明確にする。
+
+- `evaluation.json` is the source of truth for failure interpretation.
+- `run.json.primary_failure_category` is a copied summary field from `evaluation.json.primary_failure_category`.
+- `run.json.evaluation_path` points to the evaluation artifact used as the source of truth.
+- Before `evaluation.json` is generated, `run.json.primary_failure_category` must be `null`.
+- If `run.json.primary_failure_category` and `evaluation.json.primary_failure_category` disagree, validator must warn or fail.
+- Runner-generated facts in `run.json` remain authoritative for execution facts even after `evaluation.json` is created.
+
+つまり、失敗原因の解釈は `evaluation.json` が正本、実行事実は `run.json` / `codex-task` report JSON が正本である。
+
+### 5.5 Status / result enum policy
+
+`run.status`, `validation.status`, `evaluation.result` は混同しやすいため、初期 enum を固定する。
+
+```text
+run.status:
+  pending | running | completed | failed | cancelled
+
+validation.status:
+  not_run | passed | failed | skipped | blocked
+
+evaluation.result:
+  pass | partial | fail | not_evaluated
+```
+
+意味の違い:
+
+- `run.status = completed` は、runner が artifact 生成まで完了したことを示す。タスク成功を意味しない。
+- `run.status = failed` は、runner 自体が異常終了し artifact 生成や検証手順が完了しなかったことを示す。
+- `validation.status = failed` は、検証コマンドが失敗したことを示す。必ずしも `evaluation.result = fail` ではない。
+- `evaluation.result` は、成果物としてのタスク達成度に対する agent / reviewer 判断である。
+- `validation.status = blocked` は、safety rule / hook / environment 制約により検証が実行できなかったことを示す。
+- `validation.status = skipped` は、明示的な理由により検証を実行しなかったことを示す。
+
+例:
+
+```text
+run.status = completed
+validation.status = failed
+evaluation.result = partial
+```
+
+これは、runner は完了し、検証は失敗したが、成果物の一部は有効で追加修正可能、という状態を表す。
+
 ## 6. Failure classification policy
 
 失敗分類は完全自動にしない。
@@ -169,7 +216,7 @@ evaluation.json:
 
 置き場所:
 
-- `run.json`: summary として `primary_failure_category` を持ってよい。
+- `run.json`: summary として `primary_failure_category` を持ってよい。ただし `evaluation.json` からの copy summary とする。
 - `evaluation.json`: 詳細として `primary_failure_category`, `failure_categories`, `findings[].category` を持つ。
 - `failure-taxonomy.json`: enum の正本。
 
@@ -243,13 +290,15 @@ PR 分割ではなく、タスク分割として進める。
 追加候補:
 
 - `template/docs/reference/run-artifacts.md`
-- `spec/run-artifact-responsibility.json`
+- `spec/artifact-responsibility.json`
 
 DoD:
 
 - どの artifact が何の正本かが説明される。
 - `codex-task` report JSON と `run.json` の責務分離が明確である。
 - `evaluation.json` は agent 作成、runner が観測事実を作る、validator が検証する、という分担が明記される。
+- `run.json` と `evaluation.json` の同期ルールが説明される。
+- `run.status`, `validation.status`, `evaluation.result` の enum が定義される。
 
 ### TASK-002: Failure taxonomy を標準化する
 
@@ -275,11 +324,14 @@ DoD:
 | `repair_loop_stalled` | 修正ループが収束しない | stop condition, repair skill |
 | `artifact_contract_gap` | artifact の責務・構造が不明確 | run artifact docs, schema |
 
+`artifact_contract_gap` は、通常の実装失敗ではなく、artifact schema / responsibility / source-of-truth relationship が不明確で run を評価できない場合に使う。通常の implementation failure には使わない。
+
 DoD:
 
 - taxonomy が source repo の validation 対象になる。
 - `evaluation.schema.json` の `primary_failure_category`, `failure_categories`, `findings[].category` が taxonomy と整合する。
 - runner が candidate を出せる分類と、agent 判断が必要な分類が区別される。
+- `artifact_contract_gap` の利用条件が明記される。
 
 ### TASK-003: Evaluation contract を追加する
 
@@ -349,6 +401,7 @@ DoD:
 - 数値 score ではなく `rating + evidence` を基本にする。
 - `primary_failure_category`, `failure_categories`, `findings[].category` が taxonomy と整合する。
 - evaluation は成果物評価だけでなく、harness improvement candidate を持てる。
+- `evaluation.result` enum が `pass | partial | fail | not_evaluated` に固定される。
 
 ### TASK-004: Run manifest contract を追加する
 
@@ -396,6 +449,9 @@ DoD:
 - schema が source repo の validation 対象になる。
 - `run_id`, `task_type`, `workflow_level`, `preset`, `status` の必須性が定義される。
 - `run.json` は `codex-task` report JSON を参照する aggregate であり、低レベル report の置き換えではないと明記される。
+- `run.status` enum が `pending | running | completed | failed | cancelled` に固定される。
+- `validation.status` enum が `not_run | passed | failed | skipped | blocked` に固定される。
+- `primary_failure_category` は `evaluation.json` からの copied summary として扱う。
 
 ### TASK-005: Change scope policy を定義する
 
@@ -426,10 +482,16 @@ DoD:
 --expected-changed-files <path-list>
 --max-iterations <n>
 --record-run-manifest
---record-evaluation
+--evaluation-template
+--require-evaluation
 --require-clean-git
 --require-run-id
 ```
+
+`--record-evaluation` は採用しない。理由は、runner が評価判断まで作るように見えるためである。
+
+- `--evaluation-template`: runner が空の `evaluation.json` template を作るだけ。判断は agent が埋める。
+- `--require-evaluation`: run 終了時に `evaluation.json` が存在し、schema validation に通ることを要求する。
 
 初期対応では、破壊的に増やしすぎない。まずは以下を優先する。
 
@@ -438,12 +500,14 @@ DoD:
 3. `--record-run-manifest`
 4. `--allowed-files`
 5. `--expected-changed-files`
+6. `--require-evaluation`
 
 DoD:
 
 - `codex-task.sh` と `codex-task.ps1` の両方で同等の引数を扱える。
 - `--record-run-manifest` 指定時に `.codex/runs/<run_id>/run.json` を作成できる。
 - `--allowed-files` 指定時に diff のスコープ外変更を検出できる。
+- `--require-evaluation` 指定時に `evaluation.json` の存在と schema validation を確認できる。
 - 既存の safe / readonly / auto-net preset の意味を変えない。
 - `codex-task` は観測事実を生成し、評価判断は `evaluation.json` に委譲する。
 
@@ -579,26 +643,36 @@ DoD:
 
 ## 10. Suggested initial implementation order
 
-最初の対応は、以下に絞る。
+最初の対応は 2 段階に分ける。
+
+### Initial implementation A: Contract docs only
+
+まず概念・責務・分類をレビュー可能にする。validator 実装はまだ行わない。
 
 1. `template/docs/reference/run-artifacts.md`
-2. `spec/run-artifact-responsibility.json`
+2. `spec/artifact-responsibility.json`
 3. `spec/failure-taxonomy.json`
 4. `template/docs/reference/failure-taxonomy.md`
-5. `spec/evaluation.schema.json`
-6. `template/docs/reference/evaluation.md`
-7. `spec/run-manifest.schema.json`
-8. `template/.codex/templates/RUN_MANIFEST.json`
-9. `template/.codex/templates/EVALUATION.md`
-10. `tools/validate-spec.*` の拡張
-11. `template/scripts/verify` の拡張
+5. `template/docs/reference/evaluation.md`
+6. `template/docs/reference/change-scope-policy.md`
+
+### Initial implementation B: Schema and validation
+
+A のレビュー後に schema / templates / validator を追加する。
+
+1. `spec/evaluation.schema.json`
+2. `spec/run-manifest.schema.json`
+3. `template/.codex/templates/RUN_MANIFEST.json`
+4. `template/.codex/templates/EVALUATION.md`
+5. `tools/validate-spec.*` の拡張
+6. `template/scripts/verify` の拡張
 
 理由:
 
 - まず artifact の正本関係を固めないと、runner / evaluation / report が重複する。
 - failure taxonomy が先にないと、evaluation の enum が決まらない。
 - いきなり `codex-task` を大きく変えると既存安全ハーネスを壊すリスクがある。
-- run manifest / evaluation / taxonomy があれば、次の PR 以降で実装効果を測れる。
+- contract docs を先にレビュー可能にすることで、schema 実装の巻き戻しを減らす。
 
 ## 11. Consumer-facing change policy
 
@@ -670,6 +744,14 @@ DoD:
 - path normalization を必須にする。
 - `.codex/runs/` artifact と actual source changes を分離する。
 
+### RISK-008: status / result の混同で集計が壊れる
+
+対策:
+
+- `run.status`, `validation.status`, `evaluation.result` を別 enum として定義する。
+- `run.status = completed` をタスク成功と解釈しない。
+- 集計時は task outcome に `evaluation.result` を使う。
+
 ## 13. Validation plan
 
 初期対応では以下を通す。
@@ -696,25 +778,24 @@ powershell.exe -ExecutionPolicy Bypass -File tests/integration/Test-CodexSafetyH
 - source repo 側の `maintainers/plans/` に保存されている。
 - Codex 強化の方向性が OpenAI Agents SDK 中心ではなく Codex harness 中心に修正されている。
 - JSON artifact の自動生成 / agent 生成 / validator 検証の責務分離が明確である。
+- `run.json` / `evaluation.json` の source-of-truth と同期ルールが明確である。
+- `run.status`, `validation.status`, `evaluation.result` の enum と意味が明確である。
 - 初期対応タスク、後続タスク、リスク、検証方針が明確である。
 - 以後の実装 PR / タスク化の土台として使える。
 
 ## 15. Next action
 
-次に進める場合は、TASK-001 から TASK-005 を contract-first で進める。
+次に進める場合は、Initial implementation A から進める。
 
 具体的には、以下を最初の実装対象にする。
 
 - `template/docs/reference/run-artifacts.md`
-- `spec/run-artifact-responsibility.json`
+- `spec/artifact-responsibility.json`
 - `spec/failure-taxonomy.json`
 - `template/docs/reference/failure-taxonomy.md`
-- `spec/evaluation.schema.json`
 - `template/docs/reference/evaluation.md`
-- `spec/run-manifest.schema.json`
-- `template/.codex/templates/RUN_MANIFEST.json`
-- `template/.codex/templates/EVALUATION.md`
-- `tools/validate-spec.*` の contract validation 追加
-- `template/scripts/verify` の contract validation 追加
+- `template/docs/reference/change-scope-policy.md`
+
+その後、Initial implementation B として schema / templates / validator を追加する。
 
 `codex-task` の実装変更は、その後に TASK-006 として進める。
