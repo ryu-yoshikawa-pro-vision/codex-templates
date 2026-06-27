@@ -1,4 +1,4 @@
-# codex-templates v2 Source Repository
+# codex-templates Source Repository
 
 このリポジトリは consumer repo へ配布する Codex 運用テンプレートの source repository です。利用者が直接読む面は [`template/`](template) に集約し、root は template 自体の保守・仕様・検証を担います。
 
