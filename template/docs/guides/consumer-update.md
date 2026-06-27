@@ -23,21 +23,22 @@
 
 ## 一時ディレクトリ同期の例
 
+一時ディレクトリへ同期する場合も、削除して作り直すのではなく、毎回ユニークな未作成ディレクトリを使う。これにより `--force` / `-Force` や削除コマンドを使わずに安全に差分確認できる。
+
 Bash:
 
 ```bash
-rm -rf /tmp/codex-template-next
-mkdir -p /tmp/codex-template-next
-/path/to/codex-templates/tools/sync-template.sh --force --confirm-destructive-overwrite /tmp/codex-template-next
+target="${TMPDIR:-/tmp}/codex-template-next-$(date +%Y%m%d%H%M%S)"
+/path/to/codex-templates/tools/sync-template.sh "$target"
+echo "Synced template to: $target"
 ```
 
 PowerShell:
 
 ```powershell
-$target = Join-Path $env:TEMP "codex-template-next"
-if (Test-Path $target) { Remove-Item -Recurse -Force $target }
-New-Item -ItemType Directory -Force -Path $target | Out-Null
-powershell -ExecutionPolicy Bypass -File path\to\codex-templates\tools\sync-template.ps1 -Destination $target -Force -ConfirmDestructiveOverwrite
+$target = Join-Path $env:TEMP ("codex-template-next-" + [guid]::NewGuid().ToString())
+powershell -ExecutionPolicy Bypass -File path\to\codex-templates\tools\sync-template.ps1 -Destination $target
+Write-Host "Synced template to: $target"
 ```
 
 ## 直接同期する場合
