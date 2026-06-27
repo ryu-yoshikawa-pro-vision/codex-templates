@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "catalog_type": "static_artifact_responsibility_catalog",
+  "validation_status": "not_executable_in_initial_implementation_a",
+  "initial_implementation": "A",
+  "notes": "This catalog is a reviewable static contract for Initial implementation A. It is not an executable schema validation target.",
+  "artifacts": [
+    {
+      "artifact": "codex-task report JSON",
+      "primary_owner": "runner / wrapper",
+      "role": "Low-level record for a single codex-task execution.",
+      "source_of_truth": "Execution facts for one codex-task invocation.",
+      "notes": "Stores observed facts such as exit code, verify result, output path, log path, prompt source, cwd, and git branch. It is not replaced by run.json."
+    },
+    {
+      "artifact": "run.json",
+      "primary_owner": "runner / wrapper",
+      "role": "Aggregate manifest for one run.",
+      "source_of_truth": "Observed run-level facts and references across the run.",
+      "notes": "Can reference multiple codex-task report JSON artifacts and summarize task type, workflow level, preset, runtime, agents used, changed files, validation summary, safety summary, and evaluation path."
+    },
+    {
+      "artifact": "evaluation.json",
+      "primary_owner": "agent / reviewer",
+      "role": "Canonical evaluation artifact for outcome interpretation.",
+      "source_of_truth": "Failure interpretation, task outcome judgement, and improvement candidates.",
+      "notes": "Observed execution facts must be referenced from run.json, codex-task report JSON, or logs. Agents do not hand-write exit codes, changed files, or command logs here."
+    },
+    {
+      "artifact": "REPORT.md",
+      "primary_owner": "runner + agent",
+      "role": "Human-readable execution summary.",
+      "source_of_truth": "Communication summary for humans, not machine evaluation.",
+      "notes": "Useful for progress tracking and review, but not the canonical artifact for automated judgement."
+    },
+    {
+      "artifact": "JSONL logs",
+      "primary_owner": "runner / Codex / hooks",
+      "role": "Low-level event log stream.",
+      "source_of_truth": "Detailed trace and debugging evidence.",
+      "notes": "Primarily for traceability and debugging rather than aggregate summary fields."
+    },
+    {
+      "artifact": "failure-taxonomy.json",
+      "primary_owner": "source repo spec",
+      "role": "Canonical category catalog for failure classification.",
+      "source_of_truth": "Allowed failure category enum for evaluation artifacts.",
+      "notes": "Agents and reviewers select categories from this taxonomy rather than inventing new category names."
+    },
+    {
+      "artifact": "subagent-run.json",
+      "primary_owner": "runner / hook + agent summary",
+      "role": "Structured record for one subagent execution.",
+      "source_of_truth": "Observed subagent execution facts plus separately recorded summary and parent decision fields.",
+      "notes": "Start time, end time, and allowed scope are observed facts. Summary and parent decision are interpretation fields and should remain separate."
+    }
+  ]
+}

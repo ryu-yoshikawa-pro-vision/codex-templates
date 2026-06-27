@@ -17,6 +17,7 @@
 - consumer repo 更新の詳細手順を `template/docs/guides/consumer-update.md` に追加。
 - `.codex/runs/<run_id>/` の運用例として standard implementation、PR review、auto-net investigation の examples を追加。
 - `examples/runs/README.md` に run examples の入口を追加。
+- Codex harness の契約整理として `spec/artifact-responsibility.json`、`spec/failure-taxonomy.json`、`template/docs/reference/run-artifacts.md`、`template/docs/reference/failure-taxonomy.md`、`template/docs/reference/evaluation.md`、`template/docs/reference/change-scope-policy.md` を追加。
 
 ### Changed
 
