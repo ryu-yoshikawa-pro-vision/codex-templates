@@ -279,6 +279,8 @@ pass | warn | fail | not_evaluated
 - `template/docs/reference/change-scope-policy.md`
 - `spec/change-scope-policy.json`
 
+`spec/change-scope-policy.json` は、Initial implementation A では必須にしない。A では Markdown で方針をレビュー可能にし、JSON catalog / schema 化は Initial implementation B または TASK-005 の実装時に行う。
+
 ## 9. Implementation strategy
 
 PR 分割ではなく、タスク分割として進める。
@@ -468,6 +470,7 @@ DoD:
 - untracked / deleted / renamed / generated artifacts の扱いが定義される。
 - `.codex/runs/` 配下 artifact の扱いが明確である。
 - `allowed_files` と `expected_changed_files` の意味が分離される。
+- `spec/change-scope-policy.json` を追加するタイミングが Initial implementation B または TASK-005 実装時であると明記される。
 
 ### TASK-006: `codex-task` を runner として強化する
 
@@ -645,9 +648,9 @@ DoD:
 
 最初の対応は 2 段階に分ける。
 
-### Initial implementation A: Contract docs only
+### Initial implementation A: Contract docs and static catalogs
 
-まず概念・責務・分類をレビュー可能にする。validator 実装はまだ行わない。
+まず概念・責務・分類をレビュー可能にする。runner / validator 実装はまだ行わない。
 
 1. `template/docs/reference/run-artifacts.md`
 2. `spec/artifact-responsibility.json`
@@ -655,6 +658,11 @@ DoD:
 4. `template/docs/reference/failure-taxonomy.md`
 5. `template/docs/reference/evaluation.md`
 6. `template/docs/reference/change-scope-policy.md`
+
+Note:
+
+- `spec/artifact-responsibility.json` and `spec/failure-taxonomy.json` are static catalogs, not executable schema validation targets in Initial implementation A.
+- `spec/change-scope-policy.json` is intentionally deferred until Initial implementation B or TASK-005 implementation.
 
 ### Initial implementation B: Schema and validation
 
@@ -666,6 +674,7 @@ A のレビュー後に schema / templates / validator を追加する。
 4. `template/.codex/templates/EVALUATION.md`
 5. `tools/validate-spec.*` の拡張
 6. `template/scripts/verify` の拡張
+7. `spec/change-scope-policy.json` の追加要否判断
 
 理由:
 
@@ -754,7 +763,30 @@ DoD:
 
 ## 13. Validation plan
 
-初期対応では以下を通す。
+初期対応では、段階ごとに検証範囲を分ける。
+
+### Initial implementation A validation
+
+A では runner / validator の新規実装は行わないため、既存検証のみを通す。
+
+```bash
+bash tools/validate-spec.sh
+bash template/scripts/verify
+bash tests/integration/test-codex-safety-harness.sh
+```
+
+PowerShell 環境では以下も確認する。
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File tools/validate-spec.ps1
+powershell.exe -ExecutionPolicy Bypass -File tests/integration/Test-CodexSafetyHarness.ps1
+```
+
+A で追加する static catalog は、validator support が追加されるまでは Markdown docs と人間レビューで整合性を確認する。
+
+### Initial implementation B validation
+
+B では新規 schema / catalog / template の自動検証を追加する。
 
 ```bash
 bash tools/validate-spec.sh
@@ -780,6 +812,7 @@ powershell.exe -ExecutionPolicy Bypass -File tests/integration/Test-CodexSafetyH
 - JSON artifact の自動生成 / agent 生成 / validator 検証の責務分離が明確である。
 - `run.json` / `evaluation.json` の source-of-truth と同期ルールが明確である。
 - `run.status`, `validation.status`, `evaluation.result` の enum と意味が明確である。
+- Initial implementation A / B の違いが明確である。
 - 初期対応タスク、後続タスク、リスク、検証方針が明確である。
 - 以後の実装 PR / タスク化の土台として使える。
 
