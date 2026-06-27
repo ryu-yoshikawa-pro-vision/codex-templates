@@ -160,6 +160,7 @@ required_paths = [
     "spec/failure-taxonomy.json",
     "template/.codex/templates/RUN_MANIFEST.json",
     "template/.codex/templates/EVALUATION.md",
+    "template/.codex/templates/evaluation.schema.json",
     "template/docs/reference/run-artifacts.md",
     "template/docs/reference/failure-taxonomy.md",
     "template/docs/reference/evaluation.md",
@@ -169,6 +170,7 @@ for rel in required_paths:
     assert_exists(rel)
 
 evaluation_schema = read_spec("spec/evaluation.schema.json")
+bundled_evaluation_schema = read_spec("template/.codex/templates/evaluation.schema.json")
 run_manifest_schema = read_spec("spec/run-manifest.schema.json")
 artifact_responsibility = read_spec("spec/artifact-responsibility.json")
 change_scope_policy = read_spec("spec/change-scope-policy.json")
@@ -403,6 +405,10 @@ expect_enum_set(
     evaluation_props["failure_categories"]["items"]["enum"],
     taxonomy_categories,
     "spec/evaluation.schema.json failure_categories items",
+)
+ensure(
+    bundled_evaluation_schema == evaluation_schema,
+    "template/.codex/templates/evaluation.schema.json must stay in sync with spec/evaluation.schema.json",
 )
 
 dimension_names = [

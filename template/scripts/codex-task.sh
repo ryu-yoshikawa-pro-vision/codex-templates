@@ -12,9 +12,14 @@ runtime="host"
 task_type="implementation"
 workflow_level="standard"
 record_run_manifest=0
+evaluation_template=0
+require_evaluation=0
+require_clean_git=0
+require_run_id=0
 prompt_file=""
 output_schema=""
 verify_command=""
+max_iterations=""
 allow_search=0
 skip_preflight=0
 skip_verify=0
@@ -22,11 +27,17 @@ explicit_log_path=""
 explicit_output_file=0
 explicit_report_path=0
 run_id=""
+run_root=""
+evaluation_file_path=""
 cwd_for_report="$repo_root"
 declare -a prompt_parts=()
 declare -a allowed_files=()
 declare -a expected_changed_files=()
 declare -a changed_files=()
+declare -a validation_command_names=()
+declare -a validation_command_exit_codes=()
+declare -a validation_command_statuses=()
+declare -a validation_command_evidences=()
 
 timestamp="$(date +%Y%m%d-%H%M%S)"
 output_file="$artifacts_dir/codex-task-${timestamp}.json"
@@ -39,13 +50,11 @@ prompt_source=""
 codex_exit_code="null"
 verify_exit_code="null"
 validation_status="not_run"
-validation_command=""
-validation_command_exit_code="null"
-validation_command_status=""
-validation_command_evidence=""
 manifest_path=""
 manifest_started=0
 safety_scope_violation=false
+evaluation_path=""
+primary_failure_category=""
 
 json_escape() {
   local s="$1"
@@ -83,6 +92,65 @@ json_string_array() {
     fi
     printf '"%s"' "$(json_escape "$item")"
   done
+  printf ']'
+}
+
+json_nullable_string() {
+  local value="$1"
+  if [[ -n "$value" ]]; then
+    printf '"%s"' "$(json_escape "$value")"
+  else
+    printf 'null'
+  fi
+}
+
+add_validation_command() {
+  local command="$1"
+  local exit_code="$2"
+  local status="$3"
+  local evidence="$4"
+
+  validation_command_names+=("$command")
+  validation_command_exit_codes+=("$exit_code")
+  validation_command_statuses+=("$status")
+  validation_command_evidences+=("$evidence")
+
+  case "$status" in
+    blocked|failed)
+      validation_status="$status"
+      ;;
+    passed)
+      if [[ "$validation_status" == "not_run" || "$validation_status" == "skipped" ]]; then
+        validation_status="passed"
+      fi
+      ;;
+    skipped)
+      if [[ "$validation_status" == "not_run" ]]; then
+        validation_status="skipped"
+      fi
+      ;;
+  esac
+}
+
+json_validation_commands() {
+  local idx first=1
+  printf '['
+  for idx in "${!validation_command_names[@]}"; do
+    if (( first )); then
+      first=0
+    else
+      printf ','
+    fi
+    printf '\n      {\n'
+    printf '        "command": "%s",\n' "$(json_escape "${validation_command_names[$idx]}")"
+    printf '        "exit_code": %s,\n' "${validation_command_exit_codes[$idx]}"
+    printf '        "status": "%s",\n' "$(json_escape "${validation_command_statuses[$idx]}")"
+    printf '        "evidence": "%s"\n' "$(json_escape "${validation_command_evidences[$idx]}")"
+    printf '      }'
+  done
+  if (( ! first )); then
+    printf '\n    '
+  fi
   printf ']'
 }
 
@@ -265,21 +333,7 @@ write_run_manifest() {
   fi
   changed_files_json="$(json_string_array changed_files)"
 
-  if [[ -n "$validation_command_status" ]]; then
-    validation_commands_json=$(cat <<EOF
-[
-      {
-        "command": "$(json_escape "$validation_command")",
-        "exit_code": $validation_command_exit_code,
-        "status": "$(json_escape "$validation_command_status")",
-        "evidence": "$(json_escape "$validation_command_evidence")"
-      }
-    ]
-EOF
-)
-  else
-    validation_commands_json="[]"
-  fi
+  validation_commands_json="$(json_validation_commands)"
 
   ensure_parent_dir "$manifest_path"
   cat > "$manifest_path" <<EOF
@@ -308,9 +362,9 @@ EOF
     "git_mutation_attempt_blocked": false,
     "scope_violation": $safety_scope_violation
   },
-  "evaluation_path": null,
+  "evaluation_path": $(json_nullable_string "$evaluation_path"),
   "status": "$(json_escape "$run_status")",
-  "primary_failure_category": null
+  "primary_failure_category": $(json_nullable_string "$primary_failure_category")
 }
 EOF
 }
@@ -375,11 +429,7 @@ run_scope_checks() {
       sort_unique_array violations
       evidence="changed files outside allowed_files: $(join_by ', ' "${violations[@]}")"
       report_status="scope_violation"
-      validation_status="blocked"
-      validation_command="change scope check"
-      validation_command_exit_code=1
-      validation_command_status="blocked"
-      validation_command_evidence="$evidence"
+      add_validation_command "change scope check" 1 "blocked" "$evidence"
       run_status="failed"
       safety_scope_violation=true
       write_log "scope_violation" ",\"evidence\":\"$(json_escape "$evidence")\""
@@ -402,11 +452,7 @@ run_scope_checks() {
       sort_unique_array missing_expected
       evidence="expected files were not changed: $(join_by ', ' "${missing_expected[@]}")"
       report_status="expected_changes_missing"
-      validation_status="failed"
-      validation_command="expected changed files check"
-      validation_command_exit_code=1
-      validation_command_status="failed"
-      validation_command_evidence="$evidence"
+      add_validation_command "expected changed files check" 1 "failed" "$evidence"
       run_status="failed"
       safety_scope_violation=false
       write_log "expected_changes_missing" ",\"evidence\":\"$(json_escape "$evidence")\""
@@ -415,6 +461,209 @@ run_scope_checks() {
       exit 1
     fi
   fi
+}
+
+check_clean_git_precondition() {
+  (( require_clean_git )) || return 0
+
+  collect_changed_files
+  if ((${#changed_files[@]} == 0)); then
+    return 0
+  fi
+
+  local evidence
+  evidence="working tree has pre-existing source changes: $(join_by ', ' "${changed_files[@]}")"
+  report_status="dirty_git"
+  run_status="failed"
+  add_validation_command "clean git check" 1 "blocked" "$evidence"
+  write_log "dirty_git" ",\"evidence\":\"$(json_escape "$evidence")\""
+  write_report
+  write_run_manifest
+  exit 1
+}
+
+create_evaluation_template_if_needed() {
+  (( evaluation_template )) || return 0
+
+  evaluation_path=".codex/runs/$run_id/evaluation.json"
+  ensure_parent_dir "$evaluation_file_path"
+  if [[ -f "$evaluation_file_path" ]]; then
+    write_log "evaluation_template_exists" ",\"path\":\"$(json_escape "$evaluation_path")\""
+    return 0
+  fi
+
+  cat > "$evaluation_file_path" <<EOF
+{
+  "schema_version": 1,
+  "run_id": "$(json_escape "$run_id")",
+  "result": "not_evaluated",
+  "primary_failure_category": null,
+  "failure_categories": [],
+  "dimensions": {
+    "task_completion": {
+      "rating": "not_evaluated",
+      "evidence": "Task completion has not been evaluated yet."
+    },
+    "scope_control": {
+      "rating": "not_evaluated",
+      "evidence": "Scope control has not been evaluated yet."
+    },
+    "validation_confidence": {
+      "rating": "not_evaluated",
+      "evidence": "Validation confidence has not been evaluated yet."
+    },
+    "safety_compliance": {
+      "rating": "not_evaluated",
+      "evidence": "Safety compliance has not been evaluated yet."
+    },
+    "reviewability": {
+      "rating": "not_evaluated",
+      "evidence": "Reviewability has not been evaluated yet."
+    },
+    "maintainability": {
+      "rating": "not_evaluated",
+      "evidence": "Maintainability has not been evaluated yet."
+    },
+    "reproducibility": {
+      "rating": "not_evaluated",
+      "evidence": "Reproducibility has not been evaluated yet."
+    }
+  },
+  "findings": [],
+  "improvement_candidates": []
+}
+EOF
+  write_log "evaluation_template_created" ",\"path\":\"$(json_escape "$evaluation_path")\""
+}
+
+run_json_schema_validation_capture() {
+  local schema_path="$1"
+  local json_path="$2"
+  local py output
+
+  py="$(python_cmd)"
+  if [[ -z "$py" ]]; then
+    printf 'Python is required to validate JSON schema'
+    return 127
+  fi
+
+  if ! output="$("$py" "$repo_root/scripts/validate-output-schema.py" "$schema_path" "$json_path" 2>&1)"; then
+    printf '%s' "$output"
+    return 1
+  fi
+  return 0
+}
+
+resolve_evaluation_schema_path() {
+  local candidates=(
+    "$repo_root/spec/evaluation.schema.json"
+    "$repo_root/.codex/templates/evaluation.schema.json"
+  )
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    if [[ -f "$candidate" ]]; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  done
+  printf ''
+  return 1
+}
+
+read_evaluation_primary_failure_category() {
+  local py
+  py="$(python_cmd)"
+  if [[ -z "$py" ]]; then
+    printf 'Python is required to inspect evaluation.json'
+    return 127
+  fi
+
+  "$py" - "$evaluation_file_path" "$run_id" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+expected_run_id = sys.argv[2]
+
+try:
+    data = json.loads(path.read_text(encoding="utf-8"))
+except FileNotFoundError:
+    raise SystemExit(f"evaluation.json is missing: {path}")
+except json.JSONDecodeError as exc:
+    raise SystemExit(f"Invalid JSON in {path}: {exc}")
+
+actual_run_id = data.get("run_id")
+if actual_run_id != expected_run_id:
+    raise SystemExit(f"evaluation run_id mismatch: expected {expected_run_id}, got {actual_run_id}")
+
+value = data.get("primary_failure_category")
+if value is None:
+    print("null")
+else:
+    print(value)
+PY
+}
+
+validate_required_evaluation() {
+  (( require_evaluation )) || return 0
+
+  local evidence category
+  local expected_repo_path=".codex/runs/$run_id/evaluation.json"
+
+  if [[ ! -f "$evaluation_file_path" ]]; then
+    report_status="evaluation_missing"
+    run_status="failed"
+    evaluation_path=""
+    evidence="evaluation.json is missing: $expected_repo_path"
+    add_validation_command "evaluation validation" 1 "failed" "$evidence"
+    write_log "evaluation_missing" ",\"evidence\":\"$(json_escape "$evidence")\""
+    write_report
+    write_run_manifest
+    exit 1
+  fi
+
+  evaluation_path="$expected_repo_path"
+  local evaluation_schema_path
+  evaluation_schema_path="$(resolve_evaluation_schema_path)" || evaluation_schema_path=""
+  if [[ -z "$evaluation_schema_path" ]]; then
+    report_status="evaluation_invalid"
+    run_status="failed"
+    evidence="Evaluation schema not found: spec/evaluation.schema.json or .codex/templates/evaluation.schema.json"
+    add_validation_command "evaluation validation" 1 "failed" "$evidence"
+    write_log "evaluation_invalid" ",\"evidence\":\"$(json_escape "$evidence")\""
+    write_report
+    write_run_manifest
+    exit 1
+  fi
+
+  if ! evidence="$(run_json_schema_validation_capture "$evaluation_schema_path" "$evaluation_file_path" 2>&1)"; then
+    report_status="evaluation_invalid"
+    run_status="failed"
+    add_validation_command "evaluation validation" 1 "failed" "$evidence"
+    write_log "evaluation_invalid" ",\"evidence\":\"$(json_escape "$evidence")\""
+    write_report
+    write_run_manifest
+    exit 1
+  fi
+
+  if ! category="$(read_evaluation_primary_failure_category 2>&1)"; then
+    report_status="evaluation_invalid"
+    run_status="failed"
+    add_validation_command "evaluation validation" 1 "failed" "$category"
+    write_log "evaluation_invalid" ",\"evidence\":\"$(json_escape "$category")\""
+    write_report
+    write_run_manifest
+    exit 1
+  fi
+
+  if [[ "$category" == "null" ]]; then
+    primary_failure_category=""
+  else
+    primary_failure_category="$category"
+  fi
+  add_validation_command "evaluation validation" 0 "passed" "evaluation.json passed schema validation"
+  write_log "evaluation_valid" ",\"path\":\"$(json_escape "$evaluation_path")\""
 }
 
 path_under_root() {
@@ -547,9 +796,30 @@ parse_args() {
         skip_verify=1
         shift
         ;;
+      --evaluation-template)
+        evaluation_template=1
+        shift
+        ;;
+      --require-evaluation)
+        require_evaluation=1
+        shift
+        ;;
+      --require-clean-git)
+        require_clean_git=1
+        shift
+        ;;
+      --require-run-id)
+        require_run_id=1
+        shift
+        ;;
       --log-path)
         [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--log-path requires a value"
         explicit_log_path="$(resolve_path "$2")"
+        shift 2
+        ;;
+      --max-iterations)
+        [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--max-iterations requires a value"
+        max_iterations="$2"
         shift 2
         ;;
       --run-id)
@@ -619,6 +889,20 @@ apply_run_paths() {
   if ((${#expected_changed_files[@]} > 0)) && { (( ! record_run_manifest )) || [[ -z "$run_id" ]]; }; then
     fail_with_status "invalid_args" "--expected-changed-files requires --run-id and --record-run-manifest"
   fi
+  if (( evaluation_template )) && { (( ! record_run_manifest )) || [[ -z "$run_id" ]]; }; then
+    fail_with_status "invalid_args" "--evaluation-template requires --run-id and --record-run-manifest"
+  fi
+  if (( require_evaluation )) && { (( ! record_run_manifest )) || [[ -z "$run_id" ]]; }; then
+    fail_with_status "invalid_args" "--require-evaluation requires --run-id and --record-run-manifest"
+  fi
+  if (( require_run_id )) && [[ -z "$run_id" ]]; then
+    fail_with_status "invalid_args" "--require-run-id requires --run-id"
+  fi
+  if [[ -n "$max_iterations" ]]; then
+    if [[ ! "$max_iterations" =~ ^[0-9]+$ ]] || (( max_iterations < 1 || max_iterations > 10 )); then
+      fail_with_status "invalid_args" "--max-iterations must be an integer between 1 and 10"
+    fi
+  fi
 
   if (( record_run_manifest )) && [[ -z "$run_id" ]]; then
     fail_with_status "invalid_args" "--record-run-manifest requires --run-id"
@@ -626,7 +910,7 @@ apply_run_paths() {
 
   if [[ -n "$run_id" ]]; then
     validate_run_id
-    local run_root="$repo_root/.codex/runs/$run_id"
+    run_root="$repo_root/.codex/runs/$run_id"
     local normalized_runs_root normalized_run_root
     normalized_runs_root="$(normalized_path "$repo_root/.codex/runs")"
     normalized_run_root="$(normalized_path "$run_root")"
@@ -645,6 +929,7 @@ apply_run_paths() {
     if (( record_run_manifest )); then
       manifest_path="$run_root/run.json"
     fi
+    evaluation_file_path="$run_root/evaluation.json"
   fi
 
   if [[ -n "$explicit_log_path" ]]; then
@@ -729,6 +1014,10 @@ main() {
     run_status="running"
     write_run_manifest
   fi
+
+  check_clean_git_precondition
+  create_evaluation_template_if_needed
+  write_run_manifest
 
   if [[ -n "$prompt_file" ]]; then
     [[ -f "$prompt_file" ]] || fail_with_status "invalid_args" "Prompt file not found: $prompt_file"
@@ -856,13 +1145,10 @@ main() {
   if [[ -n "$output_schema" ]]; then
     if run_schema_check; then
       write_log "schema_ok"
+      add_validation_command "output schema validation" 0 "passed" "output schema validation passed"
     else
       report_status="invalid_output"
-      validation_status="failed"
-      validation_command="output schema validation"
-      validation_command_exit_code=1
-      validation_command_status="failed"
-      validation_command_evidence="output schema validation failed"
+      add_validation_command "output schema validation" 1 "failed" "output schema validation failed"
       run_status="failed"
       write_log "schema_failed"
       write_report
@@ -873,55 +1159,51 @@ main() {
 
   if (( skip_verify )); then
     report_status="verify_skipped"
-    validation_status="skipped"
     run_status="completed"
-    write_report
-    write_run_manifest
-    exit 0
+    if [[ "$validation_status" == "not_run" ]]; then
+      validation_status="skipped"
+    fi
+  else
+    used_verify="$verify_command"
+    if [[ -z "$used_verify" ]]; then
+      used_verify="$(default_verify_command)"
+    fi
+
+    if [[ -z "$used_verify" ]]; then
+      report_status="verify_skipped"
+      run_status="completed"
+      if [[ "$validation_status" == "not_run" ]]; then
+        validation_status="skipped"
+      fi
+      write_log "verify_skipped"
+    else
+      write_log "verify_start" ",\"command\":\"$(json_escape "$used_verify")\""
+      set +e
+      bash -lc "$used_verify"
+      verify_exit_code=$?
+      set -e
+      write_log "verify_exit" ",\"exit_code\":$verify_exit_code"
+
+      if [[ "$verify_exit_code" != "0" ]]; then
+        report_status="verify_failed"
+        add_validation_command "$used_verify" "$verify_exit_code" "failed" "verify command failed"
+        run_status="failed"
+        write_report
+        write_run_manifest
+        exit "$verify_exit_code"
+      fi
+
+      report_status="ok"
+      run_status="completed"
+      add_validation_command "$used_verify" "$verify_exit_code" "passed" "verify command completed successfully"
+    fi
   fi
 
-  used_verify="$verify_command"
-  if [[ -z "$used_verify" ]]; then
-    used_verify="$(default_verify_command)"
-  fi
+  validate_required_evaluation
 
-  if [[ -z "$used_verify" ]]; then
-    report_status="verify_skipped"
-    validation_status="skipped"
-    run_status="completed"
-    write_log "verify_skipped"
-    write_report
-    write_run_manifest
-    exit 0
-  fi
-
-  write_log "verify_start" ",\"command\":\"$(json_escape "$used_verify")\""
-  set +e
-  bash -lc "$used_verify"
-  verify_exit_code=$?
-  set -e
-  write_log "verify_exit" ",\"exit_code\":$verify_exit_code"
-  validation_command="$used_verify"
-  validation_command_exit_code="$verify_exit_code"
-
-  if [[ "$verify_exit_code" != "0" ]]; then
-    report_status="verify_failed"
-    validation_status="failed"
-    validation_command_status="failed"
-    validation_command_evidence="verify command failed"
-    run_status="failed"
-    write_report
-    write_run_manifest
-    exit "$verify_exit_code"
-  fi
-
-  report_status="ok"
-  validation_status="passed"
-  validation_command_status="passed"
-  validation_command_evidence="verify command completed successfully"
-  run_status="completed"
   write_report
   write_run_manifest
+  exit 0
 }
 
 parse_args "$@"

@@ -218,6 +218,7 @@ $requiredPaths = @(
     "spec/failure-taxonomy.json",
     "template/.codex/templates/RUN_MANIFEST.json",
     "template/.codex/templates/EVALUATION.md",
+    "template/.codex/templates/evaluation.schema.json",
     "template/docs/reference/run-artifacts.md",
     "template/docs/reference/failure-taxonomy.md",
     "template/docs/reference/evaluation.md",
@@ -229,6 +230,7 @@ foreach ($path in $requiredPaths) {
 }
 
 $evaluationSchema = Read-SpecFile -RelativePath "spec/evaluation.schema.json"
+$bundledEvaluationSchema = Read-SpecFile -RelativePath "template/.codex/templates/evaluation.schema.json"
 $runManifestSchema = Read-SpecFile -RelativePath "spec/run-manifest.schema.json"
 $artifactResponsibility = Read-SpecFile -RelativePath "spec/artifact-responsibility.json"
 $changeScopePolicy = Read-SpecFile -RelativePath "spec/change-scope-policy.json"
@@ -333,6 +335,9 @@ Expect-PropertyKeys -Schema $evaluationSchema -Fields @(
 Expect-EnumContains -Values $evaluationSchema.properties.result.enum -Expected @("pass", "partial", "fail", "not_evaluated") -Label "spec/evaluation.schema.json result"
 Expect-EnumSet -Values $evaluationSchema.properties.primary_failure_category.enum -Expected ($taxonomyCategories + @($null)) -Label "spec/evaluation.schema.json primary_failure_category"
 Expect-EnumSet -Values $evaluationSchema.properties.failure_categories.items.enum -Expected $taxonomyCategories -Label "spec/evaluation.schema.json failure_categories items"
+if (($bundledEvaluationSchema | ConvertTo-Json -Depth 20) -ne ($evaluationSchema | ConvertTo-Json -Depth 20)) {
+    throw "template/.codex/templates/evaluation.schema.json must stay in sync with spec/evaluation.schema.json"
+}
 
 $dimensionNames = @(
     "task_completion",
