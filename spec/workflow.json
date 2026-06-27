@@ -56,7 +56,20 @@
     "template/scripts/codex-sandbox.sh",
     "template/scripts/validate-output-schema.py",
     "template/.agents/skills/feature-plan/references/planning-workflow.md",
-    "template/.agents/skills/code-review/references/review-workflow.md"
+    "template/.agents/skills/code-review/references/review-workflow.md",
+    "template/.agents/skills/repair-loop/SKILL.md",
+    "template/.agents/skills/repair-loop/references/repair-workflow.md",
+    "template/.agents/skills/harness-improvement/SKILL.md",
+    "template/.agents/skills/harness-improvement/references/improvement-workflow.md",
+    "template/docs/reference/repair-loop.md",
+    "template/docs/reference/harness-improvement-loop.md",
+    "template/examples/repair-loop/README.md",
+    "template/examples/repair-loop/iteration-1-evaluation.json",
+    "template/examples/repair-loop/iteration-2-evaluation.json",
+    "template/examples/repair-loop/repair-summary.md",
+    "template/examples/harness-improvement/README.md",
+    "template/examples/harness-improvement/harness-improvement-candidates.json",
+    "template/examples/harness-improvement/harness-improvement-review.md"
   ],
   "planning_reference": {
     "file": "template/.agents/skills/feature-plan/references/planning-workflow.md",

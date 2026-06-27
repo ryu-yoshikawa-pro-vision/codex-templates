@@ -19,5 +19,7 @@ jobs:
         run: bash template/scripts/verify
       - name: Run observation baseline tests
         run: bash tests/integration/test-observation-baseline.sh
+      - name: Run repair improvement workflow tests
+        run: bash tests/integration/test-repair-improvement-workflow.sh
       - name: Run integration tests
         run: bash tests/integration/test-codex-safety-harness.sh

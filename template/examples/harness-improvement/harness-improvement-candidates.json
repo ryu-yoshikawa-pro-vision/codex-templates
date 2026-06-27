@@ -1,0 +1,57 @@
+{
+  "generated_from_run_id": "20260628-010000-JST",
+  "candidates": [
+    {
+      "candidate_id": "hic-001",
+      "target": "docs/reference/",
+      "failure_category": "missing_validation",
+      "source_runs": [
+        "20260628-010000-JST"
+      ],
+      "evidence": [
+        "evaluation.findings[] recorded a repeated validation wording gap in the repair-loop docs."
+      ],
+      "expected_impact": "Reduce partial repair-loop outcomes caused by missing validation guidance.",
+      "risk": "Low; docs and example wording only.",
+      "recommended_change": "Add a clearer repair-loop example that maps validation failures to iteration decisions.",
+      "strictness": "normal",
+      "status": "proposed",
+      "owner_decision": "not_reviewed"
+    },
+    {
+      "candidate_id": "hic-002",
+      "target": "spec/",
+      "failure_category": "artifact_contract_gap",
+      "source_runs": [
+        "20260627-231530-JST",
+        "20260628-010000-JST"
+      ],
+      "evidence": [
+        "Repeated review comments noted that repair-loop iteration details are documented but not machine-readable."
+      ],
+      "expected_impact": "Improve validator and reporting consistency for future repair-loop summaries.",
+      "risk": "Medium; schema or validator changes would affect consumer-facing contract and CI.",
+      "recommended_change": "Review whether a repair iteration schema should be added in a follow-up PR.",
+      "strictness": "strict",
+      "status": "deferred",
+      "owner_decision": "needs_more_evidence"
+    },
+    {
+      "candidate_id": "hic-003",
+      "target": "scripts/codex-task.*",
+      "failure_category": "unsafe_action_blocked",
+      "source_runs": [
+        "20260628-020500-JST"
+      ],
+      "evidence": [
+        "A review suggestion proposed bypassing policy to auto-apply blocked harness changes during repair."
+      ],
+      "expected_impact": "Would shorten manual follow-up work, but only by weakening the safety boundary.",
+      "risk": "High; would require policy bypass and automatic safety-layer mutation.",
+      "recommended_change": "Reject automatic safety-layer mutation and keep the proposal as a blocked candidate only.",
+      "strictness": "blocked",
+      "status": "rejected",
+      "owner_decision": "rejected"
+    }
+  ]
+}

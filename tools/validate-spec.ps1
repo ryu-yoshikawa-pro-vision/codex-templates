@@ -16,6 +16,16 @@ function Read-SpecFile {
     return ([System.IO.File]::ReadAllText($fullPath, $utf8) | ConvertFrom-Json)
 }
 
+function Read-JsonFile {
+    param([string]$RelativePath)
+    $fullPath = Join-Path $repoRoot $RelativePath
+    if (-not (Test-Path $fullPath)) {
+        throw "JSON file not found: $RelativePath"
+    }
+    $utf8 = [System.Text.UTF8Encoding]::new($false)
+    return ([System.IO.File]::ReadAllText($fullPath, $utf8) | ConvertFrom-Json)
+}
+
 function Assert-Exists {
     param([string]$RelativePath)
     if (-not (Test-Path (Join-Path $repoRoot $RelativePath))) {
@@ -216,6 +226,42 @@ function Expect-EnumSet {
 
     if ($actualKeys.Count -ne $expectedKeys.Count -or (Compare-Object -ReferenceObject $expectedKeys -DifferenceObject $actualKeys)) {
         throw "$Label enum mismatch: expected $($expectedKeys -join ', '), got $($actualKeys -join ', ')"
+    }
+}
+
+function Invoke-OutputSchemaValidation {
+    param(
+        [string]$SchemaRelativePath,
+        [string]$OutputRelativePath
+    )
+
+    $validator = Join-Path $repoRoot "template/scripts/validate-output-schema.py"
+    $schemaPath = Join-Path $repoRoot $SchemaRelativePath
+    $outputPath = Join-Path $repoRoot $OutputRelativePath
+
+    $pythonPath = $null
+    foreach ($candidate in @("python", "py")) {
+        $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
+        if (-not $cmd) {
+            continue
+        }
+        $args = @("--version")
+        if ($candidate -eq "py") {
+            $args = @("-3", "--version")
+        }
+        & $cmd.Path @args *> $null
+        if ($LASTEXITCODE -eq 0) {
+            $pythonPath = $cmd.Path
+            break
+        }
+    }
+    if (-not $pythonPath) {
+        throw "python3 or python is required"
+    }
+
+    & $pythonPath $validator $schemaPath $outputPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "Schema validation failed for $OutputRelativePath"
     }
 }
 
@@ -682,5 +728,65 @@ Assert-Contains -RelativePath "template/.codex/templates/EVALUATION.md" -Pattern
     "changed_files",
     "exit code"
 )
+
+Invoke-OutputSchemaValidation -SchemaRelativePath "spec/evaluation.schema.json" -OutputRelativePath "template/examples/repair-loop/iteration-1-evaluation.json"
+Invoke-OutputSchemaValidation -SchemaRelativePath "spec/evaluation.schema.json" -OutputRelativePath "template/examples/repair-loop/iteration-2-evaluation.json"
+
+$candidatesDoc = Read-JsonFile -RelativePath "template/examples/harness-improvement/harness-improvement-candidates.json"
+Assert-Condition ($candidatesDoc -is [pscustomobject]) "template/examples/harness-improvement/harness-improvement-candidates.json must be a JSON object"
+$candidates = Normalize-ToArray $candidatesDoc.candidates
+Assert-Condition ($candidates.Count -ge 3) "template/examples/harness-improvement/harness-improvement-candidates.json must contain at least three candidates"
+
+$candidateRequiredFields = @(
+    "candidate_id",
+    "target",
+    "failure_category",
+    "source_runs",
+    "evidence",
+    "expected_impact",
+    "risk",
+    "recommended_change",
+    "strictness",
+    "status",
+    "owner_decision"
+)
+$strictnessValues = @()
+$candidateIndex = 0
+foreach ($candidate in $candidates) {
+    $candidateIndex++
+    Assert-Condition ($candidate -is [pscustomobject]) "candidate[$candidateIndex] must be an object"
+    foreach ($field in $candidateRequiredFields) {
+        if ($field -notin $candidate.PSObject.Properties.Name) {
+            throw "candidate[$candidateIndex] missing required field: $field"
+        }
+    }
+    foreach ($field in @(
+        "candidate_id",
+        "target",
+        "failure_category",
+        "expected_impact",
+        "risk",
+        "recommended_change",
+        "strictness",
+        "status",
+        "owner_decision"
+    )) {
+        $value = $candidate.$field
+        Assert-Condition (($value -is [string]) -and -not [string]::IsNullOrWhiteSpace($value)) "candidate[$candidateIndex].$field must be a non-empty string"
+    }
+    $sourceRuns = @(Normalize-ToArray $candidate.source_runs)
+    Assert-Condition ($sourceRuns.Count -gt 0) "candidate[$candidateIndex].source_runs must be a non-empty array"
+    $evidence = @(Normalize-ToArray $candidate.evidence)
+    Assert-Condition ($evidence.Count -gt 0) "candidate[$candidateIndex].evidence must be a non-empty array"
+    Assert-Condition ($candidate.failure_category -in $taxonomyCategories) "candidate[$candidateIndex].failure_category must exist in spec/failure-taxonomy.json"
+    Assert-Condition ($candidate.strictness -in @("normal", "strict", "blocked")) "candidate[$candidateIndex].strictness must be one of normal|strict|blocked"
+    Assert-Condition ($candidate.status -in @("proposed", "accepted", "rejected", "deferred", "implemented")) "candidate[$candidateIndex].status must be one of proposed|accepted|rejected|deferred|implemented"
+    Assert-Condition ($candidate.owner_decision -in @("not_reviewed", "approved", "rejected", "needs_more_evidence")) "candidate[$candidateIndex].owner_decision must be one of not_reviewed|approved|rejected|needs_more_evidence"
+    $strictnessValues += $candidate.strictness
+}
+
+$strictnessSet = @($strictnessValues | Sort-Object -Unique)
+$expectedStrictnessSet = @("blocked", "normal", "strict") | Sort-Object
+Assert-Condition (-not (Compare-Object -ReferenceObject $expectedStrictnessSet -DifferenceObject $strictnessSet)) "harness-improvement candidates must include normal, strict, and blocked strictness values"
 
 Write-Host "PASS: spec validation"
