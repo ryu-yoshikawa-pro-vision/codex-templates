@@ -1,6 +1,42 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+validate_fake_write_path() {
+  local raw="$1"
+  local normalized="${raw//\\//}"
+
+  if [[ -z "$normalized" ]]; then
+    return 1
+  fi
+  if [[ "$normalized" == /* || "$normalized" =~ ^[A-Za-z]:/ || "$normalized" =~ ^// ]]; then
+    return 1
+  fi
+  if [[ "$normalized" == ".." || "$normalized" == ../* || "$normalized" == */../* || "$normalized" == */.. ]]; then
+    return 1
+  fi
+
+  printf '%s' "$normalized"
+}
+
+apply_fake_changes() {
+  local workdir="$1"
+  local raw_list="${FAKE_CODEX_WRITE_FILES:-}"
+  [[ -n "$raw_list" ]] || return 0
+
+  local IFS=','
+  local path normalized target
+  for path in $raw_list; do
+    [[ -n "$path" ]] || continue
+    normalized="$(validate_fake_write_path "$path")" || {
+      echo "Unsafe FAKE_CODEX_WRITE_FILES path: $path" >&2
+      exit 10
+    }
+    target="$workdir/$normalized"
+    mkdir -p "$(dirname "$target")"
+    printf '\nFAKE_CODEX_CHANGE\n' >> "$target"
+  done
+}
+
 decision_for() {
   local joined="$*"
   case "$joined" in
@@ -61,6 +97,7 @@ if [[ $# -ge 1 && "$1" == "exec" ]]; then
   output_path=""
   schema_path=""
   prompt=""
+  workdir="$(pwd -P)"
   while (($#)); do
     case "$1" in
       --output-last-message)
@@ -69,6 +106,10 @@ if [[ $# -ge 1 && "$1" == "exec" ]]; then
         ;;
       --output-schema)
         schema_path="$2"
+        shift 2
+        ;;
+      -C)
+        workdir="$2"
         shift 2
         ;;
       --profile|-C|--sandbox|--ask-for-approval)
@@ -98,6 +139,8 @@ if [[ $# -ge 1 && "$1" == "exec" ]]; then
   if [[ "$prompt" == *FAIL_CODEX* ]]; then
     exit 9
   fi
+
+  apply_fake_changes "$workdir"
 
   if [[ -n "$output_path" ]]; then
     mkdir -p "$(dirname "$output_path")"

@@ -319,7 +319,7 @@ ensure(
 
 deferred = change_scope_policy.get("deferred", {})
 ensure(
-    deferred.get("runner_enforcement") is True,
+    deferred.get("runner_enforcement") is False,
     "spec/change-scope-policy.json deferred.runner_enforcement is out of contract",
 )
 ensure(
@@ -327,7 +327,7 @@ ensure(
     "spec/change-scope-policy.json deferred.glob_matching is out of contract",
 )
 ensure(
-    deferred.get("changed_files_collection") is True,
+    deferred.get("changed_files_collection") is False,
     "spec/change-scope-policy.json deferred.changed_files_collection is out of contract",
 )
 

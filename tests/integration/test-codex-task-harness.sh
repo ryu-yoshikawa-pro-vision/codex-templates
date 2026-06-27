@@ -2,12 +2,13 @@
 set -euo pipefail
 
 source_repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-template_root="$source_repo_root/template"
-wrapper="$template_root/scripts/codex-task.sh"
-sandbox_wrapper="$template_root/scripts/codex-sandbox.sh"
+template_source_root="$source_repo_root/template"
 fake_codex="$source_repo_root/tests/fixtures/fake-codex.sh"
 fake_docker="$source_repo_root/tests/fixtures/fake-docker.sh"
 temp_root="$(mktemp -d "${TMPDIR:-/tmp}/codex-task-test.XXXXXX")"
+template_root="$temp_root/template"
+wrapper="$template_root/scripts/codex-task.sh"
+sandbox_wrapper="$template_root/scripts/codex-sandbox.sh"
 python_cmd="python3"
 if ! command -v python3 >/dev/null 2>&1; then
   python_cmd="python"
@@ -24,6 +25,17 @@ cleanup() {
   esac
 }
 trap cleanup EXIT
+
+mkdir -p "$template_root"
+cp -R "$template_source_root/." "$template_root"
+(
+  cd "$template_root"
+  git init -q
+  git config user.email codex-test@example.com
+  git config user.name codex-test
+  git add .
+  git commit -q -m "test baseline"
+)
 
 assert_status() {
   local path="$1"
@@ -100,6 +112,52 @@ if not command["evidence"]:
 PY
 }
 
+assert_manifest_state() {
+  local path="$1"
+  local expected_run_status="$2"
+  local expected_validation_status="$3"
+  local expected_scope_violation="$4"
+  local expected_changed_csv="$5"
+  local expected_command="${6:-}"
+  local expected_command_status="${7:-}"
+  "$python_cmd" - "$path" "$expected_run_status" "$expected_validation_status" "$expected_scope_violation" "$expected_changed_csv" "$expected_command" "$expected_command_status" <<'PY'
+import json
+import sys
+
+path, expected_run_status, expected_validation_status, expected_scope_violation, expected_changed_csv, expected_command, expected_command_status = sys.argv[1:8]
+data = json.load(open(path, encoding="utf-8"))
+if data["status"] != expected_run_status:
+    raise SystemExit(f"expected run status {expected_run_status}, got {data['status']}")
+if data["validation"]["status"] != expected_validation_status:
+    raise SystemExit(f"expected validation.status {expected_validation_status}, got {data['validation']['status']}")
+expected_scope = expected_scope_violation.lower() == "true"
+if data["safety"]["scope_violation"] != expected_scope:
+    raise SystemExit(f"expected scope_violation {expected_scope}, got {data['safety']['scope_violation']}")
+expected_changed = [] if expected_changed_csv == "" else expected_changed_csv.split(",")
+if data["changed_files"] != expected_changed:
+    raise SystemExit(f"expected changed_files {expected_changed}, got {data['changed_files']}")
+commands = data["validation"]["commands"]
+if expected_command:
+    if len(commands) != 1:
+        raise SystemExit(f"expected one validation command, got {len(commands)}")
+    command = commands[0]
+    if command["command"] != expected_command:
+        raise SystemExit(f"expected validation command {expected_command}, got {command['command']}")
+    if command["status"] != expected_command_status:
+        raise SystemExit(f"expected validation command status {expected_command_status}, got {command['status']}")
+    if not command["evidence"]:
+        raise SystemExit("expected non-empty validation command evidence")
+else:
+    if commands:
+        raise SystemExit(f"expected no validation commands, got {commands}")
+PY
+}
+
+restore_scope_fixtures() {
+  cp "$template_source_root/README.md" "$template_root/README.md"
+  cp "$template_source_root/scripts/verify" "$template_root/scripts/verify"
+}
+
 export CODEX_BIN="$fake_codex"
 cd "$template_root"
 printf '{"type":"object","required":["status"],"properties":{"status":{"type":"string"}},"additionalProperties":false}\n' > "$temp_root/schema.json"
@@ -143,6 +201,75 @@ manifest_report="$(find "$template_root/.codex/runs/$manifest_run_id/reports" -t
 manifest_path="$template_root/.codex/runs/$manifest_run_id/run.json"
 assert_status "$manifest_report" verify_skipped
 assert_manifest_baseline "$manifest_path" "$manifest_run_id" "$(basename "$manifest_report")"
+
+allowed_ok_run_id="20260420-020207-JST"
+FAKE_CODEX_WRITE_FILES="README.md" bash "$wrapper" --run-id "$allowed_ok_run_id" --record-run-manifest --allowed-files README.md --skip-verify "ALLOWED_OK"
+allowed_ok_report="$(find "$template_root/.codex/runs/$allowed_ok_run_id/reports" -type f -name 'codex-task-*.report.json' | sort | tail -n 1)"
+assert_status "$allowed_ok_report" verify_skipped
+assert_manifest_state "$template_root/.codex/runs/$allowed_ok_run_id/run.json" completed skipped false "README.md"
+restore_scope_fixtures
+
+allowed_violation_run_id="20260420-020208-JST"
+set +e
+FAKE_CODEX_WRITE_FILES="README.md,scripts/verify" bash "$wrapper" --run-id "$allowed_violation_run_id" --record-run-manifest --allowed-files README.md --skip-verify "ALLOWED_VIOLATION" >"$temp_root/allowed-violation.out" 2>&1
+code=$?
+set -e
+[[ $code -ne 0 ]]
+allowed_violation_report="$(find "$template_root/.codex/runs/$allowed_violation_run_id/reports" -type f -name 'codex-task-*.report.json' | sort | tail -n 1)"
+assert_status "$allowed_violation_report" scope_violation
+assert_manifest_state "$template_root/.codex/runs/$allowed_violation_run_id/run.json" failed blocked true "README.md,scripts/verify" "change scope check" blocked
+restore_scope_fixtures
+
+expected_ok_run_id="20260420-020209-JST"
+FAKE_CODEX_WRITE_FILES="README.md" bash "$wrapper" --run-id "$expected_ok_run_id" --record-run-manifest --expected-changed-files README.md --skip-verify "EXPECTED_OK"
+expected_ok_report="$(find "$template_root/.codex/runs/$expected_ok_run_id/reports" -type f -name 'codex-task-*.report.json' | sort | tail -n 1)"
+assert_status "$expected_ok_report" verify_skipped
+assert_manifest_state "$template_root/.codex/runs/$expected_ok_run_id/run.json" completed skipped false "README.md"
+restore_scope_fixtures
+
+expected_missing_run_id="20260420-020210-JST"
+set +e
+bash "$wrapper" --run-id "$expected_missing_run_id" --record-run-manifest --expected-changed-files README.md --skip-verify "EXPECTED_MISSING" >"$temp_root/expected-missing.out" 2>&1
+code=$?
+set -e
+[[ $code -ne 0 ]]
+expected_missing_report="$(find "$template_root/.codex/runs/$expected_missing_run_id/reports" -type f -name 'codex-task-*.report.json' | sort | tail -n 1)"
+assert_status "$expected_missing_report" expected_changes_missing
+assert_manifest_state "$template_root/.codex/runs/$expected_missing_run_id/run.json" failed failed false "" "expected changed files check" failed
+
+for invalid_value in "../outside.md" "/tmp/outside.md" "*.md"; do
+  rm -f "$temp_root/invalid-allowed.report.json" "$temp_root/invalid-expected.report.json"
+
+  set +e
+  bash "$wrapper" --report-path "$temp_root/invalid-allowed.report.json" --log-path "$temp_root/invalid-allowed.jsonl" --allowed-files "$invalid_value" --skip-verify "INVALID_ALLOWED" >"$temp_root/invalid-allowed.out" 2>&1
+  code=$?
+  set -e
+  [[ $code -ne 0 ]]
+  assert_status "$temp_root/invalid-allowed.report.json" invalid_args
+
+  set +e
+  bash "$wrapper" --report-path "$temp_root/invalid-expected.report.json" --log-path "$temp_root/invalid-expected.jsonl" --expected-changed-files "$invalid_value" --skip-verify "INVALID_EXPECTED" >"$temp_root/invalid-expected.out" 2>&1
+  code=$?
+  set -e
+  [[ $code -ne 0 ]]
+  assert_status "$temp_root/invalid-expected.report.json" invalid_args
+done
+
+set +e
+bash "$wrapper" --report-path "$temp_root/allowed-missing-manifest.report.json" --log-path "$temp_root/allowed-missing-manifest.jsonl" --allowed-files README.md --skip-verify "ALLOWED_NO_MANIFEST" >"$temp_root/allowed-missing-manifest.out" 2>&1
+code=$?
+set -e
+[[ $code -ne 0 ]]
+grep -q -- "--allowed-files requires --run-id and --record-run-manifest" "$temp_root/allowed-missing-manifest.out"
+assert_status "$temp_root/allowed-missing-manifest.report.json" invalid_args
+
+set +e
+bash "$wrapper" --report-path "$temp_root/expected-missing-manifest.report.json" --log-path "$temp_root/expected-missing-manifest.jsonl" --expected-changed-files README.md --skip-verify "EXPECTED_NO_MANIFEST" >"$temp_root/expected-missing-manifest.out" 2>&1
+code=$?
+set -e
+[[ $code -ne 0 ]]
+grep -q -- "--expected-changed-files requires --run-id and --record-run-manifest" "$temp_root/expected-missing-manifest.out"
+assert_status "$temp_root/expected-missing-manifest.report.json" invalid_args
 
 set +e
 bash "$wrapper" --report-path "$temp_root/missing-run-id.report.json" --log-path "$temp_root/missing-run-id.jsonl" --record-run-manifest --skip-verify "RUN_MANIFEST_NO_RUN_ID" >"$temp_root/missing-run-id.out" 2>&1

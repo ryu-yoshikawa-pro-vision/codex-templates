@@ -7,6 +7,28 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Normalize-FakeWritePath {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $normalized = $Path -replace '\\', '/'
+    if ([string]::IsNullOrWhiteSpace($normalized)) {
+        throw "Unsafe FAKE_CODEX_WRITE_FILES path: $Path"
+    }
+    if ([System.IO.Path]::IsPathRooted($normalized) -or
+        $normalized -match '^[A-Za-z]:/' -or
+        $normalized.StartsWith('//', [System.StringComparison]::Ordinal)) {
+        throw "Unsafe FAKE_CODEX_WRITE_FILES path: $Path"
+    }
+
+    foreach ($segment in $normalized.Split('/', [System.StringSplitOptions]::None)) {
+        if ($segment -eq '..') {
+            throw "Unsafe FAKE_CODEX_WRITE_FILES path: $Path"
+        }
+    }
+
+    return $normalized
+}
+
 function Get-Decision {
     param([string[]]$Tokens)
 
@@ -48,6 +70,7 @@ function Invoke-FakeExec {
     $outputPath = $null
     $schemaPath = $null
     $prompt = $null
+    $workdir = (Get-Location).Path
     $i = 0
     while ($i -lt $ExecArgs.Count) {
         $token = $ExecArgs[$i]
@@ -60,8 +83,11 @@ function Invoke-FakeExec {
                 $i++
                 $schemaPath = $ExecArgs[$i]
             }
+            '-C' {
+                $i++
+                $workdir = $ExecArgs[$i]
+            }
             '--profile' { $i++ }
-            '-C' { $i++ }
             '--sandbox' { $i++ }
             '--ask-for-approval' {
                 $i++
@@ -81,6 +107,27 @@ function Invoke-FakeExec {
 
     if ($prompt -like '*FAIL_CODEX*') {
         exit 9
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:FAKE_CODEX_WRITE_FILES)) {
+        foreach ($path in $env:FAKE_CODEX_WRITE_FILES.Split(',', [System.StringSplitOptions]::None)) {
+            if ([string]::IsNullOrWhiteSpace($path)) {
+                continue
+            }
+            try {
+                $normalized = Normalize-FakeWritePath -Path $path
+            }
+            catch {
+                Write-Error $_.Exception.Message
+                exit 10
+            }
+            $target = Join-Path $workdir ($normalized -replace '/', [System.IO.Path]::DirectorySeparatorChar)
+            $parent = Split-Path -Parent $target
+            if (-not [string]::IsNullOrWhiteSpace($parent) -and -not (Test-Path $parent)) {
+                New-Item -ItemType Directory -Path $parent -Force | Out-Null
+            }
+            Add-Content -Path $target -Value "`nFAKE_CODEX_CHANGE"
+        }
     }
 
     if ($outputPath) {

@@ -24,6 +24,9 @@ explicit_report_path=0
 run_id=""
 cwd_for_report="$repo_root"
 declare -a prompt_parts=()
+declare -a allowed_files=()
+declare -a expected_changed_files=()
+declare -a changed_files=()
 
 timestamp="$(date +%Y%m%d-%H%M%S)"
 output_file="$artifacts_dir/codex-task-${timestamp}.json"
@@ -42,6 +45,7 @@ validation_command_status=""
 validation_command_evidence=""
 manifest_path=""
 manifest_started=0
+safety_scope_violation=false
 
 json_escape() {
   local s="$1"
@@ -51,6 +55,35 @@ json_escape() {
   s="${s//$'\r'/\\r}"
   s="${s//$'\t'/\\t}"
   printf '%s' "$s"
+}
+
+join_by() {
+  local delimiter="$1"
+  shift
+  local first=1 item
+  for item in "$@"; do
+    if (( first )); then
+      printf '%s' "$item"
+      first=0
+    else
+      printf '%s%s' "$delimiter" "$item"
+    fi
+  done
+}
+
+json_string_array() {
+  local -n _items=$1
+  local first=1 item
+  printf '['
+  for item in "${_items[@]}"; do
+    if (( first )); then
+      first=0
+    else
+      printf ', '
+    fi
+    printf '"%s"' "$(json_escape "$item")"
+  done
+  printf ']'
 }
 
 ensure_parent_dir() {
@@ -84,6 +117,88 @@ validate_run_id() {
   if [[ ! "$run_id" =~ ^[0-9]{8}-[0-9]{6}-JST$ ]]; then
     fail_with_status "invalid_args" "Invalid --run-id: expected YYYYMMDD-HHMMSS-JST"
   fi
+}
+
+normalize_repo_relative_posix_path() {
+  local raw="$1"
+  raw="${raw//\\//}"
+  local -a segments=()
+  local segment
+  IFS='/' read -r -a raw_segments <<< "$raw"
+  for segment in "${raw_segments[@]}"; do
+    if [[ -z "$segment" || "$segment" == "." ]]; then
+      continue
+    fi
+    if [[ "$segment" == ".." ]]; then
+      if ((${#segments[@]} == 0)); then
+        printf ''
+        return 1
+      fi
+      unset 'segments[${#segments[@]}-1]'
+      segments=("${segments[@]}")
+      continue
+    fi
+    segments+=("$segment")
+  done
+
+  if ((${#segments[@]} == 0)); then
+    printf ''
+    return 0
+  fi
+
+  local normalized
+  local old_ifs="$IFS"
+  IFS='/'
+  normalized="${segments[*]}"
+  IFS="$old_ifs"
+  printf '%s' "$normalized"
+}
+
+sort_unique_array() {
+  local -n _target=$1
+  if ((${#_target[@]} == 0)); then
+    _target=()
+    return
+  fi
+  mapfile -t _target < <(printf '%s\n' "${_target[@]}" | LC_ALL=C sort -u)
+}
+
+normalize_scope_path() {
+  local raw="$1"
+  local option_name="$2"
+
+  if [[ -z "$raw" ]]; then
+    fail_with_status "invalid_args" "$option_name requires a non-empty path"
+  fi
+  if [[ "$raw" == *'*'* || "$raw" == *'?'* || "$raw" == *'['* || "$raw" == *']'* ]]; then
+    fail_with_status "invalid_args" "$option_name does not support glob patterns: $raw"
+  fi
+
+  local normalized_input="${raw//\\//}"
+  if [[ "$normalized_input" == /* || "$normalized_input" =~ ^[A-Za-z]:/ || "$normalized_input" =~ ^// ]]; then
+    fail_with_status "invalid_args" "$option_name requires a repo-relative path: $raw"
+  fi
+
+  local normalized
+  normalized="$(normalize_repo_relative_posix_path "$normalized_input")" || fail_with_status "invalid_args" "$option_name path escapes repo root: $raw"
+  if [[ -z "$normalized" ]]; then
+    fail_with_status "invalid_args" "$option_name requires a repo-relative file path: $raw"
+  fi
+  printf '%s' "$normalized"
+}
+
+append_normalized_scope_paths() {
+  local -n _target=$1
+  local raw_list="$2"
+  local option_name="$3"
+  local -a items=()
+  local item normalized
+
+  IFS=',' read -r -a items <<< "$raw_list"
+  for item in "${items[@]}"; do
+    normalized="$(normalize_scope_path "$item" "$option_name")"
+    _target+=("$normalized")
+  done
 }
 
 normalized_path() {
@@ -141,13 +256,14 @@ write_run_manifest() {
   (( manifest_started )) || return 0
   [[ -n "$manifest_path" ]] || return 0
 
-  local branch report_ref network_enabled validation_commands_json
+  local branch report_ref network_enabled validation_commands_json changed_files_json
   branch="$(git_branch)"
   report_ref="$(to_repo_relative_path "$report_path")"
   network_enabled=false
   if [[ "$preset" == "auto-net" ]] || (( allow_search )); then
     network_enabled=true
   fi
+  changed_files_json="$(json_string_array changed_files)"
 
   if [[ -n "$validation_command_status" ]]; then
     validation_commands_json=$(cat <<EOF
@@ -181,7 +297,7 @@ EOF
   "codex_task_reports": [
     "$(json_escape "$report_ref")"
   ],
-  "changed_files": [],
+  "changed_files": $changed_files_json,
   "validation": {
     "status": "$(json_escape "$validation_status")",
     "commands": $validation_commands_json
@@ -190,13 +306,115 @@ EOF
     "network": $network_enabled,
     "delete_attempt_blocked": false,
     "git_mutation_attempt_blocked": false,
-    "scope_violation": false
+    "scope_violation": $safety_scope_violation
   },
   "evaluation_path": null,
   "status": "$(json_escape "$run_status")",
   "primary_failure_category": null
 }
 EOF
+}
+
+collect_changed_files() {
+  changed_files=()
+  if ! git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local -a entries=()
+  local entry status primary secondary normalized
+  local i=0
+  mapfile -d '' -t entries < <(git -C "$repo_root" status --porcelain=v1 -z --untracked-files=all 2>/dev/null)
+
+  while (( i < ${#entries[@]} )); do
+    entry="${entries[$i]}"
+    ((i += 1))
+    [[ -n "$entry" ]] || continue
+
+    status="${entry:0:2}"
+    primary="${entry:3}"
+    normalized="$(normalize_repo_relative_posix_path "$primary")" || normalized=""
+    if [[ -n "$normalized" && "$normalized" != ".codex/runs" && "$normalized" != .codex/runs/* ]]; then
+      changed_files+=("$normalized")
+    fi
+
+    if [[ "$status" == *R* || "$status" == *C* ]]; then
+      if (( i < ${#entries[@]} )); then
+        secondary="${entries[$i]}"
+        ((i += 1))
+        if [[ "$status" == *R* ]]; then
+          normalized="$(normalize_repo_relative_posix_path "$secondary")" || normalized=""
+          if [[ -n "$normalized" && "$normalized" != ".codex/runs" && "$normalized" != .codex/runs/* ]]; then
+            changed_files+=("$normalized")
+          fi
+        fi
+      fi
+    fi
+  done
+
+  sort_unique_array changed_files
+}
+
+run_scope_checks() {
+  local -A allowed_lookup=()
+  local -A changed_lookup=()
+  local -a violations=()
+  local -a missing_expected=()
+  local path evidence
+
+  if ((${#allowed_files[@]} > 0)); then
+    for path in "${allowed_files[@]}"; do
+      allowed_lookup["$path"]=1
+    done
+    for path in "${changed_files[@]}"; do
+      if [[ -z "${allowed_lookup[$path]:-}" ]]; then
+        violations+=("$path")
+      fi
+    done
+    if ((${#violations[@]} > 0)); then
+      sort_unique_array violations
+      evidence="changed files outside allowed_files: $(join_by ', ' "${violations[@]}")"
+      report_status="scope_violation"
+      validation_status="blocked"
+      validation_command="change scope check"
+      validation_command_exit_code=1
+      validation_command_status="blocked"
+      validation_command_evidence="$evidence"
+      run_status="failed"
+      safety_scope_violation=true
+      write_log "scope_violation" ",\"evidence\":\"$(json_escape "$evidence")\""
+      write_report
+      write_run_manifest
+      exit 1
+    fi
+  fi
+
+  if ((${#expected_changed_files[@]} > 0)); then
+    for path in "${changed_files[@]}"; do
+      changed_lookup["$path"]=1
+    done
+    for path in "${expected_changed_files[@]}"; do
+      if [[ -z "${changed_lookup[$path]:-}" ]]; then
+        missing_expected+=("$path")
+      fi
+    done
+    if ((${#missing_expected[@]} > 0)); then
+      sort_unique_array missing_expected
+      evidence="expected files were not changed: $(join_by ', ' "${missing_expected[@]}")"
+      report_status="expected_changes_missing"
+      validation_status="failed"
+      validation_command="expected changed files check"
+      validation_command_exit_code=1
+      validation_command_status="failed"
+      validation_command_evidence="$evidence"
+      run_status="failed"
+      safety_scope_violation=false
+      write_log "expected_changes_missing" ",\"evidence\":\"$(json_escape "$evidence")\""
+      write_report
+      write_run_manifest
+      exit 1
+    fi
+  fi
 }
 
 path_under_root() {
@@ -339,6 +557,16 @@ parse_args() {
         run_id="$2"
         shift 2
         ;;
+      --allowed-files)
+        [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--allowed-files requires a value"
+        append_normalized_scope_paths allowed_files "$2" "--allowed-files"
+        shift 2
+        ;;
+      --expected-changed-files)
+        [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--expected-changed-files requires a value"
+        append_normalized_scope_paths expected_changed_files "$2" "--expected-changed-files"
+        shift 2
+        ;;
       --record-run-manifest)
         record_run_manifest=1
         shift
@@ -382,6 +610,16 @@ parse_args() {
 }
 
 apply_run_paths() {
+  sort_unique_array allowed_files
+  sort_unique_array expected_changed_files
+
+  if ((${#allowed_files[@]} > 0)) && { (( ! record_run_manifest )) || [[ -z "$run_id" ]]; }; then
+    fail_with_status "invalid_args" "--allowed-files requires --run-id and --record-run-manifest"
+  fi
+  if ((${#expected_changed_files[@]} > 0)) && { (( ! record_run_manifest )) || [[ -z "$run_id" ]]; }; then
+    fail_with_status "invalid_args" "--expected-changed-files requires --run-id and --record-run-manifest"
+  fi
+
   if (( record_run_manifest )) && [[ -z "$run_id" ]]; then
     fail_with_status "invalid_args" "--record-run-manifest requires --run-id"
   fi
@@ -599,6 +837,10 @@ main() {
   set -e
 
   write_log "codex_exec_exit" ",\"exit_code\":$codex_exit_code"
+  if (( record_run_manifest )); then
+    collect_changed_files
+    write_run_manifest
+  fi
   if [[ "$codex_exit_code" != "0" ]]; then
     report_status="codex_failed"
     run_status="failed"
@@ -608,6 +850,8 @@ main() {
   fi
 
   [[ -f "$output_file" ]] || fail_with_status "missing_output" "codex exec completed without writing output file"
+
+  run_scope_checks
 
   if [[ -n "$output_schema" ]]; then
     if run_schema_check; then

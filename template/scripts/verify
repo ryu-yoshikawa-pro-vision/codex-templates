@@ -49,7 +49,7 @@ contains() {
   if command -v rg >/dev/null 2>&1 && rg --version >/dev/null 2>&1; then
     rg -Fq -- "$pattern" "$path"
   else
-    grep -Fq "$pattern" "$path"
+    grep -Fq -- "$pattern" "$path"
   fi
 }
 
@@ -171,6 +171,15 @@ check_template_contract() {
   contains "evaluation.json" docs/reference/run-artifacts.md || return 1
   contains "codex-task" docs/reference/run-artifacts.md || return 1
   contains "Source-of-Truth" docs/reference/run-artifacts.md || return 1
+  contains "--allowed-files" scripts/codex-task.sh || return 1
+  contains "--expected-changed-files" scripts/codex-task.sh || return 1
+  contains "AllowedFiles" scripts/codex-task.ps1 || contains "--allowed-files" scripts/codex-task.ps1 || return 1
+  contains "ExpectedChangedFiles" scripts/codex-task.ps1 || contains "--expected-changed-files" scripts/codex-task.ps1 || return 1
+  contains "TASK-006B" docs/reference/change-scope-policy.md || return 1
+  contains "exact path" docs/reference/change-scope-policy.md || return 1
+  contains "--run-id" docs/reference/change-scope-policy.md || return 1
+  contains "--record-run-manifest" docs/reference/change-scope-policy.md || return 1
+  contains "run.json" docs/reference/change-scope-policy.md || return 1
   contains "primary_failure_category" docs/reference/failure-taxonomy.md || return 1
   contains "failure_categories" docs/reference/failure-taxonomy.md || return 1
   contains "artifact_contract_gap" docs/reference/failure-taxonomy.md || return 1

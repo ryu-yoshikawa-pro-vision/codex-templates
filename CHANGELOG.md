@@ -22,6 +22,9 @@
 - `codex-task` に `--task-type`、`--workflow-level`、`--record-run-manifest` を追加。
 - `codex-task --record-run-manifest --run-id <run_id>` で `.codex/runs/<run_id>/run.json` を生成する baseline support を追加。
 - `spec/change-scope-policy.json` を追加し、`--allowed-files` / `--expected-changed-files` 実装前の変更範囲ポリシーを機械検証できるようにした。
+- `codex-task` に `--allowed-files` / `--expected-changed-files` の baseline enforcement を追加。
+- `run.json.changed_files` と `run.json.safety.scope_violation` を runner が記録するように更新。
+- `.codex/runs/` 配下の generated artifact を scope check 対象外として扱うようにした。
 
 ### Changed
 

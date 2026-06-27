@@ -5,12 +5,13 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $sourceRepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\\..")).Path
-$templateRoot = Join-Path $sourceRepoRoot "template"
+$templateSourceRoot = Join-Path $sourceRepoRoot "template"
+$tempRoot = Join-Path $env:TEMP ("codex-task-test-" + [guid]::NewGuid().ToString())
+$templateRoot = Join-Path $tempRoot "template"
 $wrapperPath = Join-Path $templateRoot "scripts\\codex-task.ps1"
 $sandboxPath = Join-Path $templateRoot "scripts\\codex-sandbox.ps1"
 $fakeCodex = Join-Path $sourceRepoRoot "tests\\fixtures\\fake-codex.ps1"
 $fakeDocker = Join-Path $sourceRepoRoot "tests\\fixtures\\fake-docker.ps1"
-$tempRoot = Join-Path $env:TEMP ("codex-task-test-" + [guid]::NewGuid().ToString())
 
 function Test-PythonAvailable {
     foreach ($candidate in @("python", "python3", "py")) {
@@ -144,7 +145,57 @@ function Assert-RunManifestValidationFailed {
     if ([string]::IsNullOrWhiteSpace([string]$commands[0].evidence)) { throw "Expected non-empty validation command evidence" }
 }
 
+function Assert-RunManifestState {
+    param(
+        [string]$Path,
+        [string]$ExpectedRunStatus,
+        [string]$ExpectedValidationStatus,
+        [bool]$ExpectedScopeViolation,
+        [string[]]$ExpectedChangedFiles,
+        [string]$ExpectedCommand = $null,
+        [string]$ExpectedCommandStatus = $null
+    )
+
+    if (-not (Test-Path $Path)) {
+        throw "Missing run manifest file: $Path"
+    }
+
+    $manifest = Get-Content -Raw $Path | ConvertFrom-Json
+    if ($manifest.status -ne $ExpectedRunStatus) { throw "Expected run status $ExpectedRunStatus, got $($manifest.status)" }
+    if ($manifest.validation.status -ne $ExpectedValidationStatus) { throw "Expected validation.status $ExpectedValidationStatus, got $($manifest.validation.status)" }
+    if ([bool]$manifest.safety.scope_violation -ne $ExpectedScopeViolation) { throw "Expected scope_violation $ExpectedScopeViolation, got $($manifest.safety.scope_violation)" }
+    $actualChanged = @($manifest.changed_files)
+    if ((@($ExpectedChangedFiles).Count -ne $actualChanged.Count) -or (@($ExpectedChangedFiles) -join '|') -ne ($actualChanged -join '|')) {
+        throw "Expected changed_files $(@($ExpectedChangedFiles) -join ', '), got $($actualChanged -join ', ')"
+    }
+
+    $commands = @($manifest.validation.commands)
+    if ([string]::IsNullOrWhiteSpace($ExpectedCommand)) {
+        if ($commands.Count -ne 0) { throw "Expected no validation commands, got $($commands.Count)" }
+        return
+    }
+
+    if ($commands.Count -ne 1) { throw "Expected one validation command, got $($commands.Count)" }
+    if ($commands[0].command -ne $ExpectedCommand) { throw "Expected validation command $ExpectedCommand, got $($commands[0].command)" }
+    if ($commands[0].status -ne $ExpectedCommandStatus) { throw "Expected validation command status $ExpectedCommandStatus, got $($commands[0].status)" }
+    if ([string]::IsNullOrWhiteSpace([string]$commands[0].evidence)) { throw "Expected non-empty validation command evidence" }
+}
+
+function Restore-ScopeFixtures {
+    Copy-Item -Force (Join-Path $templateSourceRoot "README.md") (Join-Path $templateRoot "README.md")
+    Copy-Item -Force (Join-Path $templateSourceRoot "scripts\\verify") (Join-Path $templateRoot "scripts\\verify")
+}
+
 New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+New-Item -ItemType Directory -Force -Path $templateRoot | Out-Null
+Get-ChildItem -Force -Path $templateSourceRoot | ForEach-Object {
+    Copy-Item -Path $_.FullName -Destination $templateRoot -Recurse -Force
+}
+& git -C $templateRoot init -q
+& git -C $templateRoot config user.email codex-test@example.com
+& git -C $templateRoot config user.name codex-test
+& git -C $templateRoot add .
+& git -C $templateRoot commit -q -m "test baseline"
 Push-Location $templateRoot
 try {
     $schemaPath = Join-Path $tempRoot "schema.json"
@@ -262,6 +313,115 @@ try {
     $manifestReportPath = (Get-ChildItem -Path $manifestReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
     Assert-ReportStatus -Path $manifestReportPath -ExpectedStatus 'verify_skipped' | Out-Null
     Assert-RunManifestBaseline -Path (Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $manifestRunId "run.json"))) -ExpectedRunId $manifestRunId -ExpectedReportName ([System.IO.Path]::GetFileName($manifestReportPath))
+
+    $allowedOkRunId = "20260420-020307-JST"
+    $allowedOk = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $allowedOkRunId,
+        '--record-run-manifest',
+        '--allowed-files', 'README.md',
+        '--skip-verify',
+        'ALLOWED_OK'
+    ) -ExtraEnv (@{ CODEX_BIN = $fakeCodex; FAKE_CODEX_WRITE_FILES = 'README.md' })
+    if ($allowedOk.ExitCode -ne 0) { throw "allowed-files success case failed unexpectedly: $($allowedOk.Combined)" }
+    $allowedOkReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $allowedOkRunId "reports"))
+    $allowedOkReportPath = (Get-ChildItem -Path $allowedOkReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $allowedOkReportPath -ExpectedStatus 'verify_skipped' | Out-Null
+    Assert-RunManifestState -Path (Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $allowedOkRunId "run.json"))) -ExpectedRunStatus 'completed' -ExpectedValidationStatus 'skipped' -ExpectedScopeViolation $false -ExpectedChangedFiles @('README.md')
+    Restore-ScopeFixtures
+
+    $allowedViolationRunId = "20260420-020308-JST"
+    $allowedViolation = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $allowedViolationRunId,
+        '--record-run-manifest',
+        '--allowed-files', 'README.md',
+        '--skip-verify',
+        'ALLOWED_VIOLATION'
+    ) -ExtraEnv (@{ CODEX_BIN = $fakeCodex; FAKE_CODEX_WRITE_FILES = 'README.md,scripts/verify' })
+    if ($allowedViolation.ExitCode -eq 0) { throw "allowed-files violation case unexpectedly succeeded" }
+    $allowedViolationReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $allowedViolationRunId "reports"))
+    $allowedViolationReportPath = (Get-ChildItem -Path $allowedViolationReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $allowedViolationReportPath -ExpectedStatus 'scope_violation' | Out-Null
+    Assert-RunManifestState -Path (Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $allowedViolationRunId "run.json"))) -ExpectedRunStatus 'failed' -ExpectedValidationStatus 'blocked' -ExpectedScopeViolation $true -ExpectedChangedFiles @('README.md', 'scripts/verify') -ExpectedCommand 'change scope check' -ExpectedCommandStatus 'blocked'
+    Restore-ScopeFixtures
+
+    $expectedOkRunId = "20260420-020309-JST"
+    $expectedOk = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $expectedOkRunId,
+        '--record-run-manifest',
+        '--expected-changed-files', 'README.md',
+        '--skip-verify',
+        'EXPECTED_OK'
+    ) -ExtraEnv (@{ CODEX_BIN = $fakeCodex; FAKE_CODEX_WRITE_FILES = 'README.md' })
+    if ($expectedOk.ExitCode -ne 0) { throw "expected-changed-files success case failed unexpectedly: $($expectedOk.Combined)" }
+    $expectedOkReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $expectedOkRunId "reports"))
+    $expectedOkReportPath = (Get-ChildItem -Path $expectedOkReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $expectedOkReportPath -ExpectedStatus 'verify_skipped' | Out-Null
+    Assert-RunManifestState -Path (Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $expectedOkRunId "run.json"))) -ExpectedRunStatus 'completed' -ExpectedValidationStatus 'skipped' -ExpectedScopeViolation $false -ExpectedChangedFiles @('README.md')
+    Restore-ScopeFixtures
+
+    $expectedMissingRunId = "20260420-020310-JST"
+    $expectedMissing = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $expectedMissingRunId,
+        '--record-run-manifest',
+        '--expected-changed-files', 'README.md',
+        '--skip-verify',
+        'EXPECTED_MISSING'
+    ) -ExtraEnv $envMap
+    if ($expectedMissing.ExitCode -eq 0) { throw "expected missing case unexpectedly succeeded" }
+    $expectedMissingReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $expectedMissingRunId "reports"))
+    $expectedMissingReportPath = (Get-ChildItem -Path $expectedMissingReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $expectedMissingReportPath -ExpectedStatus 'expected_changes_missing' | Out-Null
+    Assert-RunManifestState -Path (Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $expectedMissingRunId "run.json"))) -ExpectedRunStatus 'failed' -ExpectedValidationStatus 'failed' -ExpectedScopeViolation $false -ExpectedChangedFiles @() -ExpectedCommand 'expected changed files check' -ExpectedCommandStatus 'failed'
+
+    foreach ($invalidValue in @('..\outside.md', 'C:\tmp\outside.md', '*.md')) {
+        $invalidAllowedReport = Join-Path $tempRoot "invalid-allowed.report.json"
+        Remove-Item -Force $invalidAllowedReport -ErrorAction SilentlyContinue
+        $invalidAllowed = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+            '--report-path', $invalidAllowedReport,
+            '--log-path', (Join-Path $tempRoot "invalid-allowed.jsonl"),
+            '--allowed-files', $invalidValue,
+            '--skip-verify',
+            'INVALID_ALLOWED'
+        ) -ExtraEnv $envMap
+        if ($invalidAllowed.ExitCode -eq 0) { throw "invalid allowed-files case unexpectedly succeeded for $invalidValue" }
+        Assert-ReportStatus -Path $invalidAllowedReport -ExpectedStatus 'invalid_args' | Out-Null
+
+        $invalidExpectedReport = Join-Path $tempRoot "invalid-expected.report.json"
+        Remove-Item -Force $invalidExpectedReport -ErrorAction SilentlyContinue
+        $invalidExpected = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+            '--report-path', $invalidExpectedReport,
+            '--log-path', (Join-Path $tempRoot "invalid-expected.jsonl"),
+            '--expected-changed-files', $invalidValue,
+            '--skip-verify',
+            'INVALID_EXPECTED'
+        ) -ExtraEnv $envMap
+        if ($invalidExpected.ExitCode -eq 0) { throw "invalid expected-changed-files case unexpectedly succeeded for $invalidValue" }
+        Assert-ReportStatus -Path $invalidExpectedReport -ExpectedStatus 'invalid_args' | Out-Null
+    }
+
+    $allowedNoManifestReport = Join-Path $tempRoot "allowed-no-manifest.report.json"
+    $allowedNoManifest = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--report-path', $allowedNoManifestReport,
+        '--log-path', (Join-Path $tempRoot "allowed-no-manifest.jsonl"),
+        '--allowed-files', 'README.md',
+        '--skip-verify',
+        'ALLOWED_NO_MANIFEST'
+    ) -ExtraEnv $envMap
+    if ($allowedNoManifest.ExitCode -eq 0) { throw "allowed-files without manifest unexpectedly succeeded" }
+    if ($allowedNoManifest.Combined -notmatch [regex]::Escape('--allowed-files requires --run-id and --record-run-manifest')) { throw "allowed-files manifest requirement message missing: $($allowedNoManifest.Combined)" }
+    Assert-ReportStatus -Path $allowedNoManifestReport -ExpectedStatus 'invalid_args' | Out-Null
+
+    $expectedNoManifestReport = Join-Path $tempRoot "expected-no-manifest.report.json"
+    $expectedNoManifest = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--report-path', $expectedNoManifestReport,
+        '--log-path', (Join-Path $tempRoot "expected-no-manifest.jsonl"),
+        '--expected-changed-files', 'README.md',
+        '--skip-verify',
+        'EXPECTED_NO_MANIFEST'
+    ) -ExtraEnv $envMap
+    if ($expectedNoManifest.ExitCode -eq 0) { throw "expected-changed-files without manifest unexpectedly succeeded" }
+    if ($expectedNoManifest.Combined -notmatch [regex]::Escape('--expected-changed-files requires --run-id and --record-run-manifest')) { throw "expected-changed-files manifest requirement message missing: $($expectedNoManifest.Combined)" }
+    Assert-ReportStatus -Path $expectedNoManifestReport -ExpectedStatus 'invalid_args' | Out-Null
 
     $missingRunIdReport = Join-Path $tempRoot "missing-run-id.report.json"
     $missingRunId = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(

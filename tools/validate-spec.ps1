@@ -276,9 +276,9 @@ Assert-Condition ($changeScopePolicy.run_artifacts.path_prefix -eq ".codex/runs/
 Assert-Condition ($changeScopePolicy.run_artifacts.excluded_from_scope_check -eq $true) "spec/change-scope-policy.json run_artifacts.excluded_from_scope_check is out of contract"
 Assert-Condition ($changeScopePolicy.run_artifacts.may_be_recorded_in_manifest -eq $true) "spec/change-scope-policy.json run_artifacts.may_be_recorded_in_manifest is out of contract"
 Assert-Condition ($changeScopePolicy.run_artifacts.must_not_be_mixed_with_source_changes -eq $true) "spec/change-scope-policy.json run_artifacts.must_not_be_mixed_with_source_changes is out of contract"
-Assert-Condition ($changeScopePolicy.deferred.runner_enforcement -eq $true) "spec/change-scope-policy.json deferred.runner_enforcement is out of contract"
+Assert-Condition ($changeScopePolicy.deferred.runner_enforcement -eq $false) "spec/change-scope-policy.json deferred.runner_enforcement is out of contract"
 Assert-Condition ($changeScopePolicy.deferred.glob_matching -eq $true) "spec/change-scope-policy.json deferred.glob_matching is out of contract"
-Assert-Condition ($changeScopePolicy.deferred.changed_files_collection -eq $true) "spec/change-scope-policy.json deferred.changed_files_collection is out of contract"
+Assert-Condition ($changeScopePolicy.deferred.changed_files_collection -eq $false) "spec/change-scope-policy.json deferred.changed_files_collection is out of contract"
 
 $taxonomyEntries = Normalize-ToArray $failureTaxonomy.categories
 Assert-Condition ($taxonomyEntries.Count -gt 0) "spec/failure-taxonomy.json categories must be a non-empty array"
