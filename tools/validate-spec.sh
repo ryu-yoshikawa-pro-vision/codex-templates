@@ -641,6 +641,10 @@ expect_enum_set(
     ["read-only", "workspace-write", "danger-full-access", "unknown"],
     "spec/subagent-run.schema.json sandbox.type",
 )
+ensure(
+    sandbox_schema["properties"]["network"].get("type") == "boolean",
+    "spec/subagent-run.schema.json sandbox.network type is out of contract",
+)
 scope_schema = subagent_props["scope"]
 expect_required_fields(
     scope_schema,

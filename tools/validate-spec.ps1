@@ -549,6 +549,7 @@ $sandboxSchema = $subagentRunSchema.properties.sandbox
 Expect-RequiredFields -Schema $sandboxSchema -Fields @("type", "network") -Label "spec/subagent-run.schema.json sandbox"
 Expect-PropertyKeys -Schema $sandboxSchema -Fields @("type", "network") -Label "spec/subagent-run.schema.json sandbox"
 Expect-EnumSet -Values $sandboxSchema.properties.type.enum -Expected @("read-only", "workspace-write", "danger-full-access", "unknown") -Label "spec/subagent-run.schema.json sandbox.type"
+Assert-Condition ($sandboxSchema.properties.network.type -eq "boolean") "spec/subagent-run.schema.json sandbox.network type is out of contract"
 $scopeSchema = $subagentRunSchema.properties.scope
 Expect-RequiredFields -Schema $scopeSchema -Fields @("declared", "compliant", "violations") -Label "spec/subagent-run.schema.json scope"
 Expect-PropertyKeys -Schema $scopeSchema -Fields @("declared", "compliant", "violations") -Label "spec/subagent-run.schema.json scope"

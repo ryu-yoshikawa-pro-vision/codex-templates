@@ -125,9 +125,12 @@
       "description": "Working directory at the time of observation, if known."
     },
     "input_summary": {
-      "type": "string",
+      "type": [
+        "string",
+        "null"
+      ],
       "minLength": 1,
-      "description": "Sanitized summary of tool input. Do not store secrets, tokens, API keys, or raw prompts."
+      "description": "Sanitized summary of tool input when applicable. Null is allowed for events without tool input. Do not store secrets, tokens, API keys, or raw prompts."
     },
     "decision": {
       "type": "object",

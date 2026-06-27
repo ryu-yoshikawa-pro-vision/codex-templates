@@ -14,29 +14,62 @@ json_escape() {
   printf '%s' "$s"
 }
 
+normalize_enum_value() {
+  local raw="$1"
+  local default_value="$2"
+  local fallback_value="$3"
+  shift 3
+
+  NORMALIZED_VALUE="$default_value"
+  ORIGINAL_VALUE=""
+
+  if [[ -z "${raw//[[:space:]]/}" ]]; then
+    return 0
+  fi
+
+  local allowed
+  for allowed in "$@"; do
+    if [[ "$raw" == "$allowed" ]]; then
+      NORMALIZED_VALUE="$raw"
+      return 0
+    fi
+  done
+
+  NORMALIZED_VALUE="$fallback_value"
+  ORIGINAL_VALUE="$raw"
+}
+
 emit_error() {
   printf '%s\n' "$1" >&2
   exit 0
 }
 
 observation_log="${CODEX_OBSERVATION_LOG:-$repo_root/.codex/observations/hooks.jsonl}"
-event_name="${CODEX_HOOK_EVENT:-ObservationError}"
 tool_name="${CODEX_HOOK_TOOL_NAME:-}"
 tool_operation="${CODEX_HOOK_TOOL_OPERATION:-}"
 tool_target="${CODEX_HOOK_TOOL_TARGET:-}"
-input_summary="${CODEX_HOOK_INPUT_SUMMARY:-Hook event observed without an explicit input summary.}"
+input_summary="${CODEX_HOOK_INPUT_SUMMARY:-}"
 run_id="${CODEX_RUN_ID:-}"
-source_name="${CODEX_HOOK_SOURCE:-codex_hook}"
-severity="${CODEX_HOOK_SEVERITY:-info}"
 decision_reason="${CODEX_HOOK_DECISION_REASON:-optional observation hook recorded the event}"
 cwd_value="${CODEX_HOOK_CWD:-$(pwd 2>/dev/null || printf '')}"
 timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date +%Y-%m-%dT%H:%M:%SZ)"
 event_stamp="$(date -u +%Y%m%dT%H%M%SZ 2>/dev/null || date +%Y%m%dT%H%M%SZ)"
 event_id="${event_stamp}-$$"
 
-if [[ -z "$input_summary" ]]; then
-  input_summary="Hook event observed without an explicit input summary."
-fi
+normalize_enum_value "${CODEX_HOOK_EVENT:-}" "ObservationError" "ObservationError" \
+  "PreToolUse" "PostToolUse" "SubagentStart" "SubagentStop" "Stop" "WrapperStart" "WrapperStop" "SafetyBlocked" "ObservationError"
+event_name="$NORMALIZED_VALUE"
+original_event="$ORIGINAL_VALUE"
+
+normalize_enum_value "${CODEX_HOOK_SOURCE:-}" "codex_hook" "unknown" \
+  "codex_hook" "codex_task" "codex_safe" "subagent" "manual" "unknown"
+source_name="$NORMALIZED_VALUE"
+original_source="$ORIGINAL_VALUE"
+
+normalize_enum_value "${CODEX_HOOK_SEVERITY:-}" "info" "warning" \
+  "debug" "info" "warning" "error" "critical"
+severity="$NORMALIZED_VALUE"
+original_severity="$ORIGINAL_VALUE"
 
 if [[ -n "$run_id" ]]; then
   run_id_json="\"$(json_escape "$run_id")\""
@@ -56,11 +89,29 @@ else
   tool_json="null"
 fi
 
+if [[ -n "${input_summary//[[:space:]]/}" ]]; then
+  input_summary_json="\"$(json_escape "$input_summary")\""
+else
+  input_summary_json="null"
+fi
+
+metadata_json='{"hook":"observe.sh"'
+if [[ -n "$original_event" ]]; then
+  metadata_json+=",\"original_event\":\"$(json_escape "$original_event")\""
+fi
+if [[ -n "$original_source" ]]; then
+  metadata_json+=",\"original_source\":\"$(json_escape "$original_source")\""
+fi
+if [[ -n "$original_severity" ]]; then
+  metadata_json+=",\"original_severity\":\"$(json_escape "$original_severity")\""
+fi
+metadata_json+='}'
+
 log_dir="$(dirname "$observation_log")"
 mkdir -p "$log_dir" 2>/dev/null || emit_error "Observation hook: failed to create log directory"
 
 payload="$(cat <<EOF
-{"schema_version":1,"event_id":"$(json_escape "$event_id")","run_id":$run_id_json,"timestamp":"$(json_escape "$timestamp")","source":"$(json_escape "$source_name")","event":"$(json_escape "$event_name")","severity":"$(json_escape "$severity")","blocking":false,"tool":$tool_json,"cwd":$cwd_json,"input_summary":"$(json_escape "$input_summary")","decision":{"action":"observe","reason":"$(json_escape "$decision_reason")"},"evidence":[],"metadata":{"hook":"observe.sh"}}
+{"schema_version":1,"event_id":"$(json_escape "$event_id")","run_id":$run_id_json,"timestamp":"$(json_escape "$timestamp")","source":"$(json_escape "$source_name")","event":"$(json_escape "$event_name")","severity":"$(json_escape "$severity")","blocking":false,"tool":$tool_json,"cwd":$cwd_json,"input_summary":$input_summary_json,"decision":{"action":"observe","reason":"$(json_escape "$decision_reason")"},"evidence":[],"metadata":$metadata_json}
 EOF
 )"
 

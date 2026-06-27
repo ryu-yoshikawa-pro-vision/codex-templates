@@ -12,6 +12,8 @@ Subagent logs are evidence, not final evaluation judgement.
 
 - read-only subagent:
   - 調査専用です。
+  - schema 上は `allowed_files = []` を記録します。
+  - 入力がなければ `input_files = []` を記録します。
   - `changed_files = []` を基本にします。
   - `mode = read_only` 相当の記録を残します。
 - writable subagent:

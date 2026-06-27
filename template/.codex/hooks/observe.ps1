@@ -10,6 +10,44 @@ function Write-ObservationError {
     exit 0
 }
 
+function Normalize-EnumValue {
+    param(
+        [AllowNull()][string]$Value,
+        [Parameter(Mandatory = $true)][string[]]$Allowed,
+        [Parameter(Mandatory = $true)][string]$Default,
+        [Parameter(Mandatory = $true)][string]$Fallback
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return [pscustomobject]@{
+            Value = $Default
+            Original = $null
+        }
+    }
+
+    if ($Allowed -contains $Value) {
+        return [pscustomobject]@{
+            Value = $Value
+            Original = $null
+        }
+    }
+
+    return [pscustomobject]@{
+        Value = $Fallback
+        Original = $Value
+    }
+}
+
+function Add-Utf8NoBomLine {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Line
+    )
+
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::AppendAllText($Path, $Line + [Environment]::NewLine, $utf8NoBom)
+}
+
 try {
     $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
     $observationLog = if ([string]::IsNullOrWhiteSpace($env:CODEX_OBSERVATION_LOG)) {
@@ -19,9 +57,26 @@ try {
         $env:CODEX_OBSERVATION_LOG
     }
 
-    $eventName = if ([string]::IsNullOrWhiteSpace($env:CODEX_HOOK_EVENT)) { "ObservationError" } else { $env:CODEX_HOOK_EVENT }
+    $normalizedEvent = Normalize-EnumValue `
+        -Value $env:CODEX_HOOK_EVENT `
+        -Allowed @("PreToolUse", "PostToolUse", "SubagentStart", "SubagentStop", "Stop", "WrapperStart", "WrapperStop", "SafetyBlocked", "ObservationError") `
+        -Default "ObservationError" `
+        -Fallback "ObservationError"
+
+    $normalizedSource = Normalize-EnumValue `
+        -Value $env:CODEX_HOOK_SOURCE `
+        -Allowed @("codex_hook", "codex_task", "codex_safe", "subagent", "manual", "unknown") `
+        -Default "codex_hook" `
+        -Fallback "unknown"
+
+    $normalizedSeverity = Normalize-EnumValue `
+        -Value $env:CODEX_HOOK_SEVERITY `
+        -Allowed @("debug", "info", "warning", "error", "critical") `
+        -Default "info" `
+        -Fallback "warning"
+
     $inputSummary = if ([string]::IsNullOrWhiteSpace($env:CODEX_HOOK_INPUT_SUMMARY)) {
-        "Hook event observed without an explicit input summary."
+        $null
     }
     else {
         $env:CODEX_HOOK_INPUT_SUMMARY
@@ -45,14 +100,27 @@ try {
         $env:CODEX_HOOK_CWD
     }
 
+    $metadata = [ordered]@{
+        hook = "observe.ps1"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($normalizedEvent.Original)) {
+        $metadata.original_event = $normalizedEvent.Original
+    }
+    if (-not [string]::IsNullOrWhiteSpace($normalizedSource.Original)) {
+        $metadata.original_source = $normalizedSource.Original
+    }
+    if (-not [string]::IsNullOrWhiteSpace($normalizedSeverity.Original)) {
+        $metadata.original_severity = $normalizedSeverity.Original
+    }
+
     $payload = [ordered]@{
         schema_version = 1
         event_id = ("{0}-{1}" -f (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ"), $PID)
         run_id = if ([string]::IsNullOrWhiteSpace($env:CODEX_RUN_ID)) { $null } else { $env:CODEX_RUN_ID }
         timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-        source = if ([string]::IsNullOrWhiteSpace($env:CODEX_HOOK_SOURCE)) { "codex_hook" } else { $env:CODEX_HOOK_SOURCE }
-        event = $eventName
-        severity = if ([string]::IsNullOrWhiteSpace($env:CODEX_HOOK_SEVERITY)) { "info" } else { $env:CODEX_HOOK_SEVERITY }
+        source = $normalizedSource.Value
+        event = $normalizedEvent.Value
+        severity = $normalizedSeverity.Value
         blocking = $false
         tool = $tool
         cwd = $cwdValue
@@ -67,9 +135,7 @@ try {
             }
         }
         evidence = @()
-        metadata = [ordered]@{
-            hook = "observe.ps1"
-        }
+        metadata = $metadata
     }
 
     $parent = Split-Path -Parent $observationLog
@@ -77,7 +143,8 @@ try {
         New-Item -ItemType Directory -Path $parent -Force | Out-Null
     }
 
-    ($payload | ConvertTo-Json -Compress -Depth 8) | Add-Content -Path $observationLog
+    $jsonLine = $payload | ConvertTo-Json -Compress -Depth 8
+    Add-Utf8NoBomLine -Path $observationLog -Line $jsonLine
     exit 0
 }
 catch {

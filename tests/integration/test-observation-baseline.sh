@@ -31,7 +31,11 @@ PY
 }
 
 cat > "$temp_root/sample-hook-observation.json" <<'EOF'
-{"schema_version":1,"event_id":"20260627T120000Z-12345","run_id":null,"timestamp":"2026-06-27T12:00:00Z","source":"codex_hook","event":"PreToolUse","severity":"info","blocking":false,"tool":{"name":"Bash","operation":"command","target":"scripts/verify"},"cwd":"/workspace","input_summary":"Run verification command","decision":{"action":"observe","reason":"optional observation hook recorded the event"},"evidence":[],"metadata":{"hook":"observe.sh"}}
+{"schema_version":1,"event_id":"20260627T120000Z-12345","run_id":null,"timestamp":"2026-06-27T12:00:00Z","source":"codex_hook","event":"WrapperStart","severity":"info","blocking":false,"tool":null,"cwd":"/workspace","input_summary":null,"decision":{"action":"observe","reason":"optional observation hook recorded the event"},"evidence":[],"metadata":{"hook":"observe.sh"}}
+EOF
+
+cat > "$temp_root/sample-hook-observation-extra.json" <<'EOF'
+{"schema_version":1,"event_id":"20260627T120000Z-12345","run_id":null,"timestamp":"2026-06-27T12:00:00Z","source":"codex_hook","event":"WrapperStart","severity":"info","blocking":false,"tool":null,"cwd":"/workspace","input_summary":null,"decision":{"action":"observe","reason":"optional observation hook recorded the event"},"evidence":[],"metadata":{"hook":"observe.sh"},"extra":"unexpected"}
 EOF
 
 cat > "$temp_root/sample-subagent-run.json" <<'EOF'
@@ -90,6 +94,13 @@ EOF
 compare_json "$source_repo_root/spec/hook-observation.schema.json" "$template_root/.codex/templates/hook-observation.schema.json"
 compare_json "$source_repo_root/spec/subagent-run.schema.json" "$template_root/.codex/templates/subagent-run.schema.json"
 
+set +e
+extra_output="$("$python_cmd" "$template_root/scripts/validate-output-schema.py" "$source_repo_root/spec/hook-observation.schema.json" "$temp_root/sample-hook-observation-extra.json" 2>&1)"
+extra_status=$?
+set -e
+[[ "$extra_status" -ne 0 ]]
+[[ "$extra_output" == *"unexpected property 'extra'"* ]]
+
 if [[ -f "$template_root/.codex/hooks/observe.sh" ]]; then
   observation_log="$temp_root/hooks.jsonl"
   (
@@ -123,6 +134,43 @@ if payload["blocking"] is not False:
     raise SystemExit(f"blocking mismatch: {payload['blocking']}")
 if payload["decision"]["action"] != "observe":
     raise SystemExit(f"decision mismatch: {payload['decision']}")
+with open(output_path, "w", encoding="utf-8") as fh:
+    json.dump(payload, fh)
+subprocess.check_call([sys.executable, validator_path, schema_path, output_path])
+PY
+
+  invalid_observation_log="$temp_root/invalid-hooks.jsonl"
+  (
+    cd "$template_root"
+    CODEX_HOOK_EVENT=UnknownEvent \
+    CODEX_HOOK_SOURCE=unknown_source \
+    CODEX_HOOK_SEVERITY=loud \
+    CODEX_OBSERVATION_LOG="$invalid_observation_log" \
+    bash ".codex/hooks/observe.sh"
+  )
+
+  "$python_cmd" - "$invalid_observation_log" "$source_repo_root/spec/hook-observation.schema.json" "$template_root/scripts/validate-output-schema.py" "$temp_root/invalid-observed-hook-event.json" <<'PY'
+import json
+import subprocess
+import sys
+log_path, schema_path, validator_path, output_path = sys.argv[1:5]
+line = open(log_path, encoding="utf-8").read().strip()
+payload = json.loads(line)
+if payload["event"] != "ObservationError":
+    raise SystemExit(f"event mismatch: {payload['event']}")
+if payload["source"] != "unknown":
+    raise SystemExit(f"source mismatch: {payload['source']}")
+if payload["severity"] != "warning":
+    raise SystemExit(f"severity mismatch: {payload['severity']}")
+if payload["input_summary"] is not None:
+    raise SystemExit(f"input_summary mismatch: {payload['input_summary']!r}")
+metadata = payload["metadata"]
+if metadata.get("original_event") != "UnknownEvent":
+    raise SystemExit(f"original_event mismatch: {metadata}")
+if metadata.get("original_source") != "unknown_source":
+    raise SystemExit(f"original_source mismatch: {metadata}")
+if metadata.get("original_severity") != "loud":
+    raise SystemExit(f"original_severity mismatch: {metadata}")
 with open(output_path, "w", encoding="utf-8") as fh:
     json.dump(payload, fh)
 subprocess.check_call([sys.executable, validator_path, schema_path, output_path])

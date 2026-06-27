@@ -109,7 +109,7 @@ try {
     $sampleSubagentPath = Join-Path $tempRoot "sample-subagent-run.json"
 
     Write-Utf8NoBom -Path $sampleHookPath -Content @'
-{"schema_version":1,"event_id":"20260627T120000Z-12345","run_id":null,"timestamp":"2026-06-27T12:00:00Z","source":"codex_hook","event":"PreToolUse","severity":"info","blocking":false,"tool":{"name":"PowerShell","operation":"command","target":"scripts/verify"},"cwd":"C:/workspace","input_summary":"Run verification command","decision":{"action":"observe","reason":"optional observation hook recorded the event"},"evidence":[],"metadata":{"hook":"observe.ps1"}}
+{"schema_version":1,"event_id":"20260627T120000Z-12345","run_id":null,"timestamp":"2026-06-27T12:00:00Z","source":"codex_hook","event":"WrapperStart","severity":"info","blocking":false,"tool":null,"cwd":"C:/workspace","input_summary":null,"decision":{"action":"observe","reason":"optional observation hook recorded the event"},"evidence":[],"metadata":{"hook":"observe.ps1"}}
 '@
 
     Write-Utf8NoBom -Path $sampleSubagentPath -Content @'
@@ -202,6 +202,36 @@ try {
         & $python $validator $hookSchema $observedPayloadPath
         if ($LASTEXITCODE -ne 0) { throw "observe.ps1 output failed schema validation" }
 
+        $invalidObservationLog = Join-Path $tempRoot "invalid-hooks.jsonl"
+        $invalid = Invoke-WindowsPowerShellFile -ScriptPath $observeHook -ExtraEnv @{
+            CODEX_HOOK_EVENT = "UnknownEvent"
+            CODEX_HOOK_SOURCE = "unknown_source"
+            CODEX_HOOK_SEVERITY = "loud"
+            CODEX_OBSERVATION_LOG = $invalidObservationLog
+        }
+        if ($invalid.ExitCode -ne 0) {
+            throw "observe.ps1 invalid enum case failed unexpectedly: $($invalid.StdErr)"
+        }
+
+        $invalidLines = @(Get-Content -Path $invalidObservationLog)
+        if ($invalidLines.Count -ne 1) {
+            throw "expected one invalid JSONL line, got $($invalidLines.Count)"
+        }
+
+        $invalidPayload = $invalidLines[0] | ConvertFrom-Json
+        if ($invalidPayload.event -ne "ObservationError") { throw "expected normalized event ObservationError, got $($invalidPayload.event)" }
+        if ($invalidPayload.source -ne "unknown") { throw "expected normalized source unknown, got $($invalidPayload.source)" }
+        if ($invalidPayload.severity -ne "warning") { throw "expected normalized severity warning, got $($invalidPayload.severity)" }
+        if ($null -ne $invalidPayload.input_summary) { throw "expected null input_summary, got $($invalidPayload.input_summary)" }
+        if ($invalidPayload.metadata.original_event -ne "UnknownEvent") { throw "missing original_event metadata" }
+        if ($invalidPayload.metadata.original_source -ne "unknown_source") { throw "missing original_source metadata" }
+        if ($invalidPayload.metadata.original_severity -ne "loud") { throw "missing original_severity metadata" }
+
+        $invalidPayloadPath = Join-Path $tempRoot "invalid-observed-hook-event.json"
+        Write-Utf8NoBom -Path $invalidPayloadPath -Content ($invalidPayload | ConvertTo-Json -Depth 10)
+        & $python $validator $hookSchema $invalidPayloadPath
+        if ($LASTEXITCODE -ne 0) { throw "observe.ps1 invalid enum output failed schema validation" }
+
         $failureDir = Join-Path $tempRoot "failure-dir"
         New-Item -ItemType Directory -Force -Path $failureDir | Out-Null
         $failure = Invoke-WindowsPowerShellFile -ScriptPath $observeHook -ExtraEnv @{
@@ -212,6 +242,9 @@ try {
         }
         if ($failure.ExitCode -ne 0) {
             throw "observe.ps1 should exit 0 even when append fails"
+        }
+        if ($failure.StdErr -notmatch "failed to append event") {
+            throw "observe.ps1 failure path did not report append failure: $($failure.StdErr)"
         }
     }
 }
