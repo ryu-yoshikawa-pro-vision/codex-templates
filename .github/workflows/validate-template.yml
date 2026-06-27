@@ -17,5 +17,7 @@ jobs:
         run: pwsh -NoProfile -File tools/validate-spec.ps1
       - name: Verify template
         run: bash template/scripts/verify
+      - name: Run observation baseline tests
+        run: bash tests/integration/test-observation-baseline.sh
       - name: Run integration tests
         run: bash tests/integration/test-codex-safety-harness.sh

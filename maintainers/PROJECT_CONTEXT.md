@@ -16,6 +16,8 @@
 - consumer-facing `.codex/config.toml` は明示指定専用の `repo_auto_net` profile を持ち、wrapper の `--preset auto-net` でのみ approval never + workspace network enabled を使う。wrapper default は `safe` のまま維持する。
 - consumer-facing execpolicy は global rules を safe baseline とし、auto-net 専用 rules を `template/.codex/rules-auto-net/` に分離する。
 - consumer-facing wrapper は `--run-id` / `-RunId` を受け取り、run がある作業では `.codex/runs/<run_id>/artifacts|reports|logs` に出力を集約する。
+- consumer-facing template は observation baseline として `spec/hook-observation.schema.json` / `template/.codex/templates/hook-observation.schema.json`、`spec/subagent-run.schema.json` / `template/.codex/templates/subagent-run.schema.json`、`template/docs/reference/hook-observation.md`、`template/docs/reference/subagent-observation.md`、optional `template/.codex/hooks/observe.*` を持つ。
+- hook observation JSONL と subagent run record は evidence artifact であり、最終 interpretation の source of truth は引き続き `evaluation.json` とする。run manifest への自動統合は未実装の後続項目として扱う。
 - command-based deletion は禁止する。`apply_patch` は差分単位で確認できる通常の編集手段として許可し、tracked runtime artifact の配布除外は明示された `git rm --cached -- <path>` の index-only migration に限定する。
 - `implementation_worker` でも削除、rename、移動、git mutation、delete / rename を含む patch operation、スコープ外リファクタリングは禁止する。writable subagent は原則 1 タスクにつき 1 つだけ使う。
 - auto-net でも削除、git add/commit/push/rm/reset/clean、remote script piping、外部 resource deletion は禁止する。PreToolUse hook は補助防御として扱い、唯一の安全境界にはしない。
@@ -55,4 +57,5 @@
 - runtime artifact の既定保存先は Git 追跡対象外。`template/.codex/artifacts/`, `template/.codex/reports/`, `template/.codex/logs/*.jsonl`, `template/.codex/runs/` は配布対象外にする。
 - source repo の historical documents は過去時点の path を含みうる。現在の正本は `spec/` と本ファイルで判断する。
 - template contract の検証は `spec/` と `template/scripts/verify*` / `tests/smoke/*` の両方で行う。
+- observation / subagent baseline の検証は `tools/validate-spec.*`、`template/scripts/verify`、`tests/integration/test-observation-baseline.*` で schema sync、reference docs、optional hook の JSONL 出力を確認する。
 - auto-net contract の検証は safe default、明示 preset、profile、rules-auto-net、削除禁止を合わせて確認する。
