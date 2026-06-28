@@ -126,7 +126,9 @@ function Get-DefaultLogPath {
 
 function Get-PythonCommand {
     foreach ($candidate in @("python", "python3", "py")) {
-        $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
+        $cmd = Get-Command $candidate -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandType -eq "Application" } |
+            Select-Object -First 1
         if (-not $cmd) {
             continue
         }
@@ -139,9 +141,9 @@ function Get-PythonCommand {
         }
 
         try {
-            & $cmd.Source --version *> $null
+            & $cmd.Path --version *> $null
             if ($LASTEXITCODE -eq 0) {
-                return $cmd.Source
+                return $cmd.Path
             }
         }
         catch {
@@ -321,6 +323,27 @@ function Get-SortedUniqueStrings {
 
     $list.Sort([System.StringComparer]::Ordinal)
     return @($list)
+}
+
+function Get-UniqueJsonObjects {
+    param([object[]]$Values)
+
+    $seen = @{}
+    $result = @()
+
+    foreach ($value in @($Values)) {
+        if ($null -eq $value) {
+            continue
+        }
+
+        $key = ($value | ConvertTo-Json -Depth 20 -Compress)
+        if (-not $seen.ContainsKey($key)) {
+            $seen[$key] = $true
+            $result += $value
+        }
+    }
+
+    return @($result)
 }
 
 function Get-CodexCommand {
@@ -598,8 +621,8 @@ function Write-RunManifest {
             if ($existingValidation) {
                 $existingCommands = if ($existingValidation.PSObject.Properties.Name -contains 'commands') { @($existingValidation.commands) } else { @() }
                 $existingWarnings = if ($existingValidation.PSObject.Properties.Name -contains 'warnings') { @($existingValidation.warnings) } else { @() }
-                $manifest.validation.commands = @(@($existingCommands) + @($manifest.validation.commands))
-                $manifest.validation.warnings = @(@($existingWarnings) + @($manifest.validation.warnings))
+                $manifest.validation.commands = @(Get-UniqueJsonObjects -Values (@($existingCommands) + @($manifest.validation.commands)))
+                $manifest.validation.warnings = @(Get-UniqueJsonObjects -Values (@($existingWarnings) + @($manifest.validation.warnings)))
             }
             $existingSafety = if ($existing.PSObject.Properties.Name -contains 'safety') { $existing.safety } else { $null }
             if ($existingSafety) {

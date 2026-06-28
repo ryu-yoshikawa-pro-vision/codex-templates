@@ -164,7 +164,7 @@ path, expected_command, expected_status, expected_evidence_pattern = sys.argv[1:
 data = json.load(open(path, encoding="utf-8"))
 commands = data["validation"]["commands"]
 matches = [command for command in commands if command["command"] == expected_command and command["status"] == expected_status]
-if not matches:
+if len(matches) != 1:
     raise SystemExit(f"expected command {expected_command}/{expected_status}, got {commands}")
 if not matches[0]["evidence"]:
     raise SystemExit("expected non-empty validation evidence")
@@ -256,8 +256,9 @@ if data["run_id"] != expected_run_id:
     raise SystemExit(f"expected evaluation run_id {expected_run_id}, got {data['run_id']}")
 if data["result"] != "not_evaluated":
     raise SystemExit(f"expected not_evaluated result, got {data['result']}")
-if data["dimensions"]["task_completion"].get("evidence_refs") != []:
-    raise SystemExit(f"expected evidence_refs [], got {data['dimensions']['task_completion'].get('evidence_refs')}")
+for name, dimension in data["dimensions"].items():
+    if dimension.get("evidence_refs") != []:
+        raise SystemExit(f"expected {name}.evidence_refs [], got {dimension.get('evidence_refs')}")
 PY
 assert_manifest_evaluation_summary "$evaluation_template_manifest" ".codex/runs/$evaluation_template_run_id/evaluation.json" "null"
 
