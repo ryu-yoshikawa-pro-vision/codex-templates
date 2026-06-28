@@ -13,7 +13,8 @@
   "changed_files": [],
   "validation": {
     "status": "not_run",
-    "commands": []
+    "commands": [],
+    "warnings": []
   },
   "safety": {
     "network": false,

@@ -6,6 +6,10 @@
 
 ## 使い分け
 
+- `scripts/new-run.ps1|sh`
+  - run directory 初期化用 helper。
+  - `.codex/runs/<run_id>/PLAN.md` / `TASKS.md` / `REPORT.md` / `run.json` をまとめて作る。
+  - 既存 run は上書きせず、`--force` / `-Force` でも欠けている親 directory を作るだけに留める。
 - `scripts/codex-safe.ps1|sh`
   - 手動対話用の安全 wrapper。
   - preflight、危険引数拒否、sandbox/approval 固定、JSONL ログを提供する。
@@ -18,19 +22,69 @@
   - `codex-task --runtime docker-sandbox` の薄い互換 wrapper。
   - Docker image と認証が明示設定されている場合だけ使う experimental path。
 
+## Workflow level の使い分け
+
+| workflow level | PLAN | TASKS | REPORT | run.json | evaluation | scope 指定 | 想定用途 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `lightweight` | 任意 | 簡易で可 | 最終 1 ブロックで可 | 任意 | 不要 | 任意 | 誤字修正、小規模 docs 修正、軽微な設定修正 |
+| `standard` | 必須 | 必須 | 必須 | 推奨 | 任意 | 推奨 | 通常の実装、複数ファイル変更 |
+| `strict` | 必須 | 必須 | 必須 | 必須 | 必須 | 必須 | 安全性・移行・公開契約に関わる変更 |
+
+- `lightweight` は無制限 mode ではない。
+- 外部通信、削除、rename、移行、権限変更、セキュリティ影響、公開 contract 変更を含む場合は `standard` 以上へ引き上げる。
+
+## Run 初期化
+
+- Bash:
+  - `bash scripts/new-run.sh --task-type implementation --workflow-level standard`
+- PowerShell:
+  - `powershell -ExecutionPolicy Bypass -File scripts/new-run.ps1 -TaskType implementation -WorkflowLevel standard`
+- `--run-id` / `-RunId` を省略した場合は JST 現在時刻から `YYYYMMDD-HHMMSS-JST` を生成する。
+- 生成対象:
+  - `.codex/runs/<run_id>/PLAN.md`
+  - `.codex/runs/<run_id>/TASKS.md`
+  - `.codex/runs/<run_id>/REPORT.md`
+  - `.codex/runs/<run_id>/run.json`
+- `--no-plan` / `-NoPlan` は `PLAN.md` を省略する。
+- `--no-run-manifest` / `-NoRunManifest` は `run.json` を省略する。
+- 既存 run directory がある場合は失敗する。`--force` / `-Force` は親 directory 作成を許可するだけで、既存 run の上書きは行わない。
+
 ## `codex-task` の主な引数
 
 - `--preset safe|readonly|auto-net`
 - `--runtime host|docker-sandbox`
+- `--task-type plan|review|implementation|investigation|repair|harness-improvement`
+- `--workflow-level lightweight|standard|strict`
 - `--prompt-file <path>` または末尾 prompt
 - `--output-file <path>`
 - `--output-schema <path>`
 - `--report-path <path>`
 - `--run-id <run_id>`
+- `--record-run-manifest`
 - `--verify-command <cmd>`
 - `--allow-search`
 - `--skip-preflight`
 - `--skip-verify`
+- `--allowed-files <path1,path2,...>`
+- `--allowed-dirs <dir1,dir2,...>`
+- `--allowed-globs <pattern1,pattern2,...>`
+- `--expected-changed-files <path1,path2,...>`
+- `--expected-missing warn|fail`
+
+### scope option の要点
+
+- `allowed-files` は exact path。
+- `allowed-dirs` は指定 directory 配下を許可する。trailing slash の有無は同一扱い。
+- `allowed-globs` は限定的な glob を扱う。special token は `*`、`**`、`?` のみ。
+- scope option を使う場合は `--run-id` と `--record-run-manifest` を必須にする。
+- `.codex/runs/` 配下の generated artifact は source scope から除外する。
+
+### expected missing の要点
+
+- 既定値は `fail`。
+- `warn` を指定すると、`expected_changed_files` に挙げた file が未変更でも exit code は成功のままにする。
+- warning は stdout/stderr と `run.json.validation.warnings` に記録する。
+- warning を記録した run manifest は `validation.status = "passed_with_warnings"` とする。
 
 ### `--verify-command` の扱い
 
@@ -54,6 +108,10 @@
   - wrapper start、preflight、codex exec、schema check、verify のイベントを追記する
   - 既定: `.codex/logs/codex-task-YYYYMMDD-HHMMSS.jsonl`
   - `--run-id` 指定時: `.codex/runs/<run_id>/logs/codex-task-YYYYMMDD-HHMMSS.jsonl`
+- run manifest:
+  - `--record-run-manifest` 指定時のみ `.codex/runs/<run_id>/run.json` を更新する
+  - `validation.warnings` に non-fatal warning を記録できる
+  - `expected-missing=warn` を使った場合は `validation.status = "passed_with_warnings"` になる
 
 ## `--output-schema` の対応範囲
 
@@ -77,6 +135,8 @@
 
 ## 推奨フロー
 
+- run を初期化する:
+  - `new-run`
 - 手動で探索・相談しながら進める:
   - `codex-safe`
 - 生成物をファイルで残す自動実装・CI 補助:

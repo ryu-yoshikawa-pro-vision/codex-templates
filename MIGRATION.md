@@ -44,3 +44,10 @@
 - consumer-facing 変更時は `spec/` と `template/` を両方更新してください。
 - consumer-facing では `template/docs/agent/` を前提にしません。`template/AGENTS.md` と `template/.agents/skills/*` が正本です。
 - historical docs 内の旧パス参照は当時の記録として残っています。
+
+## Harness usability update の取り込み
+
+- `scripts/new-run.sh` と `scripts/new-run.ps1` を追加し、run 初期化は手動コピーより script 利用を推奨する。
+- `scripts/codex-task.sh` と `scripts/codex-task.ps1` は `allowed-dirs`、`allowed-globs`、`expected-missing warn|fail` をサポートする。
+- `.codex/templates/RUN_MANIFEST.json` と `spec/run-manifest.schema.json` は `validation.warnings` と `passed_with_warnings` を扱う。
+- `AGENTS.md`、`PLANS.md`、`docs/reference/codex-implementation-harness.md`、`docs/reference/change-scope-policy.md`、`docs/guides/quickstart.md` も一緒に同期する。

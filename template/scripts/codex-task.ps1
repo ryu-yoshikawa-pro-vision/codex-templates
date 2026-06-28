@@ -44,7 +44,13 @@ param(
 
     [string[]]$AllowedFiles,
 
+    [string[]]$AllowedDirs,
+
+    [string[]]$AllowedGlobs,
+
     [string[]]$ExpectedChangedFiles,
+
+    [string]$ExpectedMissing,
 
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$Arguments
@@ -214,6 +220,84 @@ function Add-NormalizedScopePaths {
     foreach ($item in $RawList.Split(',', [System.StringSplitOptions]::None)) {
         $Target.Add((Normalize-RepoRelativePosixPath -Path $item -ValidateScopePath -OptionName $OptionName))
     }
+}
+
+function Add-NormalizedDirectoryScopePaths {
+    param(
+        [Parameter(Mandatory = $true)]$Target,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$RawList,
+        [Parameter(Mandatory = $true)][string]$OptionName
+    )
+
+    foreach ($item in $RawList.Split(',', [System.StringSplitOptions]::None)) {
+        $trimmed = $item.TrimEnd('/', '\')
+        $Target.Add((Normalize-RepoRelativePosixPath -Path $trimmed -ValidateScopePath -OptionName $OptionName))
+    }
+}
+
+function Add-NormalizedScopeGlobs {
+    param(
+        [Parameter(Mandatory = $true)]$Target,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$RawList,
+        [Parameter(Mandatory = $true)][string]$OptionName
+    )
+
+    foreach ($item in $RawList.Split(',', [System.StringSplitOptions]::None)) {
+        if ([string]::IsNullOrWhiteSpace($item)) {
+            throw "$OptionName requires a non-empty path"
+        }
+
+        $normalizedInput = $item -replace '\\', '/'
+        if ([System.IO.Path]::IsPathRooted($normalizedInput) -or $normalizedInput -match '^[A-Za-z]:/' -or $normalizedInput.StartsWith('//', [System.StringComparison]::Ordinal)) {
+            throw "$OptionName requires a repo-relative path: $item"
+        }
+
+        $segments = New-Object System.Collections.Generic.List[string]
+        foreach ($segment in $normalizedInput.Split('/', [System.StringSplitOptions]::None)) {
+            if ([string]::IsNullOrEmpty($segment) -or $segment -eq '.') {
+                continue
+            }
+            if ($segment -eq '..') {
+                throw "$OptionName path escapes repo root: $item"
+            }
+            $segments.Add($segment)
+        }
+
+        if ($segments.Count -eq 0) {
+            throw "$OptionName requires a repo-relative path: $item"
+        }
+
+        $Target.Add(($segments -join '/'))
+    }
+}
+
+function Convert-LimitedGlobToRegex {
+    param([Parameter(Mandatory = $true)][string]$Pattern)
+
+    $builder = [System.Text.StringBuilder]::new('^')
+    $i = 0
+    while ($i -lt $Pattern.Length) {
+        $char = $Pattern[$i]
+        if ($char -eq '*') {
+            if (($i + 1) -lt $Pattern.Length -and $Pattern[$i + 1] -eq '*') {
+                [void]$builder.Append('.*')
+                $i += 2
+                continue
+            }
+            [void]$builder.Append('[^/]*')
+            $i++
+            continue
+        }
+        if ($char -eq '?') {
+            [void]$builder.Append('[^/]')
+            $i++
+            continue
+        }
+        [void]$builder.Append([regex]::Escape([string]$char))
+        $i++
+    }
+    [void]$builder.Append('$')
+    return $builder.ToString()
 }
 
 function Get-SortedUniqueStrings {
@@ -410,6 +494,27 @@ function Add-ValidationCommand {
     }
 }
 
+function Add-ValidationWarning {
+    param(
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$State,
+        [Parameter(Mandatory = $true)][string]$Type,
+        [Parameter(Mandatory = $true)][string]$Path,
+        [AllowNull()][string]$Message
+    )
+
+    $State.validation_warnings = @($State.validation_warnings) + @(
+        [ordered]@{
+            type = $Type
+            path = $Path
+            message = $Message
+        }
+    )
+
+    if ($State.validation_status -notin @('blocked', 'failed')) {
+        $State.validation_status = 'passed_with_warnings'
+    }
+}
+
 function Write-RunManifest {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -441,6 +546,7 @@ function Write-RunManifest {
         validation = [ordered]@{
             status = $State.validation_status
             commands = @($State.validation_commands)
+            warnings = @($State.validation_warnings)
         }
         safety = [ordered]@{
             network = ($State.preset -eq "auto-net" -or $State.allow_search)
@@ -454,6 +560,42 @@ function Write-RunManifest {
     }
 
     ($manifest | ConvertTo-Json -Depth 8) | Set-Content -Path $Path
+}
+
+function Test-PathMatchesAllowedDir {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$AllowedDir
+    )
+
+    return $Path -ceq $AllowedDir -or $Path.StartsWith($AllowedDir + '/', [System.StringComparison]::Ordinal)
+}
+
+function Test-PathMatchesAllowedScope {
+    param(
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$State,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    foreach ($allowed in @($State.allowed_files)) {
+        if ($Path -ceq $allowed) {
+            return $true
+        }
+    }
+
+    foreach ($allowedDir in @($State.allowed_dirs)) {
+        if (Test-PathMatchesAllowedDir -Path $Path -AllowedDir $allowedDir) {
+            return $true
+        }
+    }
+
+    foreach ($pattern in @($State.allowed_globs)) {
+        if ($Path -cmatch (Convert-LimitedGlobToRegex -Pattern $pattern)) {
+            return $true
+        }
+    }
+
+    return $false
 }
 
 function Get-GitChangedFiles {
@@ -543,22 +685,17 @@ function Invoke-ScopeChecks {
         [Parameter(Mandatory = $true)][string]$RepoRoot
     )
 
-    if (@($State.allowed_files).Count -gt 0) {
-        $allowedLookup = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-        foreach ($path in @($State.allowed_files)) {
-            [void]$allowedLookup.Add($path)
-        }
-
+    if ((@($State.allowed_files).Count + @($State.allowed_dirs).Count + @($State.allowed_globs).Count) -gt 0) {
         $violations = New-Object System.Collections.Generic.List[string]
         foreach ($path in @($State.changed_files)) {
-            if (-not $allowedLookup.Contains($path)) {
+            if (-not (Test-PathMatchesAllowedScope -State $State -Path $path)) {
                 $violations.Add($path)
             }
         }
 
         if ($violations.Count -gt 0) {
             $orderedViolations = @(Get-SortedUniqueStrings -Values @($violations))
-            $evidence = "changed files outside allowed_files: " + ($orderedViolations -join ', ')
+            $evidence = "changed files outside allowed scope: " + ($orderedViolations -join ', ')
             $Report.status = "scope_violation"
             Add-ValidationCommand -State $State -Command "change scope check" -ExitCode 1 -Status "blocked" -Evidence $evidence
             $State.run_status = "failed"
@@ -588,16 +725,24 @@ function Invoke-ScopeChecks {
         if ($missingExpected.Count -gt 0) {
             $orderedMissing = @(Get-SortedUniqueStrings -Values @($missingExpected))
             $evidence = "expected files were not changed: " + ($orderedMissing -join ', ')
-            $Report.status = "expected_changes_missing"
-            Add-ValidationCommand -State $State -Command "expected changed files check" -ExitCode 1 -Status "failed" -Evidence $evidence
-            $State.run_status = "failed"
-            $State.scope_violation = $false
-            Write-TaskLog -Path $State.log_path -Event "expected_changes_missing" -Data @{ evidence = $evidence }
-            Write-TaskReport -Path $State.report_path -Report $Report
-            if ($State.record_run_manifest) {
-                Write-RunManifest -Path $State.manifest_path -State $State -Report $Report -RepoRoot $RepoRoot
+            if ($State.expected_missing_behavior -eq 'fail') {
+                $Report.status = "expected_changes_missing"
+                Add-ValidationCommand -State $State -Command "expected changed files check" -ExitCode 1 -Status "failed" -Evidence $evidence
+                $State.run_status = "failed"
+                $State.scope_violation = $false
+                Write-TaskLog -Path $State.log_path -Event "expected_changes_missing" -Data @{ evidence = $evidence }
+                Write-TaskReport -Path $State.report_path -Report $Report
+                if ($State.record_run_manifest) {
+                    Write-RunManifest -Path $State.manifest_path -State $State -Report $Report -RepoRoot $RepoRoot
+                }
+                exit 1
             }
-            exit 1
+
+            foreach ($path in $orderedMissing) {
+                Add-ValidationWarning -State $State -Type 'expected_changed_file_missing' -Path $path -Message ("expected file was not changed: " + $path)
+            }
+            Write-Warning $evidence
+            Write-TaskLog -Path $State.log_path -Event "expected_changes_missing_warning" -Data @{ evidence = $evidence }
         }
     }
 }
@@ -898,8 +1043,12 @@ $state = [ordered]@{
     run_status = "pending"
     validation_status = "not_run"
     validation_commands = @()
+    validation_warnings = @()
     allowed_files = (New-Object System.Collections.Generic.List[string])
+    allowed_dirs = (New-Object System.Collections.Generic.List[string])
+    allowed_globs = (New-Object System.Collections.Generic.List[string])
     expected_changed_files = (New-Object System.Collections.Generic.List[string])
+    expected_missing_behavior = "fail"
     changed_files = @()
     scope_violation = $false
 }
@@ -948,12 +1097,25 @@ if ($PSBoundParameters.ContainsKey('AllowedFiles')) {
         $normalizedArguments.Add($value)
     }
 }
+if ($PSBoundParameters.ContainsKey('AllowedDirs')) {
+    foreach ($value in $AllowedDirs) {
+        $normalizedArguments.Add('--allowed-dirs')
+        $normalizedArguments.Add($value)
+    }
+}
+if ($PSBoundParameters.ContainsKey('AllowedGlobs')) {
+    foreach ($value in $AllowedGlobs) {
+        $normalizedArguments.Add('--allowed-globs')
+        $normalizedArguments.Add($value)
+    }
+}
 if ($PSBoundParameters.ContainsKey('ExpectedChangedFiles')) {
     foreach ($value in $ExpectedChangedFiles) {
         $normalizedArguments.Add('--expected-changed-files')
         $normalizedArguments.Add($value)
     }
 }
+if ($PSBoundParameters.ContainsKey('ExpectedMissing')) { $normalizedArguments.Add('--expected-missing'); $normalizedArguments.Add($ExpectedMissing) }
 if ($Arguments) {
     foreach ($arg in $Arguments) {
         $normalizedArguments.Add($arg)
@@ -1066,6 +1228,26 @@ while ($i -lt $Arguments.Count) {
                 Fail-Task -Status "invalid_args" -Message $_.Exception.Message -LogPath $state.log_path -ReportPath $state.report_path -Report $report
             }
         }
+        '--allowed-dirs' {
+            $i++
+            if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--allowed-dirs requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
+            try {
+                Add-NormalizedDirectoryScopePaths -Target $state.allowed_dirs -RawList $Arguments[$i] -OptionName '--allowed-dirs'
+            }
+            catch {
+                Fail-Task -Status "invalid_args" -Message $_.Exception.Message -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+            }
+        }
+        '--allowed-globs' {
+            $i++
+            if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--allowed-globs requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
+            try {
+                Add-NormalizedScopeGlobs -Target $state.allowed_globs -RawList $Arguments[$i] -OptionName '--allowed-globs'
+            }
+            catch {
+                Fail-Task -Status "invalid_args" -Message $_.Exception.Message -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+            }
+        }
         '--expected-changed-files' {
             $i++
             if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--expected-changed-files requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
@@ -1075,6 +1257,11 @@ while ($i -lt $Arguments.Count) {
             catch {
                 Fail-Task -Status "invalid_args" -Message $_.Exception.Message -LogPath $state.log_path -ReportPath $state.report_path -Report $report
             }
+        }
+        '--expected-missing' {
+            $i++
+            if ($i -ge $Arguments.Count) { Fail-Task -Status "invalid_args" -Message "--expected-missing requires a value" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
+            $state.expected_missing_behavior = $Arguments[$i]
         }
         '--record-run-manifest' { $state.record_run_manifest = $true }
         '--dangerously-bypass-approvals-and-sandbox' { Block-UnsafeArgument -Token $token -Reason "dangerous bypass is prohibited" -LogPath $state.log_path -ReportPath $state.report_path -Report $report }
@@ -1097,10 +1284,20 @@ while ($i -lt $Arguments.Count) {
 }
 
 $state.allowed_files = @(Get-SortedUniqueStrings -Values @($state.allowed_files))
+$state.allowed_dirs = @(Get-SortedUniqueStrings -Values @($state.allowed_dirs))
+$state.allowed_globs = @(Get-SortedUniqueStrings -Values @($state.allowed_globs))
 $state.expected_changed_files = @(Get-SortedUniqueStrings -Values @($state.expected_changed_files))
+
+if ($state.expected_missing_behavior -notin @('warn', 'fail')) {
+    Fail-Task -Status "invalid_args" -Message "--expected-missing must be warn or fail" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+}
 
 if (@($state.allowed_files).Count -gt 0 -and (-not $state.record_run_manifest -or [string]::IsNullOrWhiteSpace($state.run_id))) {
     Fail-Task -Status "invalid_args" -Message "--allowed-files requires --run-id and --record-run-manifest" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
+}
+
+if ((@($state.allowed_dirs).Count + @($state.allowed_globs).Count) -gt 0 -and (-not $state.record_run_manifest -or [string]::IsNullOrWhiteSpace($state.run_id))) {
+    Fail-Task -Status "invalid_args" -Message "scope options require --run-id and --record-run-manifest" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
 }
 
 if (@($state.expected_changed_files).Count -gt 0 -and (-not $state.record_run_manifest -or [string]::IsNullOrWhiteSpace($state.run_id))) {
@@ -1182,7 +1379,7 @@ if ($state.runtime -notin @("host", "docker-sandbox")) {
     Fail-Task -Status "invalid_args" -Message "Unsupported runtime: $($state.runtime)" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
 }
 
-if ($state.task_type -notin @("plan", "review", "implementation", "investigation", "repair")) {
+if ($state.task_type -notin @("plan", "review", "implementation", "investigation", "repair", "harness-improvement")) {
     Fail-Task -Status "invalid_args" -Message "Invalid --task-type: $($state.task_type)" -LogPath $state.log_path -ReportPath $state.report_path -Report $report
 }
 
@@ -1387,7 +1584,7 @@ if ($state.output_schema) {
 if ($state.skip_verify) {
     $report.status = "verify_skipped"
     $state.run_status = "completed"
-    if ($state.validation_status -eq 'not_run') {
+    if ($state.validation_status -ceq 'not_run') {
         $state.validation_status = 'skipped'
     }
 }
@@ -1405,7 +1602,7 @@ else {
     if ([string]::IsNullOrWhiteSpace($verifyCommand)) {
         $report.status = "verify_skipped"
         $state.run_status = "completed"
-        if ($state.validation_status -eq 'not_run') {
+        if ($state.validation_status -ceq 'not_run') {
             $state.validation_status = 'skipped'
         }
         Write-TaskLog -Path $state.log_path -Event "verify_skipped" -Data @{}

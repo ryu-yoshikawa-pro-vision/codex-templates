@@ -25,6 +25,15 @@
 ## Ambiguity handling
 - Contract marker: `mandatory-question`
 - Plan Mode では、AI が判断し切れない不透明点を推測で埋めてはいけない。
+- `Blocking questions`:
+  - 回答がないと目的、スコープ、安全性、移行方針、完了判定が変わるもの。
+  - 未解決のまま実装へ進んではいけない。
+- `Assumptions allowed`:
+  - 既存 repo の convention で自然に決まり、後から局所修正できる細部。
+  - 仮定として計画へ明記したうえで先に進めてよい。
+- `Follow-up notes`:
+  - 実装後に確認すればよく、今回の差分を止めるほどではないもの。
+  - 実装中は記録に留め、完了報告や follow-up として扱う。
 - 目的、成功条件、非目標、変更スコープ、対象ユーザー、DoD、検証方法、完了判定が曖昧な場合は必ず質問する。
 - 破壊的変更、移行、削除、セキュリティ、外部連携、費用、運用負荷に影響する不透明点は必ず質問する。
 - ユーザーの好みや優先順位で結論が変わる場合は必ず質問する。
@@ -43,3 +52,4 @@
 8. Validation plan
 9. Risks
 10. Open questions
+11. Follow-up notes

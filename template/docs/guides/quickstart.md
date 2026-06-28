@@ -7,8 +7,11 @@
 3. `AGENTS.md` を読む。
 4. `docs/PROJECT_CONTEXT.md` をそのプロジェクト用に更新する。
 5. `bash scripts/verify` または `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` を実行して最低限のセットアップを確認する。
-6. 最初の依頼で `.codex/runs/<run_id>/` を作る。
+6. 最初の依頼では `scripts/new-run.sh` または `scripts/new-run.ps1` で `.codex/runs/<run_id>/` を初期化する。
+   - Bash: `bash scripts/new-run.sh --task-type implementation --workflow-level standard`
+   - PowerShell: `powershell -ExecutionPolicy Bypass -File scripts/new-run.ps1 -TaskType implementation -WorkflowLevel standard`
 7. 計画系は `PLANS.md`、レビュー系は `CODE_REVIEW.md` から対応 skill を開く。
+8. 軽微な修正だけなら `lightweight`、通常の実装は `standard`、安全性・移行・公開契約を触る変更は `strict` を選ぶ。
 
 ## 最初に編集すること
 
