@@ -106,6 +106,55 @@
               "type": "string",
               "minLength": 1,
               "description": "Evidence supporting the rating. Even when not_evaluated, record why the dimension was not evaluated."
+            },
+            "evidence_refs": {
+              "type": "array",
+              "description": "Optional structured references to run artifacts that support the evidence string.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "summary"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "run_manifest",
+                      "codex_task_report",
+                      "log_event",
+                      "hook_observation",
+                      "subagent_run",
+                      "changed_file",
+                      "validation_command",
+                      "evaluation_note"
+                    ]
+                  },
+                  "path": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "selector": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "event_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
             }
           }
         },
@@ -130,6 +179,54 @@
               "type": "string",
               "minLength": 1,
               "description": "Evidence supporting the rating. Even when not_evaluated, record why the dimension was not evaluated."
+            },
+            "evidence_refs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "summary"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "run_manifest",
+                      "codex_task_report",
+                      "log_event",
+                      "hook_observation",
+                      "subagent_run",
+                      "changed_file",
+                      "validation_command",
+                      "evaluation_note"
+                    ]
+                  },
+                  "path": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "selector": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "event_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
             }
           }
         },
@@ -154,6 +251,54 @@
               "type": "string",
               "minLength": 1,
               "description": "Evidence supporting the rating. Even when not_evaluated, record why the dimension was not evaluated."
+            },
+            "evidence_refs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "summary"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "run_manifest",
+                      "codex_task_report",
+                      "log_event",
+                      "hook_observation",
+                      "subagent_run",
+                      "changed_file",
+                      "validation_command",
+                      "evaluation_note"
+                    ]
+                  },
+                  "path": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "selector": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "event_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
             }
           }
         },
@@ -178,6 +323,54 @@
               "type": "string",
               "minLength": 1,
               "description": "Evidence supporting the rating. Even when not_evaluated, record why the dimension was not evaluated."
+            },
+            "evidence_refs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "summary"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "run_manifest",
+                      "codex_task_report",
+                      "log_event",
+                      "hook_observation",
+                      "subagent_run",
+                      "changed_file",
+                      "validation_command",
+                      "evaluation_note"
+                    ]
+                  },
+                  "path": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "selector": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "event_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
             }
           }
         },
@@ -202,6 +395,54 @@
               "type": "string",
               "minLength": 1,
               "description": "Evidence supporting the rating. Even when not_evaluated, record why the dimension was not evaluated."
+            },
+            "evidence_refs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "summary"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "run_manifest",
+                      "codex_task_report",
+                      "log_event",
+                      "hook_observation",
+                      "subagent_run",
+                      "changed_file",
+                      "validation_command",
+                      "evaluation_note"
+                    ]
+                  },
+                  "path": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "selector": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "event_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
             }
           }
         },
@@ -226,6 +467,54 @@
               "type": "string",
               "minLength": 1,
               "description": "Evidence supporting the rating. Even when not_evaluated, record why the dimension was not evaluated."
+            },
+            "evidence_refs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "summary"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "run_manifest",
+                      "codex_task_report",
+                      "log_event",
+                      "hook_observation",
+                      "subagent_run",
+                      "changed_file",
+                      "validation_command",
+                      "evaluation_note"
+                    ]
+                  },
+                  "path": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "selector": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "event_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
             }
           }
         },
@@ -250,6 +539,54 @@
               "type": "string",
               "minLength": 1,
               "description": "Evidence supporting the rating. Even when not_evaluated, record why the dimension was not evaluated."
+            },
+            "evidence_refs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "summary"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "run_manifest",
+                      "codex_task_report",
+                      "log_event",
+                      "hook_observation",
+                      "subagent_run",
+                      "changed_file",
+                      "validation_command",
+                      "evaluation_note"
+                    ]
+                  },
+                  "path": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "selector": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "event_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
             }
           }
         }
@@ -296,6 +633,54 @@
             "type": "string",
             "minLength": 1
           },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "summary"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "run_manifest",
+                    "codex_task_report",
+                    "log_event",
+                    "hook_observation",
+                    "subagent_run",
+                    "changed_file",
+                    "validation_command",
+                    "evaluation_note"
+                  ]
+                },
+                "path": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "selector": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "event_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "summary": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
           "detail": {
             "type": "string",
             "minLength": 1
@@ -323,6 +708,54 @@
           "evidence": {
             "type": "string",
             "minLength": 1
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "summary"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "run_manifest",
+                    "codex_task_report",
+                    "log_event",
+                    "hook_observation",
+                    "subagent_run",
+                    "changed_file",
+                    "validation_command",
+                    "evaluation_note"
+                  ]
+                },
+                "path": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "selector": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "event_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "summary": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
           },
           "expected_impact": {
             "type": "string",

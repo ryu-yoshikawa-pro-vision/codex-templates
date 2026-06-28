@@ -141,10 +141,14 @@ function Test-TemplateContract {
     if ($implementationHarness -notmatch [regex]::Escape("--allowed-dirs")) { throw "implementation harness doc missing allowed-dirs guidance" }
     if ($implementationHarness -notmatch [regex]::Escape("--allowed-globs")) { throw "implementation harness doc missing allowed-globs guidance" }
     if ($implementationHarness -notmatch [regex]::Escape("--expected-missing")) { throw "implementation harness doc missing expected-missing guidance" }
+    if ($implementationHarness -notmatch [regex]::Escape("collect-run-artifacts")) { throw "implementation harness doc missing artifact collector guidance" }
     $newRunBash = Get-Content -Raw scripts/new-run.sh
     $newRunPowerShell = Get-Content -Raw scripts/new-run.ps1
     if ($newRunBash -notmatch [regex]::Escape("Existing run directories are never overwritten")) { throw "new-run.sh missing non-overwrite contract" }
     if ($newRunPowerShell -notmatch [regex]::Escape("Run directory already exists and will not be overwritten")) { throw "new-run.ps1 missing non-overwrite contract" }
+    if (-not (Test-Path scripts/collect-run-artifacts.sh)) { throw "missing scripts/collect-run-artifacts.sh" }
+    if (-not (Test-Path scripts/collect-run-artifacts.ps1)) { throw "missing scripts/collect-run-artifacts.ps1" }
+    if (-not (Test-Path scripts/collect-run-artifacts.py)) { throw "missing scripts/collect-run-artifacts.py" }
     $changeScope = Get-Content -Raw docs/reference/change-scope-policy.md
     if ($changeScope -notmatch [regex]::Escape("allowed_dirs")) { throw "change-scope doc missing allowed_dirs guidance" }
     if ($changeScope -notmatch [regex]::Escape("allowed_globs")) { throw "change-scope doc missing allowed_globs guidance" }
@@ -154,6 +158,15 @@ function Test-TemplateContract {
     $runArtifacts = Get-Content -Raw docs/reference/run-artifacts.md
     if ($runArtifacts -notmatch [regex]::Escape("--max-iterations")) { throw "run-artifacts doc missing max-iterations guidance" }
     if ($runArtifacts -notmatch [regex]::Escape("repair loop")) { throw "run-artifacts doc missing repair loop guidance" }
+    if ($runArtifacts -notmatch [regex]::Escape("collect-run-artifacts")) { throw "run-artifacts doc missing collector guidance" }
+    $evaluationDoc = Get-Content -Raw docs/reference/evaluation.md
+    if ($evaluationDoc -notmatch [regex]::Escape("evidence_refs")) { throw "evaluation doc missing evidence_refs guidance" }
+    $evaluationTemplate = Get-Content -Raw .codex/templates/EVALUATION.md
+    if ($evaluationTemplate -notmatch [regex]::Escape("evidence_refs")) { throw "evaluation template missing evidence_refs guidance" }
+    $hookDoc = Get-Content -Raw docs/reference/hook-observation.md
+    if ($hookDoc -notmatch [regex]::Escape("run.json.hook_observations")) { throw "hook observation doc missing manifest integration guidance" }
+    $subagentDoc = Get-Content -Raw docs/reference/subagent-observation.md
+    if ($subagentDoc -notmatch [regex]::Escape("run.json.subagents.records")) { throw "subagent observation doc missing manifest integration guidance" }
 
     $config = Get-Content -Raw .codex/config.toml
     if ($config -notmatch [regex]::Escape('sandbox_mode = "workspace-write"')) { throw "config missing workspace-write sandbox" }

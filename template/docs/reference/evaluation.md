@@ -12,6 +12,7 @@
 - evaluation は成果評価だけでなく、harness improvement candidate を持てます。
 - 観測事実は `run.json` / `codex-task` report JSON / logs を参照します。
 - agent が exit code、changed files、executed commands などの実行事実を後書きしません。
+- `evidence` は人間向け短文、`evidence_refs` は machine-readable な artifact 参照として使います。
 
 ## Rating Enum
 
@@ -117,6 +118,7 @@ pass | partial | fail | not_evaluated
 - `findings[].category` も taxonomy と整合する必要があります。
 - taxonomy 外の category は使いません。
 - evidence のない finding / rating は後続 validator で warning または failure にするべきです。
+- `evidence_refs` は optional ですが、`run.json` / report / log / subagent / validation command への参照があると reviewability が上がります。
 
 ## Improvement Candidates
 
@@ -124,6 +126,7 @@ pass | partial | fail | not_evaluated
 
 - `target`
 - `evidence`
+- `evidence_refs` (optional)
 - `expected_impact`
 - `recommendation`
 
@@ -153,7 +156,16 @@ pass | partial | fail | not_evaluated
   "dimensions": {
     "task_completion": {
       "rating": "warn",
-      "evidence": "Implementation completed, but required verification failed."
+      "evidence": "Implementation completed, but required verification failed.",
+      "evidence_refs": [
+        {
+          "kind": "validation_command",
+          "path": ".codex/runs/20260627-103240-JST/run.json",
+          "selector": "$.validation.commands[0]",
+          "event_id": null,
+          "summary": "verify command exited with code 1"
+        }
+      ]
     },
     "scope_control": {
       "rating": "pass",
@@ -169,6 +181,15 @@ pass | partial | fail | not_evaluated
       "category": "missing_validation",
       "severity": "medium",
       "evidence": "bash template/scripts/verify exited with code 1.",
+      "evidence_refs": [
+        {
+          "kind": "run_manifest",
+          "path": ".codex/runs/20260627-103240-JST/run.json",
+          "selector": "$.validation",
+          "event_id": null,
+          "summary": "validation summary recorded the verify failure"
+        }
+      ],
       "detail": "Required verification did not pass."
     }
   ],
@@ -176,6 +197,7 @@ pass | partial | fail | not_evaluated
     {
       "target": "PLANS.md",
       "evidence": "Repeated missing validation findings across implementation runs.",
+      "evidence_refs": [],
       "expected_impact": "Reduce ambiguous fallback validation decisions.",
       "recommendation": "Clarify fallback validation policy."
     }

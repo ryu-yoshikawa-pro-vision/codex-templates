@@ -61,6 +61,9 @@
 - `--report-path <path>`
 - `--run-id <run_id>`
 - `--record-run-manifest`
+- `scripts/collect-run-artifacts.ps1|sh`
+  - run-local artifact を再走査して `run.json` summary を再集約する helper。
+  - `codex-task` からも利用され、report / hook / subagent / evaluation の path と count を更新する。
 - `--verify-command <cmd>`
 - `--allow-search`
 - `--skip-preflight`
@@ -110,6 +113,7 @@
   - `--run-id` 指定時: `.codex/runs/<run_id>/logs/codex-task-YYYYMMDD-HHMMSS.jsonl`
 - run manifest:
   - `--record-run-manifest` 指定時のみ `.codex/runs/<run_id>/run.json` を更新する
+  - report / hook / subagent / evaluation summary は `collect-run-artifacts.*` により再集約される
   - `validation.warnings` に non-fatal warning を記録できる
   - `expected-missing=warn` を使った場合は `validation.status = "passed_with_warnings"` になる
 

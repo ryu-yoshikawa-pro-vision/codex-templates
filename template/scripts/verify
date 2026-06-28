@@ -235,6 +235,7 @@ check_template_contract() {
   contains "Source-of-Truth" docs/reference/run-artifacts.md || return 1
   contains "hook-observation JSONL" docs/reference/run-artifacts.md || return 1
   contains "subagent-run.json" docs/reference/run-artifacts.md || return 1
+  contains "collect-run-artifacts" docs/reference/run-artifacts.md || return 1
   contains "--allowed-files" scripts/codex-task.sh || return 1
   contains "--allowed-dirs" scripts/codex-task.sh || return 1
   contains "--allowed-globs" scripts/codex-task.sh || return 1
@@ -255,6 +256,9 @@ check_template_contract() {
   contains "RequireCleanGit" scripts/codex-task.ps1 || contains "--require-clean-git" scripts/codex-task.ps1 || return 1
   contains "RequireRunId" scripts/codex-task.ps1 || contains "--require-run-id" scripts/codex-task.ps1 || return 1
   contains "MaxIterations" scripts/codex-task.ps1 || contains "--max-iterations" scripts/codex-task.ps1 || return 1
+  [[ -f scripts/collect-run-artifacts.sh ]] || return 1
+  [[ -f scripts/collect-run-artifacts.ps1 ]] || return 1
+  [[ -f scripts/collect-run-artifacts.py ]] || return 1
   contains "allowed_dirs" docs/reference/change-scope-policy.md || return 1
   contains "allowed_globs" docs/reference/change-scope-policy.md || return 1
   contains "expected_missing" docs/reference/change-scope-policy.md || return 1
@@ -299,12 +303,16 @@ check_template_contract() {
   contains "Observation hook must not weaken safety hooks." docs/reference/hook-observation.md || return 1
   contains "Observation hook failure must not stop Codex execution." docs/reference/hook-observation.md || return 1
   contains "Observation events are not the source of truth for evaluation decisions." docs/reference/hook-observation.md || return 1
+  contains "run.json.hook_observations" docs/reference/hook-observation.md || return 1
   contains "implementation_worker" docs/reference/subagent-observation.md || return 1
   contains "allowed_files" docs/reference/subagent-observation.md || return 1
   contains "changed_files" docs/reference/subagent-observation.md || return 1
   contains "parent_decision" docs/reference/subagent-observation.md || return 1
   contains "used_in_final_plan" docs/reference/subagent-observation.md || return 1
   contains "Subagent logs are evidence, not final evaluation judgement." docs/reference/subagent-observation.md || return 1
+  contains "run.json.subagents.records" docs/reference/subagent-observation.md || return 1
+  contains "evidence_refs" docs/reference/evaluation.md || return 1
+  contains "evidence_refs" .codex/templates/EVALUATION.md || return 1
   contains "Review -> Repair -> Validate" docs/reference/repair-loop.md || return 1
   contains "max iteration" docs/reference/repair-loop.md || return 1
   contains "stop condition" docs/reference/repair-loop.md || return 1

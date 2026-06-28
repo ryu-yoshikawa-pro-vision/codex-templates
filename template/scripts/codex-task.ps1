@@ -559,7 +559,58 @@ function Write-RunManifest {
         primary_failure_category = $State.primary_failure_category
     }
 
+    if (Test-Path $Path) {
+        try {
+            $existing = Get-Content -Raw -Path $Path | ConvertFrom-Json
+        }
+        catch {
+            $existing = $null
+        }
+
+        if ($existing) {
+            $manifest.agents_used = @(Get-SortedUniqueStrings -Values (@($existing.agents_used) + @($manifest.agents_used)))
+            $manifest.codex_task_reports = @(Get-SortedUniqueStrings -Values (@($existing.codex_task_reports) + @($manifest.codex_task_reports)))
+            $manifest.changed_files = @(Get-SortedUniqueStrings -Values (@($existing.changed_files) + @($manifest.changed_files)))
+            $existingValidation = if ($existing.PSObject.Properties.Name -contains 'validation') { $existing.validation } else { $null }
+            if ($existingValidation) {
+                $existingCommands = if ($existingValidation.PSObject.Properties.Name -contains 'commands') { @($existingValidation.commands) } else { @() }
+                $existingWarnings = if ($existingValidation.PSObject.Properties.Name -contains 'warnings') { @($existingValidation.warnings) } else { @() }
+                $manifest.validation.commands = @($existingCommands + @($manifest.validation.commands))
+                $manifest.validation.warnings = @($existingWarnings + @($manifest.validation.warnings))
+            }
+            $existingSafety = if ($existing.PSObject.Properties.Name -contains 'safety') { $existing.safety } else { $null }
+            if ($existingSafety) {
+                $manifest.safety.network = ([bool]$existingSafety.network -or [bool]$manifest.safety.network)
+                $manifest.safety.delete_attempt_blocked = ([bool]$existingSafety.delete_attempt_blocked -or [bool]$manifest.safety.delete_attempt_blocked)
+                $manifest.safety.git_mutation_attempt_blocked = ([bool]$existingSafety.git_mutation_attempt_blocked -or [bool]$manifest.safety.git_mutation_attempt_blocked)
+                $manifest.safety.scope_violation = ([bool]$existingSafety.scope_violation -or [bool]$manifest.safety.scope_violation)
+            }
+            if ($null -eq $manifest.evaluation_path -and $null -ne $existing.evaluation_path) {
+                $manifest.evaluation_path = $existing.evaluation_path
+            }
+            if ($null -eq $manifest.primary_failure_category -and $null -ne $existing.primary_failure_category) {
+                $manifest.primary_failure_category = $existing.primary_failure_category
+            }
+            foreach ($key in @('artifact_summary', 'hook_observations', 'subagents')) {
+                if ($existing.PSObject.Properties.Name -contains $key) {
+                    $manifest[$key] = $existing.$key
+                }
+            }
+        }
+    }
+
     ($manifest | ConvertTo-Json -Depth 8) | Set-Content -Path $Path
+
+    $pythonAvailable = ($null -ne (Get-Command python -ErrorAction SilentlyContinue)) -or ($null -ne (Get-Command py -ErrorAction SilentlyContinue))
+    if ($pythonAvailable) {
+        $collector = Join-Path $RepoRoot "scripts\\collect-run-artifacts.ps1"
+        if (Test-Path $collector) {
+            & powershell.exe -ExecutionPolicy Bypass -File $collector -RunId $State.run_id -ManifestPath $Path | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                throw "collect-run-artifacts failed with exit code $LASTEXITCODE"
+            }
+        }
+    }
 }
 
 function Test-PathMatchesAllowedDir {
@@ -805,30 +856,37 @@ function Initialize-EvaluationTemplate {
             task_completion = [ordered]@{
                 rating = "not_evaluated"
                 evidence = "Task completion has not been evaluated yet."
+                evidence_refs = @()
             }
             scope_control = [ordered]@{
                 rating = "not_evaluated"
                 evidence = "Scope control has not been evaluated yet."
+                evidence_refs = @()
             }
             validation_confidence = [ordered]@{
                 rating = "not_evaluated"
                 evidence = "Validation confidence has not been evaluated yet."
+                evidence_refs = @()
             }
             safety_compliance = [ordered]@{
                 rating = "not_evaluated"
                 evidence = "Safety compliance has not been evaluated yet."
+                evidence_refs = @()
             }
             reviewability = [ordered]@{
                 rating = "not_evaluated"
                 evidence = "Reviewability has not been evaluated yet."
+                evidence_refs = @()
             }
             maintainability = [ordered]@{
                 rating = "not_evaluated"
                 evidence = "Maintainability has not been evaluated yet."
+                evidence_refs = @()
             }
             reproducibility = [ordered]@{
                 rating = "not_evaluated"
                 evidence = "Reproducibility has not been evaluated yet."
+                evidence_refs = @()
             }
         }
         findings = @()

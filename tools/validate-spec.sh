@@ -507,6 +507,31 @@ expect_enum_set(
     taxonomy_categories,
     "spec/evaluation.schema.json failure_categories items",
 )
+evidence_ref_schema = evaluation_props["dimensions"]["properties"]["task_completion"]["properties"]["evidence_refs"]["items"]
+expect_required_fields(
+    evidence_ref_schema,
+    ["kind", "summary"],
+    "spec/evaluation.schema.json $defs.evidence_ref",
+)
+expect_property_keys(
+    evidence_ref_schema,
+    ["kind", "path", "selector", "event_id", "summary"],
+    "spec/evaluation.schema.json $defs.evidence_ref",
+)
+expect_enum_set(
+    evidence_ref_schema.get("properties", {}).get("kind", {}).get("enum", []),
+    [
+        "run_manifest",
+        "codex_task_report",
+        "log_event",
+        "hook_observation",
+        "subagent_run",
+        "changed_file",
+        "validation_command",
+        "evaluation_note",
+    ],
+    "spec/evaluation.schema.json evidence_refs.kind",
+)
 ensure(
     bundled_evaluation_schema == evaluation_schema,
     "template/.codex/templates/evaluation.schema.json must stay in sync with spec/evaluation.schema.json",
@@ -806,7 +831,7 @@ expect_property_keys(dimensions_schema, dimension_names, "spec/evaluation.schema
 for name in dimension_names:
     dimension_schema = dimensions_schema["properties"][name]
     expect_required_fields(dimension_schema, ["rating", "evidence"], f"spec/evaluation.schema.json dimensions.{name}")
-    expect_property_keys(dimension_schema, ["rating", "evidence"], f"spec/evaluation.schema.json dimensions.{name}")
+    expect_property_keys(dimension_schema, ["rating", "evidence", "evidence_refs"], f"spec/evaluation.schema.json dimensions.{name}")
     expect_enum_contains(
         dimension_schema["properties"]["rating"]["enum"],
         ["pass", "warn", "fail", "not_evaluated"],
@@ -821,7 +846,7 @@ expect_required_fields(
 )
 expect_property_keys(
     findings_item,
-    ["category", "severity", "evidence", "detail"],
+    ["category", "severity", "evidence", "evidence_refs", "detail"],
     "spec/evaluation.schema.json findings item",
 )
 expect_enum_set(
@@ -843,7 +868,7 @@ expect_required_fields(
 )
 expect_property_keys(
     improvement_item,
-    ["target", "evidence", "expected_impact", "recommendation"],
+    ["target", "evidence", "evidence_refs", "expected_impact", "recommendation"],
     "spec/evaluation.schema.json improvement_candidates item",
 )
 
@@ -966,6 +991,44 @@ expect_property_keys(
     ["network", "delete_attempt_blocked", "git_mutation_attempt_blocked", "scope_violation"],
     "spec/run-manifest.schema.json safety",
 )
+artifact_summary_schema = run_manifest_props["artifact_summary"]
+expect_required_fields(
+    artifact_summary_schema,
+    ["codex_task_report_count", "hook_event_count", "subagent_run_count", "evaluation_present"],
+    "spec/run-manifest.schema.json artifact_summary",
+)
+hook_summary_schema = run_manifest_props["hook_observations"]
+expect_required_fields(
+    hook_summary_schema,
+    ["log_paths", "event_counts", "blocking_event_count", "safety_blocked_count", "observation_error_count"],
+    "spec/run-manifest.schema.json hook_observations",
+)
+subagents_schema = run_manifest_props["subagents"]
+expect_required_fields(subagents_schema, ["records", "summary"], "spec/run-manifest.schema.json subagents")
+subagent_record_schema = subagents_schema["properties"]["records"]["items"]
+expect_required_fields(
+    subagent_record_schema,
+    [
+        "path",
+        "subagent_run_id",
+        "agent_name",
+        "role",
+        "mode",
+        "status",
+        "allowed_files_count",
+        "changed_files_count",
+        "scope_compliant",
+        "used_in_final_plan",
+        "parent_decision",
+    ],
+    "spec/run-manifest.schema.json subagents.records item",
+)
+subagent_summary_schema = subagents_schema["properties"]["summary"]
+expect_required_fields(
+    subagent_summary_schema,
+    ["total", "read_only", "writable", "scope_violations", "used_in_final_plan"],
+    "spec/run-manifest.schema.json subagents.summary",
+)
 expect_enum_set(
     run_manifest_props["primary_failure_category"]["enum"],
     taxonomy_categories + [None],
@@ -998,6 +1061,38 @@ ensure(
         "scope_violation",
     },
     "template/.codex/templates/RUN_MANIFEST.json safety keys are out of contract",
+)
+ensure(
+    run_manifest_template.get("artifact_summary")
+    == {
+        "codex_task_report_count": 0,
+        "hook_event_count": 0,
+        "subagent_run_count": 0,
+        "evaluation_present": False,
+    },
+    "template/.codex/templates/RUN_MANIFEST.json artifact_summary defaults are out of contract",
+)
+ensure(
+    run_manifest_template.get("hook_observations")
+    == {
+        "log_paths": [],
+        "event_counts": {},
+        "blocking_event_count": 0,
+        "safety_blocked_count": 0,
+        "observation_error_count": 0,
+    },
+    "template/.codex/templates/RUN_MANIFEST.json hook_observations defaults are out of contract",
+)
+ensure(
+    run_manifest_template.get("subagents", {}).get("summary")
+    == {
+        "total": 0,
+        "read_only": 0,
+        "writable": 0,
+        "scope_violations": 0,
+        "used_in_final_plan": 0,
+    },
+    "template/.codex/templates/RUN_MANIFEST.json subagents.summary defaults are out of contract",
 )
 
 assert_contains(

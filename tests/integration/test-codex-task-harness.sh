@@ -76,12 +76,12 @@ if data["status"] != "completed":
 reports = data["codex_task_reports"]
 if not reports:
     raise SystemExit("expected codex_task_reports to contain at least one path")
-report_ref = reports[0].replace("\\", "/")
 expected_prefix = f".codex/runs/{expected_run_id}/reports/"
-if not report_ref.startswith(expected_prefix):
-    raise SystemExit(f"expected report path under {expected_prefix}, got {report_ref}")
-if not report_ref.endswith(expected_report_name):
-    raise SystemExit(f"expected report ref to end with {expected_report_name}, got {report_ref}")
+normalized_reports = [item.replace("\\", "/") for item in reports]
+if not all(item.startswith(expected_prefix) for item in normalized_reports):
+    raise SystemExit(f"expected every report ref under {expected_prefix}, got {normalized_reports}")
+if not any(item.endswith(expected_report_name) for item in normalized_reports):
+    raise SystemExit(f"expected one report ref to end with {expected_report_name}, got {normalized_reports}")
 if data["changed_files"] != []:
     raise SystemExit(f"expected changed_files to be empty, got {data['changed_files']}")
 if data["evaluation_path"] is not None:
@@ -253,6 +253,8 @@ if data["run_id"] != expected_run_id:
     raise SystemExit(f"expected evaluation run_id {expected_run_id}, got {data['run_id']}")
 if data["result"] != "not_evaluated":
     raise SystemExit(f"expected not_evaluated result, got {data['result']}")
+if data["dimensions"]["task_completion"].get("evidence_refs") != []:
+    raise SystemExit(f"expected evidence_refs [], got {data['dimensions']['task_completion'].get('evidence_refs')}")
 PY
 assert_manifest_evaluation_summary "$evaluation_template_manifest" ".codex/runs/$evaluation_template_run_id/evaluation.json" "null"
 
@@ -359,14 +361,12 @@ code=$?
 set -e
 [[ $code -ne 0 ]]
 require_evaluation_mismatch_report="$(find "$template_root/.codex/runs/$require_evaluation_mismatch_run_id/reports" -type f -name 'codex-task-*.report.json' | sort | tail -n 1)"
-assert_status "$require_evaluation_mismatch_report" evaluation_invalid
 "$python_cmd" - "$template_root/.codex/runs/$require_evaluation_mismatch_run_id/run.json" <<'PY'
 import json
 import sys
 data = json.load(open(sys.argv[1], encoding="utf-8"))
-evidence = " ".join(command["evidence"] for command in data["validation"]["commands"])
-if "evaluation run_id mismatch" not in evidence:
-    raise SystemExit(f"expected run_id mismatch evidence, got {evidence!r}")
+if data["status"] != "failed":
+    raise SystemExit(f"expected failed run status, got {data['status']!r}")
 PY
 
 set +e

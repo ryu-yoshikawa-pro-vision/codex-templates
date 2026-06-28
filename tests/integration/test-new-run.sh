@@ -52,6 +52,29 @@ if data["workflow_level"] != expected_workflow_level:
     raise SystemExit(f"expected workflow_level {expected_workflow_level}, got {data['workflow_level']}")
 if data["preset"] != expected_preset:
     raise SystemExit(f"expected preset {expected_preset}, got {data['preset']}")
+if data["artifact_summary"] != {
+    "codex_task_report_count": 0,
+    "hook_event_count": 0,
+    "subagent_run_count": 0,
+    "evaluation_present": False,
+}:
+    raise SystemExit(f"unexpected artifact_summary defaults: {data['artifact_summary']}")
+if data["hook_observations"] != {
+    "log_paths": [],
+    "event_counts": {},
+    "blocking_event_count": 0,
+    "safety_blocked_count": 0,
+    "observation_error_count": 0,
+}:
+    raise SystemExit(f"unexpected hook_observations defaults: {data['hook_observations']}")
+if data["subagents"]["summary"] != {
+    "total": 0,
+    "read_only": 0,
+    "writable": 0,
+    "scope_violations": 0,
+    "used_in_final_plan": 0,
+}:
+    raise SystemExit(f"unexpected subagents defaults: {data['subagents']}")
 PY
 }
 
