@@ -9,6 +9,7 @@
 - `run.json.evaluation_path` は evaluation artifact への summary link です。
 - `run.json.primary_failure_category` は valid evaluation からコピーされる summary field です。
 - baseline では `--evaluation-template` と `--require-evaluation` は `--run-id` + `--record-run-manifest` と組み合わせます。
+- `evidence` は required の短い説明、`evidence_refs` は optional の structured reference です。
 
 ## Inputs
 
@@ -25,6 +26,7 @@
 - Do not hand-write `changed_files`, exit code, log path, report path, or executed commands.
 - Choose `failure_categories` and `findings[].category` from `spec/failure-taxonomy.json`.
 - Every `rating` and finding must include evidence.
+- `evidence_refs` を使う場合は artifact 全文を複製せず、path / selector / event_id / summary で参照する。
 - If `result` is `fail` or `partial`, `primary_failure_category` should usually be non-null.
 - `improvement_candidates` should include `target`, `evidence`, `expected_impact`, and `recommendation`.
 
@@ -40,31 +42,38 @@
   "dimensions": {
     "task_completion": {
       "rating": "not_evaluated",
-      "evidence": "Task completion has not been evaluated yet."
+      "evidence": "Task completion has not been evaluated yet.",
+      "evidence_refs": []
     },
     "scope_control": {
       "rating": "not_evaluated",
-      "evidence": "Scope control has not been evaluated yet."
+      "evidence": "Scope control has not been evaluated yet.",
+      "evidence_refs": []
     },
     "validation_confidence": {
       "rating": "not_evaluated",
-      "evidence": "Validation confidence has not been evaluated yet."
+      "evidence": "Validation confidence has not been evaluated yet.",
+      "evidence_refs": []
     },
     "safety_compliance": {
       "rating": "not_evaluated",
-      "evidence": "Safety compliance has not been evaluated yet."
+      "evidence": "Safety compliance has not been evaluated yet.",
+      "evidence_refs": []
     },
     "reviewability": {
       "rating": "not_evaluated",
-      "evidence": "Reviewability has not been evaluated yet."
+      "evidence": "Reviewability has not been evaluated yet.",
+      "evidence_refs": []
     },
     "maintainability": {
       "rating": "not_evaluated",
-      "evidence": "Maintainability has not been evaluated yet."
+      "evidence": "Maintainability has not been evaluated yet.",
+      "evidence_refs": []
     },
     "reproducibility": {
       "rating": "not_evaluated",
-      "evidence": "Reproducibility has not been evaluated yet."
+      "evidence": "Reproducibility has not been evaluated yet.",
+      "evidence_refs": []
     }
   },
   "findings": [],

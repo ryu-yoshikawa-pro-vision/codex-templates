@@ -34,10 +34,14 @@ Both are validated by schema / validator.
 - run 全体の aggregate manifest です。
 - 複数の `codex-task` report JSON を参照できます。
 - task type、workflow level、preset、runtime、agents used、changed files、validation summary、safety summary、evaluation path などを保持します。
+- `artifact_summary` は report / hook / subagent / evaluation の存在数を summary します。
+- `hook_observations` は run に紐づく hook JSONL の path と event count を summary します。
+- `subagents.records` は `subagent-run.json` 全文ではなく、path と scope summary だけを保持します。
 - `codex-task` report JSON の置き換えではありません。
 - `validation.commands` は single command 前提ではなく、`output schema validation`、`verify`、`evaluation validation`、`clean git check` など複数の観測結果を保持できます。
 - `run.json.evaluation_path` は `evaluation.json` への summary link です。
 - `run.json.primary_failure_category` は valid な `evaluation.json.primary_failure_category` からだけコピーされる summary field です。
+- `scripts/collect-run-artifacts.sh` / `scripts/collect-run-artifacts.ps1` は on-disk artifact を再走査し、`run.json` summary を再集約できます。
 
 ### `evaluation.json`
 
@@ -46,6 +50,7 @@ Both are validated by schema / validator.
 - agent が exit code や changed files などの実行事実を後書きする場所ではありません。
 - runner は evaluation result を自動判断しません。
 - runner が行うのは `evaluation.json` の template 作成、存在確認、JSON / schema validation、`run_id` 一致確認、manifest summary field 更新だけです。
+- `evidence` 文字列は required のまま維持し、必要に応じて `evidence_refs` で `run.json` / report / JSONL / subagent record / validation command などへの structured reference を追加できます。
 
 ## Runner Completion Options
 
@@ -93,7 +98,7 @@ Both are validated by schema / validator.
 - 集計の正本というより、追跡・デバッグ用です。
 - `hook-observation JSONL` は observation event 単位の補助 artifact です。
 - observation event は evidence であり、評価判断の source of truth ではありません。
-- run manifest への observation summary 統合は後続 PR で扱います。
+- collector は run_id 一致の event だけを `run.json.hook_observations` へ summary 統合します。
 
 ### `failure-taxonomy.json`
 
@@ -106,7 +111,7 @@ Both are validated by schema / validator.
 - 開始・終了・許可範囲などの観測事実と、summary / parent decision などの判断情報を分けて扱います。
 - `allowed_files`、`changed_files`、`scope.compliant` により、writable subagent が宣言した境界を守ったかを追跡します。
 - `subagent-run.json` は evidence 補助であり、最終 interpretation の source of truth ではありません。
-- run manifest への自動統合は後続 PR で扱います。
+- collector は `.codex/runs/<run_id>/subagents/*.json` を走査し、`run.json.subagents.records[]` と `run.json.subagents.summary` に summary 統合します。
 
 ## Status / Result Enum
 
@@ -146,3 +151,4 @@ evaluation.result = partial
 - `evaluation.json` は実行結果の説明責任を持ちますが、実行事実を再生成しません。
 - JSONL logs は後から評価の evidence をたどるための補助であり、summary field の正本ではありません。
 - `hook-observation JSONL` と `subagent-run.json` は観測 / evidence の補助であり、評価判断の source of truth は引き続き `evaluation.json` です。
+- invalid hook JSONL line や invalid subagent JSON は warning として扱い、collector failure だけで run 自体を失敗扱いにはしません。

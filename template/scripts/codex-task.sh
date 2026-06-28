@@ -507,7 +507,7 @@ write_run_manifest() {
   (( manifest_started )) || return 0
   [[ -n "$manifest_path" ]] || return 0
 
-  local branch report_ref network_enabled validation_commands_json validation_warnings_json changed_files_json
+  local branch report_ref network_enabled validation_commands_json validation_warnings_json changed_files_json py manifest_json
   branch="$(git_branch)"
   report_ref="$(to_repo_relative_path "$report_path")"
   network_enabled=false
@@ -517,9 +517,10 @@ write_run_manifest() {
   changed_files_json="$(json_string_array changed_files)"
   validation_commands_json="$(json_validation_commands)"
   validation_warnings_json="$(json_validation_warnings)"
+  py="$(python_cmd)"
 
   ensure_parent_dir "$manifest_path"
-  cat > "$manifest_path" <<EOF
+  manifest_json="$(cat <<EOF
 {
   "schema_version": 1,
   "run_id": "$(json_escape "$run_id")",
@@ -546,11 +547,97 @@ write_run_manifest() {
     "git_mutation_attempt_blocked": false,
     "scope_violation": $safety_scope_violation
   },
+  "artifact_summary": {
+    "codex_task_report_count": 0,
+    "hook_event_count": 0,
+    "subagent_run_count": 0,
+    "evaluation_present": false
+  },
+  "hook_observations": {
+    "log_paths": [],
+    "event_counts": {},
+    "blocking_event_count": 0,
+    "safety_blocked_count": 0,
+    "observation_error_count": 0
+  },
+  "subagents": {
+    "records": [],
+    "summary": {
+      "total": 0,
+      "read_only": 0,
+      "writable": 0,
+      "scope_violations": 0,
+      "used_in_final_plan": 0
+    }
+  },
   "evaluation_path": $(json_nullable_string "$evaluation_path"),
   "status": "$(json_escape "$run_status")",
   "primary_failure_category": $(json_nullable_string "$primary_failure_category")
 }
 EOF
+)"
+
+  if [[ -n "$py" && -f "$manifest_path" ]]; then
+    manifest_json="$(
+      CODEX_BASE_MANIFEST_JSON="$manifest_json" "$py" - "$manifest_path" <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+current = json.loads(os.environ["CODEX_BASE_MANIFEST_JSON"])
+existing_path = Path(sys.argv[1])
+try:
+    existing = json.loads(existing_path.read_text(encoding="utf-8"))
+except Exception:
+    existing = {}
+
+
+def uniq(values):
+    result = []
+    seen = set()
+    for value in values:
+        marker = json.dumps(value, sort_keys=True, ensure_ascii=True)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        result.append(value)
+    return result
+
+
+current["agents_used"] = uniq(existing.get("agents_used", []) + current.get("agents_used", []))
+current["codex_task_reports"] = uniq(existing.get("codex_task_reports", []) + current.get("codex_task_reports", []))
+current["changed_files"] = uniq(existing.get("changed_files", []) + current.get("changed_files", []))
+
+current_validation = current.get("validation", {})
+existing_validation = existing.get("validation", {})
+current_validation["commands"] = uniq(existing_validation.get("commands", []) + current_validation.get("commands", []))
+current_validation["warnings"] = uniq(existing_validation.get("warnings", []) + current_validation.get("warnings", []))
+current["validation"] = current_validation
+
+current_safety = current.get("safety", {})
+existing_safety = existing.get("safety", {})
+for key in ("network", "delete_attempt_blocked", "git_mutation_attempt_blocked", "scope_violation"):
+    current_safety[key] = bool(current_safety.get(key)) or bool(existing_safety.get(key))
+current["safety"] = current_safety
+
+if current.get("evaluation_path") is None and existing.get("evaluation_path") is not None:
+    current["evaluation_path"] = existing.get("evaluation_path")
+if current.get("primary_failure_category") is None and existing.get("primary_failure_category") is not None:
+    current["primary_failure_category"] = existing.get("primary_failure_category")
+for key in ("artifact_summary", "hook_observations", "subagents"):
+    if key in existing:
+        current[key] = existing[key]
+
+print(json.dumps(current, ensure_ascii=True, indent=2))
+PY
+    )"
+  fi
+
+  printf '%s\n' "$manifest_json" > "$manifest_path"
+  if [[ -n "$py" && -f "$repo_root/scripts/collect-run-artifacts.sh" ]]; then
+    bash "$repo_root/scripts/collect-run-artifacts.sh" --run-id "$run_id" --manifest-path "$manifest_path" >/dev/null
+  fi
 }
 
 collect_changed_files() {
@@ -691,31 +778,38 @@ create_evaluation_template_if_needed() {
   "dimensions": {
     "task_completion": {
       "rating": "not_evaluated",
-      "evidence": "Task completion has not been evaluated yet."
+      "evidence": "Task completion has not been evaluated yet.",
+      "evidence_refs": []
     },
     "scope_control": {
       "rating": "not_evaluated",
-      "evidence": "Scope control has not been evaluated yet."
+      "evidence": "Scope control has not been evaluated yet.",
+      "evidence_refs": []
     },
     "validation_confidence": {
       "rating": "not_evaluated",
-      "evidence": "Validation confidence has not been evaluated yet."
+      "evidence": "Validation confidence has not been evaluated yet.",
+      "evidence_refs": []
     },
     "safety_compliance": {
       "rating": "not_evaluated",
-      "evidence": "Safety compliance has not been evaluated yet."
+      "evidence": "Safety compliance has not been evaluated yet.",
+      "evidence_refs": []
     },
     "reviewability": {
       "rating": "not_evaluated",
-      "evidence": "Reviewability has not been evaluated yet."
+      "evidence": "Reviewability has not been evaluated yet.",
+      "evidence_refs": []
     },
     "maintainability": {
       "rating": "not_evaluated",
-      "evidence": "Maintainability has not been evaluated yet."
+      "evidence": "Maintainability has not been evaluated yet.",
+      "evidence_refs": []
     },
     "reproducibility": {
       "rating": "not_evaluated",
-      "evidence": "Reproducibility has not been evaluated yet."
+      "evidence": "Reproducibility has not been evaluated yet.",
+      "evidence_refs": []
     }
   },
   "findings": [],

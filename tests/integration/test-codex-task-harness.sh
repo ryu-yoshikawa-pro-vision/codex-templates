@@ -76,12 +76,12 @@ if data["status"] != "completed":
 reports = data["codex_task_reports"]
 if not reports:
     raise SystemExit("expected codex_task_reports to contain at least one path")
-report_ref = reports[0].replace("\\", "/")
 expected_prefix = f".codex/runs/{expected_run_id}/reports/"
-if not report_ref.startswith(expected_prefix):
-    raise SystemExit(f"expected report path under {expected_prefix}, got {report_ref}")
-if not report_ref.endswith(expected_report_name):
-    raise SystemExit(f"expected report ref to end with {expected_report_name}, got {report_ref}")
+normalized_reports = [item.replace("\\", "/") for item in reports]
+if not all(item.startswith(expected_prefix) for item in normalized_reports):
+    raise SystemExit(f"expected every report ref under {expected_prefix}, got {normalized_reports}")
+if not any(item.endswith(expected_report_name) for item in normalized_reports):
+    raise SystemExit(f"expected one report ref to end with {expected_report_name}, got {normalized_reports}")
 if data["changed_files"] != []:
     raise SystemExit(f"expected changed_files to be empty, got {data['changed_files']}")
 if data["evaluation_path"] is not None:
@@ -156,17 +156,20 @@ assert_manifest_contains_command() {
   local path="$1"
   local expected_command="$2"
   local expected_status="$3"
-  "$python_cmd" - "$path" "$expected_command" "$expected_status" <<'PY'
+  local expected_evidence_pattern="${4:-}"
+  "$python_cmd" - "$path" "$expected_command" "$expected_status" "$expected_evidence_pattern" <<'PY'
 import json
 import sys
-path, expected_command, expected_status = sys.argv[1:4]
+path, expected_command, expected_status, expected_evidence_pattern = sys.argv[1:5]
 data = json.load(open(path, encoding="utf-8"))
 commands = data["validation"]["commands"]
 matches = [command for command in commands if command["command"] == expected_command and command["status"] == expected_status]
-if not matches:
+if len(matches) != 1:
     raise SystemExit(f"expected command {expected_command}/{expected_status}, got {commands}")
 if not matches[0]["evidence"]:
     raise SystemExit("expected non-empty validation evidence")
+if expected_evidence_pattern and expected_evidence_pattern not in matches[0]["evidence"]:
+    raise SystemExit(f"expected evidence to contain {expected_evidence_pattern!r}, got {matches[0]['evidence']!r}")
 PY
 }
 
@@ -253,6 +256,9 @@ if data["run_id"] != expected_run_id:
     raise SystemExit(f"expected evaluation run_id {expected_run_id}, got {data['run_id']}")
 if data["result"] != "not_evaluated":
     raise SystemExit(f"expected not_evaluated result, got {data['result']}")
+for name, dimension in data["dimensions"].items():
+    if dimension.get("evidence_refs") != []:
+        raise SystemExit(f"expected {name}.evidence_refs [], got {dimension.get('evidence_refs')}")
 PY
 assert_manifest_evaluation_summary "$evaluation_template_manifest" ".codex/runs/$evaluation_template_run_id/evaluation.json" "null"
 
@@ -360,14 +366,8 @@ set -e
 [[ $code -ne 0 ]]
 require_evaluation_mismatch_report="$(find "$template_root/.codex/runs/$require_evaluation_mismatch_run_id/reports" -type f -name 'codex-task-*.report.json' | sort | tail -n 1)"
 assert_status "$require_evaluation_mismatch_report" evaluation_invalid
-"$python_cmd" - "$template_root/.codex/runs/$require_evaluation_mismatch_run_id/run.json" <<'PY'
-import json
-import sys
-data = json.load(open(sys.argv[1], encoding="utf-8"))
-evidence = " ".join(command["evidence"] for command in data["validation"]["commands"])
-if "evaluation run_id mismatch" not in evidence:
-    raise SystemExit(f"expected run_id mismatch evidence, got {evidence!r}")
-PY
+assert_manifest_state "$template_root/.codex/runs/$require_evaluation_mismatch_run_id/run.json" failed failed false "" "evaluation validation" failed
+assert_manifest_contains_command "$template_root/.codex/runs/$require_evaluation_mismatch_run_id/run.json" "evaluation validation" "failed" "run_id mismatch"
 
 set +e
 bash "$wrapper" --report-path "$temp_root/evaluation-template-no-manifest.report.json" --log-path "$temp_root/evaluation-template-no-manifest.jsonl" --evaluation-template --skip-verify "EVALUATION_TEMPLATE_NO_MANIFEST" >"$temp_root/evaluation-template-no-manifest.out" 2>&1

@@ -126,7 +126,9 @@ function Get-DefaultLogPath {
 
 function Get-PythonCommand {
     foreach ($candidate in @("python", "python3", "py")) {
-        $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
+        $cmd = Get-Command $candidate -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandType -eq "Application" } |
+            Select-Object -First 1
         if (-not $cmd) {
             continue
         }
@@ -139,9 +141,9 @@ function Get-PythonCommand {
         }
 
         try {
-            & $cmd.Source --version *> $null
+            & $cmd.Path --version *> $null
             if ($LASTEXITCODE -eq 0) {
-                return $cmd.Source
+                return $cmd.Path
             }
         }
         catch {
@@ -321,6 +323,27 @@ function Get-SortedUniqueStrings {
 
     $list.Sort([System.StringComparer]::Ordinal)
     return @($list)
+}
+
+function Get-UniqueJsonObjects {
+    param([object[]]$Values)
+
+    $seen = @{}
+    $result = @()
+
+    foreach ($value in @($Values)) {
+        if ($null -eq $value) {
+            continue
+        }
+
+        $key = ($value | ConvertTo-Json -Depth 20 -Compress)
+        if (-not $seen.ContainsKey($key)) {
+            $seen[$key] = $true
+            $result += $value
+        }
+    }
+
+    return @($result)
 }
 
 function Get-CodexCommand {
@@ -554,12 +577,90 @@ function Write-RunManifest {
             git_mutation_attempt_blocked = $false
             scope_violation = $State.scope_violation
         }
+        artifact_summary = [ordered]@{
+            codex_task_report_count = 0
+            hook_event_count = 0
+            subagent_run_count = 0
+            evaluation_present = $false
+        }
+        hook_observations = [ordered]@{
+            log_paths = @()
+            event_counts = [ordered]@{}
+            blocking_event_count = 0
+            safety_blocked_count = 0
+            observation_error_count = 0
+        }
+        subagents = [ordered]@{
+            records = @()
+            summary = [ordered]@{
+                total = 0
+                read_only = 0
+                writable = 0
+                scope_violations = 0
+                used_in_final_plan = 0
+            }
+        }
         evaluation_path = $State.evaluation_path
         status = $State.run_status
         primary_failure_category = $State.primary_failure_category
     }
 
+    if (Test-Path $Path) {
+        try {
+            $existing = Get-Content -Raw -Path $Path | ConvertFrom-Json
+        }
+        catch {
+            $existing = $null
+        }
+
+        if ($existing) {
+            $manifest.agents_used = @(Get-SortedUniqueStrings -Values (@(@($existing.agents_used) + @($manifest.agents_used))))
+            $manifest.codex_task_reports = @(Get-SortedUniqueStrings -Values (@(@($existing.codex_task_reports) + @($manifest.codex_task_reports))))
+            $manifest.changed_files = @(Get-SortedUniqueStrings -Values (@(@($existing.changed_files) + @($manifest.changed_files))))
+            $existingValidation = if ($existing.PSObject.Properties.Name -contains 'validation') { $existing.validation } else { $null }
+            if ($existingValidation) {
+                $existingCommands = if ($existingValidation.PSObject.Properties.Name -contains 'commands') { @($existingValidation.commands) } else { @() }
+                $existingWarnings = if ($existingValidation.PSObject.Properties.Name -contains 'warnings') { @($existingValidation.warnings) } else { @() }
+                $manifest.validation.commands = @(Get-UniqueJsonObjects -Values (@($existingCommands) + @($manifest.validation.commands)))
+                $manifest.validation.warnings = @(Get-UniqueJsonObjects -Values (@($existingWarnings) + @($manifest.validation.warnings)))
+            }
+            $existingSafety = if ($existing.PSObject.Properties.Name -contains 'safety') { $existing.safety } else { $null }
+            if ($existingSafety) {
+                $manifest.safety.network = ([bool]$existingSafety.network -or [bool]$manifest.safety.network)
+                $manifest.safety.delete_attempt_blocked = ([bool]$existingSafety.delete_attempt_blocked -or [bool]$manifest.safety.delete_attempt_blocked)
+                $manifest.safety.git_mutation_attempt_blocked = ([bool]$existingSafety.git_mutation_attempt_blocked -or [bool]$manifest.safety.git_mutation_attempt_blocked)
+                $manifest.safety.scope_violation = ([bool]$existingSafety.scope_violation -or [bool]$manifest.safety.scope_violation)
+            }
+            if ($null -eq $manifest.evaluation_path -and $null -ne $existing.evaluation_path) {
+                $manifest.evaluation_path = $existing.evaluation_path
+            }
+            if ($null -eq $manifest.primary_failure_category -and $null -ne $existing.primary_failure_category) {
+                $manifest.primary_failure_category = $existing.primary_failure_category
+            }
+            foreach ($key in @('artifact_summary', 'hook_observations', 'subagents')) {
+                if ($existing.PSObject.Properties.Name -contains $key) {
+                    $manifest[$key] = $existing.$key
+                }
+            }
+        }
+    }
+
     ($manifest | ConvertTo-Json -Depth 8) | Set-Content -Path $Path
+
+    $pythonCmd = Get-PythonCommand
+    if (-not $pythonCmd) {
+        throw "Python is required to collect run artifacts when -RecordRunManifest is enabled"
+    }
+
+    $collector = Join-Path $RepoRoot "scripts\\collect-run-artifacts.ps1"
+    if (-not (Test-Path $collector)) {
+        throw "collect-run-artifacts.ps1 is required when -RecordRunManifest is enabled"
+    }
+
+    & powershell.exe -ExecutionPolicy Bypass -File $collector -RunId $State.run_id -ManifestPath $Path | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "collect-run-artifacts failed with exit code $LASTEXITCODE"
+    }
 }
 
 function Test-PathMatchesAllowedDir {
@@ -805,30 +906,37 @@ function Initialize-EvaluationTemplate {
             task_completion = [ordered]@{
                 rating = "not_evaluated"
                 evidence = "Task completion has not been evaluated yet."
+                evidence_refs = @()
             }
             scope_control = [ordered]@{
                 rating = "not_evaluated"
                 evidence = "Scope control has not been evaluated yet."
+                evidence_refs = @()
             }
             validation_confidence = [ordered]@{
                 rating = "not_evaluated"
                 evidence = "Validation confidence has not been evaluated yet."
+                evidence_refs = @()
             }
             safety_compliance = [ordered]@{
                 rating = "not_evaluated"
                 evidence = "Safety compliance has not been evaluated yet."
+                evidence_refs = @()
             }
             reviewability = [ordered]@{
                 rating = "not_evaluated"
                 evidence = "Reviewability has not been evaluated yet."
+                evidence_refs = @()
             }
             maintainability = [ordered]@{
                 rating = "not_evaluated"
                 evidence = "Maintainability has not been evaluated yet."
+                evidence_refs = @()
             }
             reproducibility = [ordered]@{
                 rating = "not_evaluated"
                 evidence = "Reproducibility has not been evaluated yet."
+                evidence_refs = @()
             }
         }
         findings = @()

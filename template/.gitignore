@@ -4,3 +4,4 @@
 .codex/runs/*
 !.codex/runs/
 !.codex/runs/.gitkeep
+scripts/__pycache__/

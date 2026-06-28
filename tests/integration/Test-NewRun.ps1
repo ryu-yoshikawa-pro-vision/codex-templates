@@ -73,6 +73,9 @@ try {
     if ($manifest.task_type -ne 'harness-improvement') { throw "Expected harness-improvement task type, got $($manifest.task_type)" }
     if ($manifest.workflow_level -ne 'strict') { throw "Expected strict workflow, got $($manifest.workflow_level)" }
     if ($manifest.preset -ne 'auto-net') { throw "Expected auto-net preset, got $($manifest.preset)" }
+    if ($manifest.artifact_summary.codex_task_report_count -ne 0 -or $manifest.artifact_summary.hook_event_count -ne 0 -or $manifest.artifact_summary.subagent_run_count -ne 0 -or $manifest.artifact_summary.evaluation_present -ne $false) { throw "artifact_summary defaults are out of contract" }
+    if ((@($manifest.hook_observations.log_paths).Count -ne 0) -or (@($manifest.hook_observations.PSObject.Properties.Name) -notcontains 'event_counts') -or (@($manifest.hook_observations.event_counts.PSObject.Properties | ForEach-Object { $_.Name }).Count -ne 0) -or $manifest.hook_observations.blocking_event_count -ne 0 -or $manifest.hook_observations.safety_blocked_count -ne 0 -or $manifest.hook_observations.observation_error_count -ne 0) { throw "hook_observations defaults are out of contract" }
+    if (@($manifest.subagents.records).Count -ne 0 -or $manifest.subagents.summary.total -ne 0 -or $manifest.subagents.summary.read_only -ne 0 -or $manifest.subagents.summary.writable -ne 0 -or $manifest.subagents.summary.scope_violations -ne 0 -or $manifest.subagents.summary.used_in_final_plan -ne 0) { throw "subagents defaults are out of contract" }
 
     $duplicate = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @('-RunId', $runId, '-Force')
     if ($duplicate.ExitCode -eq 0) { throw "Duplicate run unexpectedly succeeded" }

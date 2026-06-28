@@ -271,6 +271,215 @@
         "artifact_contract_gap"
       ],
       "description": "Copied summary field from evaluation.json.primary_failure_category. Before evaluation.json exists, this should remain null."
+    },
+    "artifact_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "codex_task_report_count",
+        "hook_event_count",
+        "subagent_run_count",
+        "evaluation_present"
+      ],
+      "properties": {
+        "codex_task_report_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hook_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "subagent_run_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evaluation_present": {
+          "type": "boolean"
+        }
+      }
+    },
+    "hook_observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "log_paths",
+        "event_counts",
+        "blocking_event_count",
+        "safety_blocked_count",
+        "observation_error_count"
+      ],
+      "properties": {
+        "log_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "event_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "blocking_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "safety_blocked_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observation_error_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "subagents": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "records",
+        "summary"
+      ],
+      "properties": {
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "subagent_run_id",
+              "agent_name",
+              "role",
+              "mode",
+              "status",
+              "allowed_files_count",
+              "changed_files_count",
+              "scope_compliant",
+              "used_in_final_plan",
+              "parent_decision"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "subagent_run_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "agent_name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "planner",
+                  "investigator",
+                  "reviewer",
+                  "implementation_worker",
+                  "validator",
+                  "other"
+                ]
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "read_only",
+                  "writable",
+                  "hybrid",
+                  "unknown"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "running",
+                  "completed",
+                  "failed",
+                  "cancelled",
+                  "blocked",
+                  "not_run"
+                ]
+              },
+              "allowed_files_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "changed_files_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "scope_compliant": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "used_in_final_plan": {
+                "type": "boolean"
+              },
+              "parent_decision": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "accepted",
+                  "partially_accepted",
+                  "rejected",
+                  "deferred",
+                  "not_reviewed",
+                  null
+                ]
+              }
+            }
+          }
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "total",
+            "read_only",
+            "writable",
+            "scope_violations",
+            "used_in_final_plan"
+          ],
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "read_only": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "writable": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "scope_violations": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "used_in_final_plan": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
     }
   }
 }

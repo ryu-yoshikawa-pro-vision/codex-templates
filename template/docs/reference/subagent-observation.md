@@ -71,8 +71,9 @@ Subagent logs are evidence, not final evaluation judgement.
 
 ## run manifest との関係
 
-- `subagent-run.json` の run manifest への自動統合は後続 PR で扱います。
-- 今回は schema / docs / bundled template の baseline のみを追加します。
+- collector は `.codex/runs/<run_id>/subagents/*.json` を集約し、`run.json.subagents.records[]` に path と summary を載せます。
+- `run.json` には全文を埋め込まず、`allowed_files_count` / `changed_files_count` / `scope_compliant` / `parent_decision` などの summary だけを載せます。
+- read-only subagent の `changed_files != []` や writable subagent の `allowed_files = []` は warning の対象です。
 
 ## Sample JSON
 

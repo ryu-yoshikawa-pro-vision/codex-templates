@@ -13,7 +13,7 @@ Observation events are not the source of truth for evaluation decisions.
 - 対象は observation event 1 件ごとの schema と optional hook baseline です。
 - `hook-observation JSONL` は evidence / tracing 用です。
 - block 判断の正本は既存 safety hook / wrapper / policy に残ります。
-- run manifest への統合は後続 PR で扱います。
+- collector は run_id 一致の event を `run.json.hook_observations` に summary 統合します。
 
 ## Event Types
 
@@ -99,7 +99,8 @@ optional hook baseline は次を受け取れます。
 ## run manifest との関係
 
 - `hook-observation JSONL` は追跡用の補助 artifact です。
-- run manifest 統合は後続 PR で扱います。
+- `run.json` には path / count / blocking summary だけを載せ、raw event 全文は JSONL に残します。
+- `SafetyBlocked` は count と既知 type に限って `run.json.safety` summary 更新に使えます。
 - `evaluation.json` が interpretation の source of truth である点は変えません。
 
 ## Sample JSONL

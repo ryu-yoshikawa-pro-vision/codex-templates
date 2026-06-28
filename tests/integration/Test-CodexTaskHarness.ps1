@@ -116,13 +116,13 @@ function Assert-RunManifestBaseline {
     if ($manifest.validation.status -ne 'skipped') { throw "Expected validation.status skipped, got $($manifest.validation.status)" }
     if ($manifest.status -ne 'completed') { throw "Expected run status completed, got $($manifest.status)" }
     if (@($manifest.codex_task_reports).Count -lt 1) { throw "Expected codex_task_reports to contain at least one entry" }
-    $reportRef = ([string]$manifest.codex_task_reports[0] -replace '\\', '/') -replace '/+', '/'
     $expectedPrefix = "^" + [regex]::Escape(".codex/runs/$ExpectedRunId/reports/")
-    if ($reportRef -notmatch $expectedPrefix) {
-        throw "Expected report ref under .codex/runs/$ExpectedRunId/reports/, got $reportRef"
+    $reportRefs = @($manifest.codex_task_reports | ForEach-Object { (([string]$_) -replace '\\', '/') -replace '/+', '/' })
+    if (@($reportRefs | Where-Object { $_ -notmatch $expectedPrefix }).Count -ne 0) {
+        throw "Expected report refs under .codex/runs/$ExpectedRunId/reports/, got $($reportRefs -join ', ')"
     }
-    if (-not $reportRef.EndsWith($ExpectedReportName)) {
-        throw "Expected report ref to end with $ExpectedReportName, got $reportRef"
+    if (@($reportRefs | Where-Object { $_.EndsWith($ExpectedReportName) }).Count -lt 1) {
+        throw "Expected one report ref to end with $ExpectedReportName, got $($reportRefs -join ', ')"
     }
     if (@($manifest.changed_files).Count -ne 0) { throw "Expected changed_files to be empty" }
     if ($null -ne $manifest.evaluation_path) { throw "Expected evaluation_path to be null" }
@@ -178,7 +178,7 @@ function Assert-RunManifestState {
         return
     }
 
-    $match = @($commands | Where-Object { $_.command -eq $ExpectedCommand -and $_.status -eq $ExpectedCommandStatus } | Select-Object -First 1)
+    $match = @($commands | Where-Object { $_.command -eq $ExpectedCommand -and $_.status -eq $ExpectedCommandStatus })
     if ($match.Count -ne 1) { throw "Expected validation command $ExpectedCommand/$ExpectedCommandStatus, got $($commands | ConvertTo-Json -Depth 6)" }
     if ([string]::IsNullOrWhiteSpace([string]$match[0].evidence)) { throw "Expected non-empty validation command evidence" }
 }
@@ -187,7 +187,8 @@ function Assert-RunManifestContainsCommand {
     param(
         [string]$Path,
         [string]$ExpectedCommand,
-        [string]$ExpectedStatus
+        [string]$ExpectedStatus,
+        [string]$ExpectedEvidencePattern = $null
     )
 
     if (-not (Test-Path $Path)) {
@@ -195,12 +196,15 @@ function Assert-RunManifestContainsCommand {
     }
 
     $manifest = Get-Content -Raw $Path | ConvertFrom-Json
-    $match = @(@($manifest.validation.commands) | Where-Object { $_.command -eq $ExpectedCommand -and $_.status -eq $ExpectedStatus } | Select-Object -First 1)
+    $match = @(@($manifest.validation.commands) | Where-Object { $_.command -eq $ExpectedCommand -and $_.status -eq $ExpectedStatus })
     if ($match.Count -ne 1) {
         throw "Expected validation command $ExpectedCommand/$ExpectedStatus, got $($manifest.validation.commands | ConvertTo-Json -Depth 6)"
     }
     if ([string]::IsNullOrWhiteSpace([string]$match[0].evidence)) {
         throw "Expected non-empty validation command evidence"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedEvidencePattern) -and ([string]$match[0].evidence -notmatch [regex]::Escape($ExpectedEvidencePattern))) {
+        throw "Expected validation evidence to contain '$ExpectedEvidencePattern', got '$($match[0].evidence)'"
     }
 }
 
@@ -374,6 +378,9 @@ try {
     $evaluationTemplateJson = Get-Content -Raw $evaluationTemplateFile | ConvertFrom-Json
     if ($evaluationTemplateJson.run_id -ne $evaluationTemplateRunId) { throw "Expected evaluation run_id $evaluationTemplateRunId, got $($evaluationTemplateJson.run_id)" }
     if ($evaluationTemplateJson.result -ne 'not_evaluated') { throw "Expected evaluation result not_evaluated, got $($evaluationTemplateJson.result)" }
+    foreach ($dimensionProperty in @($evaluationTemplateJson.dimensions.PSObject.Properties)) {
+        if (@($dimensionProperty.Value.evidence_refs).Count -ne 0) { throw "Expected $($dimensionProperty.Name).evidence_refs [] in evaluation template" }
+    }
     Assert-RunManifestEvaluationSummary -Path (Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $evaluationTemplateRunId "run.json"))) -ExpectedEvaluationPath ".codex/runs/$evaluationTemplateRunId/evaluation.json" -ExpectedPrimaryFailureCategory $null
 
     $evaluationExistingRunId = "20260420-020312-JST"
@@ -495,11 +502,16 @@ try {
     ) -ExtraEnv $envMap
     if ($requireEvaluationMismatch.ExitCode -eq 0) { throw "require-evaluation run-id mismatch case unexpectedly succeeded" }
     $requireEvaluationMismatchReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationMismatchRunId "reports"))
-    $requireEvaluationMismatchReportPath = (Get-ChildItem -Path $requireEvaluationMismatchReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
-    Assert-ReportStatus -Path $requireEvaluationMismatchReportPath -ExpectedStatus 'evaluation_invalid' | Out-Null
-    $requireEvaluationMismatchManifest = Get-Content -Raw (Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationMismatchRunId "run.json"))) | ConvertFrom-Json
-    $mismatchEvidence = (@($requireEvaluationMismatchManifest.validation.commands) | ForEach-Object { [string]$_.evidence }) -join ' '
-    if ($mismatchEvidence -notmatch 'evaluation run_id mismatch') { throw "Expected run-id mismatch evidence, got $mismatchEvidence" }
+    if (Test-Path $requireEvaluationMismatchReportsDir) {
+        $requireEvaluationMismatchReportPath = (Get-ChildItem -Path $requireEvaluationMismatchReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+        if (-not [string]::IsNullOrWhiteSpace($requireEvaluationMismatchReportPath)) {
+            Assert-ReportStatus -Path $requireEvaluationMismatchReportPath -ExpectedStatus 'evaluation_invalid' | Out-Null
+        }
+    }
+    $requireEvaluationMismatchManifestPath = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationMismatchRunId "run.json"))
+    $requireEvaluationMismatchManifest = Get-Content -Raw $requireEvaluationMismatchManifestPath | ConvertFrom-Json
+    if ($requireEvaluationMismatchManifest.run_id -ne $requireEvaluationMismatchRunId) { throw "Expected mismatch manifest run_id $requireEvaluationMismatchRunId, got $($requireEvaluationMismatchManifest.run_id)" }
+    Assert-RunManifestContainsCommand -Path $requireEvaluationMismatchManifestPath -ExpectedCommand 'evaluation validation' -ExpectedStatus 'failed' -ExpectedEvidencePattern 'run_id mismatch'
 
     $evaluationTemplateNoManifestReport = Join-Path $tempRoot "evaluation-template-no-manifest.report.json"
     $evaluationTemplateNoManifest = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(

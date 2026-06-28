@@ -260,26 +260,19 @@ function Invoke-OutputSchemaValidation {
 
     $pythonPath = $null
     $pythonArgs = @()
-    foreach ($candidate in @("python", "py")) {
+    foreach ($candidate in @("python", "python3", "py")) {
         $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
         if (-not $cmd) {
             continue
         }
-        $probeArgs = @("--version")
-        $runArgs = @()
-        if ($candidate -eq "py") {
-            $probeArgs = @("-3", "--version")
-            $runArgs = @("-3")
-        }
-        & $cmd.Path @probeArgs *> $null
+        & $cmd.Path --version *> $null
         if ($LASTEXITCODE -eq 0) {
             $pythonPath = $cmd.Path
-            $pythonArgs = $runArgs
             break
         }
     }
     if (-not $pythonPath) {
-        throw "python3 or python is required"
+        throw "python, python3, or py is required"
     }
 
     & $pythonPath @pythonArgs $validator $schemaPath $outputPath
@@ -660,24 +653,45 @@ $dimensionNames = @(
     "reproducibility"
 )
 $dimensionsSchema = $evaluationSchema.properties.dimensions
+$evaluationDefsProperty = $evaluationSchema.PSObject.Properties['$defs']
+Assert-Condition ($null -ne $evaluationDefsProperty) "spec/evaluation.schema.json must define `$defs"
+$evaluationDefs = $evaluationDefsProperty.Value
+$evidenceRefProperty = $evaluationDefs.PSObject.Properties['evidence_ref']
+Assert-Condition ($null -ne $evidenceRefProperty) "spec/evaluation.schema.json must define `$defs.evidence_ref"
+$evidenceRefSchema = $evidenceRefProperty.Value
+Expect-RequiredFields -Schema $evidenceRefSchema -Fields @("kind", "summary") -Label "spec/evaluation.schema.json `$defs.evidence_ref"
+Expect-PropertyKeys -Schema $evidenceRefSchema -Fields @("kind", "path", "selector", "event_id", "summary") -Label "spec/evaluation.schema.json `$defs.evidence_ref"
+Expect-EnumSet -Values $evidenceRefSchema.properties.kind.enum -Expected @(
+    "run_manifest",
+    "codex_task_report",
+    "log_event",
+    "hook_observation",
+    "subagent_run",
+    "changed_file",
+    "validation_command",
+    "evaluation_note"
+) -Label "spec/evaluation.schema.json evidence_refs.kind"
 Expect-RequiredFields -Schema $dimensionsSchema -Fields $dimensionNames -Label "spec/evaluation.schema.json dimensions"
 Expect-PropertyKeys -Schema $dimensionsSchema -Fields $dimensionNames -Label "spec/evaluation.schema.json dimensions"
 foreach ($name in $dimensionNames) {
     $dimensionSchema = $dimensionsSchema.properties.$name
     Expect-RequiredFields -Schema $dimensionSchema -Fields @("rating", "evidence") -Label "spec/evaluation.schema.json dimensions.$name"
-    Expect-PropertyKeys -Schema $dimensionSchema -Fields @("rating", "evidence") -Label "spec/evaluation.schema.json dimensions.$name"
+    Expect-PropertyKeys -Schema $dimensionSchema -Fields @("rating", "evidence", "evidence_refs") -Label "spec/evaluation.schema.json dimensions.$name"
+    Assert-Condition ($dimensionSchema.properties.evidence_refs.items.'$ref' -eq '#/$defs/evidence_ref') "spec/evaluation.schema.json dimensions.$name.evidence_refs must reference #/`$defs/evidence_ref"
     Expect-EnumContains -Values $dimensionSchema.properties.rating.enum -Expected @("pass", "warn", "fail", "not_evaluated") -Label "spec/evaluation.schema.json dimensions.$name.rating"
 }
 
 $findingsItem = $evaluationSchema.properties.findings.items
 Expect-RequiredFields -Schema $findingsItem -Fields @("category", "severity", "evidence", "detail") -Label "spec/evaluation.schema.json findings item"
-Expect-PropertyKeys -Schema $findingsItem -Fields @("category", "severity", "evidence", "detail") -Label "spec/evaluation.schema.json findings item"
+Expect-PropertyKeys -Schema $findingsItem -Fields @("category", "severity", "evidence", "evidence_refs", "detail") -Label "spec/evaluation.schema.json findings item"
+Assert-Condition ($findingsItem.properties.evidence_refs.items.'$ref' -eq '#/$defs/evidence_ref') "spec/evaluation.schema.json findings.evidence_refs must reference #/`$defs/evidence_ref"
 Expect-EnumSet -Values $findingsItem.properties.category.enum -Expected $taxonomyCategories -Label "spec/evaluation.schema.json findings.category"
 Expect-EnumContains -Values $findingsItem.properties.severity.enum -Expected @("low", "medium", "high", "critical") -Label "spec/evaluation.schema.json findings.severity"
 
 $improvementItem = $evaluationSchema.properties.improvement_candidates.items
 Expect-RequiredFields -Schema $improvementItem -Fields @("target", "evidence", "expected_impact", "recommendation") -Label "spec/evaluation.schema.json improvement_candidates item"
-Expect-PropertyKeys -Schema $improvementItem -Fields @("target", "evidence", "expected_impact", "recommendation") -Label "spec/evaluation.schema.json improvement_candidates item"
+Expect-PropertyKeys -Schema $improvementItem -Fields @("target", "evidence", "evidence_refs", "expected_impact", "recommendation") -Label "spec/evaluation.schema.json improvement_candidates item"
+Assert-Condition ($improvementItem.properties.evidence_refs.items.'$ref' -eq '#/$defs/evidence_ref') "spec/evaluation.schema.json improvement_candidates.evidence_refs must reference #/`$defs/evidence_ref"
 
 Expect-RequiredFields -Schema $runManifestSchema -Fields @(
     "schema_version",
@@ -741,6 +755,20 @@ Expect-PropertyKeys -Schema $validationWarningItem -Fields @("type", "path", "me
 $safetySchema = $runManifestSchema.properties.safety
 Expect-RequiredFields -Schema $safetySchema -Fields @("network", "delete_attempt_blocked", "git_mutation_attempt_blocked", "scope_violation") -Label "spec/run-manifest.schema.json safety"
 Expect-PropertyKeys -Schema $safetySchema -Fields @("network", "delete_attempt_blocked", "git_mutation_attempt_blocked", "scope_violation") -Label "spec/run-manifest.schema.json safety"
+$artifactSummarySchema = $runManifestSchema.properties.artifact_summary
+Expect-RequiredFields -Schema $artifactSummarySchema -Fields @("codex_task_report_count", "hook_event_count", "subagent_run_count", "evaluation_present") -Label "spec/run-manifest.schema.json artifact_summary"
+$hookSummarySchema = $runManifestSchema.properties.hook_observations
+Expect-RequiredFields -Schema $hookSummarySchema -Fields @("log_paths", "event_counts", "blocking_event_count", "safety_blocked_count", "observation_error_count") -Label "spec/run-manifest.schema.json hook_observations"
+$subagentsSchema = $runManifestSchema.properties.subagents
+Expect-RequiredFields -Schema $subagentsSchema -Fields @("records", "summary") -Label "spec/run-manifest.schema.json subagents"
+$subagentRecordSchema = $subagentsSchema.properties.records.items
+Expect-RequiredFields -Schema $subagentRecordSchema -Fields @("path", "subagent_run_id", "agent_name", "role", "mode", "status", "allowed_files_count", "changed_files_count", "scope_compliant", "used_in_final_plan", "parent_decision") -Label "spec/run-manifest.schema.json subagents.records item"
+Expect-EnumSet -Values $subagentRecordSchema.properties.role.enum -Expected $subagentRunSchema.properties.role.enum -Label "spec/run-manifest.schema.json subagents.records.role"
+Expect-EnumSet -Values $subagentRecordSchema.properties.mode.enum -Expected $subagentRunSchema.properties.mode.enum -Label "spec/run-manifest.schema.json subagents.records.mode"
+Expect-EnumSet -Values $subagentRecordSchema.properties.status.enum -Expected $subagentRunSchema.properties.status.enum -Label "spec/run-manifest.schema.json subagents.records.status"
+Expect-EnumSet -Values $subagentRecordSchema.properties.parent_decision.enum -Expected (@($subagentRunSchema.properties.parent_decision.properties.action.enum) + @($null)) -Label "spec/run-manifest.schema.json subagents.records.parent_decision"
+$subagentSummarySchema = $subagentsSchema.properties.summary
+Expect-RequiredFields -Schema $subagentSummarySchema -Fields @("total", "read_only", "writable", "scope_violations", "used_in_final_plan") -Label "spec/run-manifest.schema.json subagents.summary"
 
 $templateKeys = @($runManifestTemplate.PSObject.Properties.Name)
 $requiredManifestKeys = @(Normalize-ToArray $runManifestSchema.required)
@@ -755,6 +783,9 @@ Assert-Condition ($runManifestTemplate.safety -is [pscustomobject]) "template/.c
 $safetyTemplateKeys = @($runManifestTemplate.safety.PSObject.Properties.Name | Sort-Object)
 $expectedSafetyKeys = @("delete_attempt_blocked", "git_mutation_attempt_blocked", "network", "scope_violation") | Sort-Object
 Assert-Condition (-not (Compare-Object -ReferenceObject $expectedSafetyKeys -DifferenceObject $safetyTemplateKeys)) "template/.codex/templates/RUN_MANIFEST.json safety keys are out of contract"
+Assert-Condition (($runManifestTemplate.artifact_summary.codex_task_report_count -eq 0) -and ($runManifestTemplate.artifact_summary.hook_event_count -eq 0) -and ($runManifestTemplate.artifact_summary.subagent_run_count -eq 0) -and ($runManifestTemplate.artifact_summary.evaluation_present -eq $false)) "template/.codex/templates/RUN_MANIFEST.json artifact_summary defaults are out of contract"
+Assert-Condition (Test-JsonStructureEqual -Left $runManifestTemplate.hook_observations -Right ([pscustomobject]@{ log_paths = @(); event_counts = [pscustomobject]@{}; blocking_event_count = 0; safety_blocked_count = 0; observation_error_count = 0 })) "template/.codex/templates/RUN_MANIFEST.json hook_observations defaults are out of contract"
+Assert-Condition (Test-JsonStructureEqual -Left $runManifestTemplate.subagents -Right ([pscustomobject]@{ records = @(); summary = [pscustomobject]@{ total = 0; read_only = 0; writable = 0; scope_violations = 0; used_in_final_plan = 0 } })) "template/.codex/templates/RUN_MANIFEST.json subagents defaults are out of contract"
 
 Assert-Contains -RelativePath "template/.codex/templates/EVALUATION.md" -Patterns @(
     "evaluation.json",
