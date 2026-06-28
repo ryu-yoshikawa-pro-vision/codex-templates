@@ -88,3 +88,4 @@
 - consumer 更新ガイド: [`template/docs/guides/consumer-update.md`](template/docs/guides/consumer-update.md)
 - consumer 向け safety harness: [`template/docs/reference/codex-safety-harness.md`](template/docs/reference/codex-safety-harness.md)
 - run examples: [`examples/runs/`](examples/runs/)
+- SDK runner evaluation example: `examples/codex-sdk-runner/`
