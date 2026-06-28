@@ -55,8 +55,10 @@ if (Test-Path -LiteralPath $runRoot) {
     throw "Run directory already exists and will not be overwritten: .codex/runs/$RunId"
 }
 
+$createdRunRoot = $false
 try {
-    New-Item -ItemType Directory -Path $runRoot | Out-Null
+    New-Item -ItemType Directory -Path $runRoot -ErrorAction Stop | Out-Null
+    $createdRunRoot = $true
     Copy-Item -LiteralPath (Join-Path $repoRoot ".codex\templates\TASKS.md") -Destination (Join-Path $runRoot "TASKS.md")
     Copy-Item -LiteralPath (Join-Path $repoRoot ".codex\templates\REPORT.md") -Destination (Join-Path $runRoot "REPORT.md")
     if (-not $NoPlan) {
@@ -73,8 +75,11 @@ try {
     }
 }
 catch {
-    if (Test-Path -LiteralPath $runRoot) {
+    if ($createdRunRoot -and (Test-Path -LiteralPath $runRoot)) {
         Remove-Item -LiteralPath $runRoot -Recurse -Force
+    }
+    if ((-not $createdRunRoot) -and (Test-Path -LiteralPath $runRoot)) {
+        throw "Run directory already exists and will not be overwritten: .codex/runs/$RunId"
     }
     throw
 }

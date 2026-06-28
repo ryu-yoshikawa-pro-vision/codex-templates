@@ -46,6 +46,11 @@ Get-ChildItem -Force -Path $templateSourceRoot | ForEach-Object {
 }
 Push-Location $templateRoot
 try {
+    $scriptContent = Get-Content -Raw $wrapperPath
+    if ($scriptContent -notmatch [regex]::Escape('$createdRunRoot = $false')) { throw "new-run.ps1 missing createdRunRoot initialization" }
+    if ($scriptContent -notmatch [regex]::Escape('if ($createdRunRoot -and (Test-Path -LiteralPath $runRoot))')) { throw "new-run.ps1 missing guarded rollback removal" }
+    if ($scriptContent -notmatch [regex]::Escape('if ((-not $createdRunRoot) -and (Test-Path -LiteralPath $runRoot))')) { throw "new-run.ps1 missing duplicate-run guard in catch" }
+
     $runId = "20260628-113100-JST"
     $result = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
         '-RunId', $runId,

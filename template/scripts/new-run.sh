@@ -144,12 +144,10 @@ else
 fi
 
 run_root="$runs_root/$run_id"
-if [[ -e "$run_root" ]]; then
+if ! mkdir "$run_root"; then
   echo "Run directory already exists and will not be overwritten: .codex/runs/$run_id" >&2
   exit 1
 fi
-
-mkdir "$run_root"
 cp "$repo_root/.codex/templates/TASKS.md" "$run_root/TASKS.md"
 cp "$repo_root/.codex/templates/REPORT.md" "$run_root/REPORT.md"
 if (( ! no_plan )); then

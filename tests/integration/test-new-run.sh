@@ -27,6 +27,12 @@ mkdir -p "$template_root"
 cp -R "$template_source_root/." "$template_root"
 cd "$template_root"
 
+grep -Fq 'if ! mkdir "$run_root"; then' "$wrapper"
+if grep -Fq '[[ -e "$run_root" ]]' "$wrapper"; then
+  echo "new-run.sh still contains precheck for existing run_root" >&2
+  exit 1
+fi
+
 assert_manifest_fields() {
   local path="$1"
   local expected_run_id="$2"
