@@ -35,6 +35,17 @@ function Invoke-WindowsPowerShellFile {
     }
 }
 
+function Get-PythonCommand {
+    foreach ($candidate in @("python", "python3", "py")) {
+        $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
+        if ($cmd) {
+            return $cmd.Source
+        }
+    }
+
+    throw "Python is required for this test"
+}
+
 function Invoke-PythonValidation {
     param(
         [Parameter(Mandatory = $true)][string]$ScriptPath,
@@ -44,8 +55,9 @@ function Invoke-PythonValidation {
 
     $stdoutFile = [System.IO.Path]::GetTempFileName()
     $stderrFile = [System.IO.Path]::GetTempFileName()
+    $python = Get-PythonCommand
     try {
-        $proc = Start-Process -FilePath 'python' `
+        $proc = Start-Process -FilePath $python `
             -ArgumentList @($ScriptPath, $SchemaPath, $JsonPath) `
             -NoNewWindow -Wait -PassThru `
             -RedirectStandardOutput $stdoutFile `
@@ -182,13 +194,17 @@ not-json
     if ($data.artifact_summary.codex_task_report_count -ne 2 -or $data.artifact_summary.hook_event_count -ne 5 -or $data.artifact_summary.subagent_run_count -ne 1 -or $data.artifact_summary.evaluation_present -ne $true) {
         throw "Unexpected artifact_summary: $($data.artifact_summary | ConvertTo-Json -Depth 6)"
     }
-    $changed = @($data.changed_files)
-    if (@(@("README.md", "docs/reference/hook-observation.md") | Where-Object { $_ -notin $changed }).Count -ne 0) { throw "Unexpected changed_files: $($changed -join ', ')" }
+    if ((@($data.changed_files) | ConvertTo-Json -Compress) -ne '["README.md","docs/reference/hook-observation.md"]') { throw "Unexpected changed_files: $($data.changed_files | ConvertTo-Json -Compress)" }
+    if ((@($data.hook_observations.log_paths) | ConvertTo-Json -Compress) -ne ('[".codex/observations/hooks.jsonl",".codex/runs/{0}/logs/extra-hooks.jsonl"]' -f $runId)) { throw "Unexpected hook log paths: $($data.hook_observations.log_paths | ConvertTo-Json -Compress)" }
     if ($data.hook_observations.event_counts.SafetyBlocked -ne 2 -or $data.hook_observations.event_counts.ObservationError -ne 1 -or $data.hook_observations.event_counts.WrapperStart -ne 1 -or $data.hook_observations.event_counts.SubagentStart -ne 1) {
         throw "Unexpected hook event counts: $($data.hook_observations | ConvertTo-Json -Depth 6)"
     }
+    if ($data.hook_observations.blocking_event_count -ne 2 -or $data.hook_observations.safety_blocked_count -ne 2 -or $data.hook_observations.observation_error_count -ne 1) { throw "Unexpected hook summary counts: $($data.hook_observations | ConvertTo-Json -Depth 6)" }
     if ($data.safety.delete_attempt_blocked -ne $true -or $data.safety.git_mutation_attempt_blocked -ne $true) { throw "Safety summary was not updated: $($data.safety | ConvertTo-Json -Depth 4)" }
-    if ($data.subagents.summary.total -ne 1 -or $data.subagents.summary.writable -ne 1 -or $data.subagents.summary.used_in_final_plan -ne 1) { throw "Unexpected subagent summary: $($data.subagents.summary | ConvertTo-Json -Depth 4)" }
+    if ($data.subagents.summary.total -ne 1 -or $data.subagents.summary.read_only -ne 0 -or $data.subagents.summary.writable -ne 1 -or $data.subagents.summary.scope_violations -ne 0 -or $data.subagents.summary.used_in_final_plan -ne 1) { throw "Unexpected subagent summary: $($data.subagents.summary | ConvertTo-Json -Depth 4)" }
+    if (@($data.subagents.records).Count -ne 1) { throw "Unexpected subagent record count: $(@($data.subagents.records).Count)" }
+    $record = @($data.subagents.records)[0]
+    if ($record.path -ne ".codex/runs/$runId/subagents/subagent-001.json" -or $record.subagent_run_id -ne 'subagent-001' -or $record.agent_name -ne 'implementation_worker' -or $record.role -ne 'implementation_worker' -or $record.mode -ne 'writable' -or $record.status -ne 'completed' -or $record.allowed_files_count -ne 1 -or $record.changed_files_count -ne 1 -or $record.scope_compliant -ne $true -or $record.used_in_final_plan -ne $true -or $record.parent_decision -ne 'accepted') { throw "Unexpected subagent record: $($record | ConvertTo-Json -Depth 6)" }
     if ($data.evaluation_path -ne ".codex/runs/$runId/evaluation.json") { throw "Unexpected evaluation_path: $($data.evaluation_path)" }
     if ($data.primary_failure_category -ne "missing_validation") { throw "Unexpected primary_failure_category: $($data.primary_failure_category)" }
     if ("implementation_worker" -notin @($data.agents_used)) { throw "agents_used missing implementation_worker: $($data.agents_used -join ', ')" }
@@ -196,6 +212,44 @@ not-json
     foreach ($expected in @("expected_changed_file_missing", "subagent_invalid_json", "subagent_parent_run_mismatch", "hook_observation_invalid_jsonl")) {
         if ($expected -notin $warningTypes) { throw "Missing warning ${expected}: $($warningTypes -join ', ')" }
     }
+
+    $baseManifestPath = Join-Path $runRoot "base.json"
+    @"
+{
+  "schema_version": 1,
+  "run_id": "$runId",
+  "task_type": "harness-improvement",
+  "workflow_level": "strict",
+  "preset": "safe",
+  "runtime": "host",
+  "agents_used": ["baseline"],
+  "repo": "sample/repo",
+  "branch": "feature/base-manifest",
+  "base_branch": "main",
+  "codex_task_reports": [],
+  "changed_files": [],
+  "validation": {"status": "not_run", "commands": [], "warnings": []},
+  "safety": {"network": false, "delete_attempt_blocked": false, "git_mutation_attempt_blocked": false, "scope_violation": false},
+  "artifact_summary": {"codex_task_report_count": 0, "hook_event_count": 0, "subagent_run_count": 0, "evaluation_present": false},
+  "hook_observations": {"log_paths": [], "event_counts": {}, "blocking_event_count": 0, "safety_blocked_count": 0, "observation_error_count": 0},
+  "subagents": {"records": [], "summary": {"total": 0, "read_only": 0, "writable": 0, "scope_violations": 0, "used_in_final_plan": 0}},
+  "evaluation_path": null,
+  "status": "pending",
+  "primary_failure_category": null
+}
+"@ | Set-Content -Path $baseManifestPath
+    $relativeManifestPath = ".codex/runs/$runId/relative-run.json"
+    Push-Location $tempRoot
+    try {
+        $relativeCollector = Invoke-WindowsPowerShellFile -ScriptPath (Join-Path $templateRoot "scripts\\collect-run-artifacts.ps1") -Arguments @('-RunId', $runId, '-BaseManifest', ".codex/runs/$runId/base.json", '-ManifestPath', $relativeManifestPath)
+    }
+    finally {
+        Pop-Location
+    }
+    if ($relativeCollector.ExitCode -ne 0) { throw "relative base-manifest collector failed: $($relativeCollector.StdOut)`n$($relativeCollector.StdErr)" }
+    $relativeData = Get-Content -Raw (Join-Path $templateRoot $relativeManifestPath) | ConvertFrom-Json
+    if ($relativeData.repo -ne 'sample/repo' -or $relativeData.base_branch -ne 'main' -or $relativeData.branch -ne 'feature/base-manifest') { throw "Relative base-manifest inheritance failed: $($relativeData | ConvertTo-Json -Depth 6)" }
+    if ('baseline' -notin @($relativeData.agents_used)) { throw "Relative base-manifest agents_used inheritance failed: $($relativeData.agents_used -join ', ')" }
 
     $validator = Join-Path $templateRoot "scripts\\validate-output-schema.py"
     $schema = Join-Path $templateRoot ".codex\\templates\\evaluation.schema.json"

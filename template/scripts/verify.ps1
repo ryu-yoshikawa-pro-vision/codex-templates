@@ -156,6 +156,10 @@ function Test-TemplateContract {
     if ($changeScope -notmatch [regex]::Escape("must_be_subset_of_allowed_scope")) { throw "change-scope doc missing allowed scope subset contract" }
     if ($changeScope -notmatch [regex]::Escape("--record-run-manifest")) { throw "change-scope doc missing record-run-manifest guidance" }
     $runArtifacts = Get-Content -Raw docs/reference/run-artifacts.md
+    if ($runArtifacts -notmatch [regex]::Escape("run.json")) { throw "run-artifacts doc missing run.json guidance" }
+    if ($runArtifacts -notmatch [regex]::Escape("changed_files")) { throw "run-artifacts doc missing changed_files guidance" }
+    if ($runArtifacts -notmatch [regex]::Escape("hook_observations")) { throw "run-artifacts doc missing hook_observations guidance" }
+    if ($runArtifacts -notmatch [regex]::Escape("subagents")) { throw "run-artifacts doc missing subagents guidance" }
     if ($runArtifacts -notmatch [regex]::Escape("--max-iterations")) { throw "run-artifacts doc missing max-iterations guidance" }
     if ($runArtifacts -notmatch [regex]::Escape("repair loop")) { throw "run-artifacts doc missing repair loop guidance" }
     if ($runArtifacts -notmatch [regex]::Escape("collect-run-artifacts")) { throw "run-artifacts doc missing collector guidance" }
@@ -166,6 +170,11 @@ function Test-TemplateContract {
     $hookDoc = Get-Content -Raw docs/reference/hook-observation.md
     if ($hookDoc -notmatch [regex]::Escape("run.json.hook_observations")) { throw "hook observation doc missing manifest integration guidance" }
     $subagentDoc = Get-Content -Raw docs/reference/subagent-observation.md
+    if ($subagentDoc -notmatch [regex]::Escape("implementation_worker")) { throw "subagent observation doc missing implementation_worker guidance" }
+    if ($subagentDoc -notmatch [regex]::Escape("allowed_files")) { throw "subagent observation doc missing allowed_files guidance" }
+    if ($subagentDoc -notmatch [regex]::Escape("changed_files")) { throw "subagent observation doc missing changed_files guidance" }
+    if ($subagentDoc -notmatch [regex]::Escape("parent_decision")) { throw "subagent observation doc missing parent_decision guidance" }
+    if ($subagentDoc -notmatch [regex]::Escape("used_in_final_plan")) { throw "subagent observation doc missing used_in_final_plan guidance" }
     if ($subagentDoc -notmatch [regex]::Escape("run.json.subagents.records")) { throw "subagent observation doc missing manifest integration guidance" }
 
     $config = Get-Content -Raw .codex/config.toml

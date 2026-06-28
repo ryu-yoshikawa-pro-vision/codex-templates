@@ -207,7 +207,9 @@ if data["subagents"]["summary"] != {
 record = data["subagents"]["records"][0]
 if record["path"] != f".codex/runs/{run_id}/subagents/subagent-001.json":
     raise SystemExit(f"unexpected subagent record path: {record}")
-if record["changed_files_count"] != 1 or record["allowed_files_count"] != 1 or record["scope_compliant"] is not True:
+if record["subagent_run_id"] != "subagent-001" or record["agent_name"] != "implementation_worker" or record["role"] != "implementation_worker" or record["mode"] != "writable" or record["status"] != "completed":
+    raise SystemExit(f"unexpected subagent identity fields: {record}")
+if record["changed_files_count"] != 1 or record["allowed_files_count"] != 1 or record["scope_compliant"] is not True or record["used_in_final_plan"] is not True or record["parent_decision"] != "accepted":
     raise SystemExit(f"unexpected subagent record: {record}")
 if data["evaluation_path"] != f".codex/runs/{run_id}/evaluation.json":
     raise SystemExit(f"unexpected evaluation_path: {data['evaluation_path']}")
@@ -219,6 +221,49 @@ warning_types = {item["type"] for item in data["validation"]["warnings"]}
 for expected in {"expected_changed_file_missing", "subagent_invalid_json", "subagent_parent_run_mismatch", "hook_observation_invalid_jsonl"}:
     if expected not in warning_types:
         raise SystemExit(f"missing warning {expected}: {data['validation']['warnings']}")
+PY
+
+cat > ".codex/runs/$run_id/base.json" <<EOF
+{
+  "schema_version": 1,
+  "run_id": "$run_id",
+  "task_type": "harness-improvement",
+  "workflow_level": "strict",
+  "preset": "safe",
+  "runtime": "host",
+  "agents_used": ["baseline"],
+  "repo": "sample/repo",
+  "branch": "feature/base-manifest",
+  "base_branch": "main",
+  "codex_task_reports": [],
+  "changed_files": [],
+  "validation": {"status": "not_run", "commands": [], "warnings": []},
+  "safety": {"network": false, "delete_attempt_blocked": false, "git_mutation_attempt_blocked": false, "scope_violation": false},
+  "artifact_summary": {"codex_task_report_count": 0, "hook_event_count": 0, "subagent_run_count": 0, "evaluation_present": false},
+  "hook_observations": {"log_paths": [], "event_counts": {}, "blocking_event_count": 0, "safety_blocked_count": 0, "observation_error_count": 0},
+  "subagents": {"records": [], "summary": {"total": 0, "read_only": 0, "writable": 0, "scope_violations": 0, "used_in_final_plan": 0}},
+  "evaluation_path": null,
+  "status": "pending",
+  "primary_failure_category": null
+}
+EOF
+
+(
+  cd "$temp_root"
+  bash "$template_root/scripts/collect-run-artifacts.sh" \
+    --run-id "$run_id" \
+    --base-manifest ".codex/runs/$run_id/base.json" \
+    --manifest-path ".codex/runs/$run_id/relative-run.json"
+)
+
+"$python_cmd" - "$template_root/.codex/runs/$run_id/relative-run.json" <<'PY'
+import json
+import sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+if data["repo"] != "sample/repo" or data["branch"] != "feature/base-manifest" or data["base_branch"] != "main":
+    raise SystemExit(f"relative base-manifest inheritance failed: {data}")
+if "baseline" not in data["agents_used"]:
+    raise SystemExit(f"relative base-manifest agents_used inheritance failed: {data['agents_used']}")
 PY
 
 cat > "$temp_root/evaluation-old.json" <<'EOF'

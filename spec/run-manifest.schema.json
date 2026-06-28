@@ -382,15 +382,35 @@
               },
               "role": {
                 "type": "string",
-                "minLength": 1
+                "enum": [
+                  "planner",
+                  "investigator",
+                  "reviewer",
+                  "implementation_worker",
+                  "validator",
+                  "other"
+                ]
               },
               "mode": {
                 "type": "string",
-                "minLength": 1
+                "enum": [
+                  "read_only",
+                  "writable",
+                  "hybrid",
+                  "unknown"
+                ]
               },
               "status": {
                 "type": "string",
-                "minLength": 1
+                "enum": [
+                  "pending",
+                  "running",
+                  "completed",
+                  "failed",
+                  "cancelled",
+                  "blocked",
+                  "not_run"
+                ]
               },
               "allowed_files_count": {
                 "type": "integer",
@@ -414,7 +434,14 @@
                   "string",
                   "null"
                 ],
-                "minLength": 1
+                "enum": [
+                  "accepted",
+                  "partially_accepted",
+                  "rejected",
+                  "deferred",
+                  "not_reviewed",
+                  null
+                ]
               }
             }
           }

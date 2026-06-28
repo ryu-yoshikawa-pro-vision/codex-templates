@@ -554,6 +554,29 @@ function Write-RunManifest {
             git_mutation_attempt_blocked = $false
             scope_violation = $State.scope_violation
         }
+        artifact_summary = [ordered]@{
+            codex_task_report_count = 0
+            hook_event_count = 0
+            subagent_run_count = 0
+            evaluation_present = $false
+        }
+        hook_observations = [ordered]@{
+            log_paths = @()
+            event_counts = [ordered]@{}
+            blocking_event_count = 0
+            safety_blocked_count = 0
+            observation_error_count = 0
+        }
+        subagents = [ordered]@{
+            records = @()
+            summary = [ordered]@{
+                total = 0
+                read_only = 0
+                writable = 0
+                scope_violations = 0
+                used_in_final_plan = 0
+            }
+        }
         evaluation_path = $State.evaluation_path
         status = $State.run_status
         primary_failure_category = $State.primary_failure_category
@@ -568,15 +591,15 @@ function Write-RunManifest {
         }
 
         if ($existing) {
-            $manifest.agents_used = @(Get-SortedUniqueStrings -Values (@($existing.agents_used) + @($manifest.agents_used)))
-            $manifest.codex_task_reports = @(Get-SortedUniqueStrings -Values (@($existing.codex_task_reports) + @($manifest.codex_task_reports)))
-            $manifest.changed_files = @(Get-SortedUniqueStrings -Values (@($existing.changed_files) + @($manifest.changed_files)))
+            $manifest.agents_used = @(Get-SortedUniqueStrings -Values (@(@($existing.agents_used) + @($manifest.agents_used))))
+            $manifest.codex_task_reports = @(Get-SortedUniqueStrings -Values (@(@($existing.codex_task_reports) + @($manifest.codex_task_reports))))
+            $manifest.changed_files = @(Get-SortedUniqueStrings -Values (@(@($existing.changed_files) + @($manifest.changed_files))))
             $existingValidation = if ($existing.PSObject.Properties.Name -contains 'validation') { $existing.validation } else { $null }
             if ($existingValidation) {
                 $existingCommands = if ($existingValidation.PSObject.Properties.Name -contains 'commands') { @($existingValidation.commands) } else { @() }
                 $existingWarnings = if ($existingValidation.PSObject.Properties.Name -contains 'warnings') { @($existingValidation.warnings) } else { @() }
-                $manifest.validation.commands = @($existingCommands + @($manifest.validation.commands))
-                $manifest.validation.warnings = @($existingWarnings + @($manifest.validation.warnings))
+                $manifest.validation.commands = @(@($existingCommands) + @($manifest.validation.commands))
+                $manifest.validation.warnings = @(@($existingWarnings) + @($manifest.validation.warnings))
             }
             $existingSafety = if ($existing.PSObject.Properties.Name -contains 'safety') { $existing.safety } else { $null }
             if ($existingSafety) {
@@ -601,15 +624,19 @@ function Write-RunManifest {
 
     ($manifest | ConvertTo-Json -Depth 8) | Set-Content -Path $Path
 
-    $pythonAvailable = ($null -ne (Get-Command python -ErrorAction SilentlyContinue)) -or ($null -ne (Get-Command py -ErrorAction SilentlyContinue))
-    if ($pythonAvailable) {
-        $collector = Join-Path $RepoRoot "scripts\\collect-run-artifacts.ps1"
-        if (Test-Path $collector) {
-            & powershell.exe -ExecutionPolicy Bypass -File $collector -RunId $State.run_id -ManifestPath $Path | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                throw "collect-run-artifacts failed with exit code $LASTEXITCODE"
-            }
-        }
+    $pythonCmd = Get-PythonCommand
+    if (-not $pythonCmd) {
+        throw "Python is required to collect run artifacts when -RecordRunManifest is enabled"
+    }
+
+    $collector = Join-Path $RepoRoot "scripts\\collect-run-artifacts.ps1"
+    if (-not (Test-Path $collector)) {
+        throw "collect-run-artifacts.ps1 is required when -RecordRunManifest is enabled"
+    }
+
+    & powershell.exe -ExecutionPolicy Bypass -File $collector -RunId $State.run_id -ManifestPath $Path | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "collect-run-artifacts failed with exit code $LASTEXITCODE"
     }
 }
 

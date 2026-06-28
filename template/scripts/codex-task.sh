@@ -547,6 +547,29 @@ write_run_manifest() {
     "git_mutation_attempt_blocked": false,
     "scope_violation": $safety_scope_violation
   },
+  "artifact_summary": {
+    "codex_task_report_count": 0,
+    "hook_event_count": 0,
+    "subagent_run_count": 0,
+    "evaluation_present": false
+  },
+  "hook_observations": {
+    "log_paths": [],
+    "event_counts": {},
+    "blocking_event_count": 0,
+    "safety_blocked_count": 0,
+    "observation_error_count": 0
+  },
+  "subagents": {
+    "records": [],
+    "summary": {
+      "total": 0,
+      "read_only": 0,
+      "writable": 0,
+      "scope_violations": 0,
+      "used_in_final_plan": 0
+    }
+  },
   "evaluation_path": $(json_nullable_string "$evaluation_path"),
   "status": "$(json_escape "$run_status")",
   "primary_failure_category": $(json_nullable_string "$primary_failure_category")
@@ -603,8 +626,8 @@ if current.get("evaluation_path") is None and existing.get("evaluation_path") is
 if current.get("primary_failure_category") is None and existing.get("primary_failure_category") is not None:
     current["primary_failure_category"] = existing.get("primary_failure_category")
 for key in ("artifact_summary", "hook_observations", "subagents"):
-    if key in existing and key not in current:
-      current[key] = existing[key]
+    if key in existing:
+        current[key] = existing[key]
 
 print(json.dumps(current, ensure_ascii=True, indent=2))
 PY

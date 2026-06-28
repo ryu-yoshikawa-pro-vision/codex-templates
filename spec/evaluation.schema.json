@@ -14,6 +14,53 @@
     "findings",
     "improvement_candidates"
   ],
+  "$defs": {
+    "evidence_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "summary"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "run_manifest",
+            "codex_task_report",
+            "log_event",
+            "hook_observation",
+            "subagent_run",
+            "changed_file",
+            "validation_command",
+            "evaluation_note"
+          ]
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selector": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "event_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
   "properties": {
     "schema_version": {
       "type": "integer",
@@ -111,49 +158,7 @@
               "type": "array",
               "description": "Optional structured references to run artifacts that support the evidence string.",
               "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "summary"
-                ],
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "enum": [
-                      "run_manifest",
-                      "codex_task_report",
-                      "log_event",
-                      "hook_observation",
-                      "subagent_run",
-                      "changed_file",
-                      "validation_command",
-                      "evaluation_note"
-                    ]
-                  },
-                  "path": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "selector": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "event_id": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "summary": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
+                "$ref": "#/$defs/evidence_ref"
               }
             }
           }
@@ -183,49 +188,7 @@
             "evidence_refs": {
               "type": "array",
               "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "summary"
-                ],
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "enum": [
-                      "run_manifest",
-                      "codex_task_report",
-                      "log_event",
-                      "hook_observation",
-                      "subagent_run",
-                      "changed_file",
-                      "validation_command",
-                      "evaluation_note"
-                    ]
-                  },
-                  "path": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "selector": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "event_id": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "summary": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
+                "$ref": "#/$defs/evidence_ref"
               }
             }
           }
@@ -255,49 +218,7 @@
             "evidence_refs": {
               "type": "array",
               "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "summary"
-                ],
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "enum": [
-                      "run_manifest",
-                      "codex_task_report",
-                      "log_event",
-                      "hook_observation",
-                      "subagent_run",
-                      "changed_file",
-                      "validation_command",
-                      "evaluation_note"
-                    ]
-                  },
-                  "path": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "selector": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "event_id": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "summary": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
+                "$ref": "#/$defs/evidence_ref"
               }
             }
           }
@@ -327,49 +248,7 @@
             "evidence_refs": {
               "type": "array",
               "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "summary"
-                ],
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "enum": [
-                      "run_manifest",
-                      "codex_task_report",
-                      "log_event",
-                      "hook_observation",
-                      "subagent_run",
-                      "changed_file",
-                      "validation_command",
-                      "evaluation_note"
-                    ]
-                  },
-                  "path": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "selector": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "event_id": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "summary": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
+                "$ref": "#/$defs/evidence_ref"
               }
             }
           }
@@ -399,49 +278,7 @@
             "evidence_refs": {
               "type": "array",
               "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "summary"
-                ],
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "enum": [
-                      "run_manifest",
-                      "codex_task_report",
-                      "log_event",
-                      "hook_observation",
-                      "subagent_run",
-                      "changed_file",
-                      "validation_command",
-                      "evaluation_note"
-                    ]
-                  },
-                  "path": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "selector": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "event_id": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "summary": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
+                "$ref": "#/$defs/evidence_ref"
               }
             }
           }
@@ -471,49 +308,7 @@
             "evidence_refs": {
               "type": "array",
               "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "summary"
-                ],
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "enum": [
-                      "run_manifest",
-                      "codex_task_report",
-                      "log_event",
-                      "hook_observation",
-                      "subagent_run",
-                      "changed_file",
-                      "validation_command",
-                      "evaluation_note"
-                    ]
-                  },
-                  "path": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "selector": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "event_id": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "summary": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
+                "$ref": "#/$defs/evidence_ref"
               }
             }
           }
@@ -543,49 +338,7 @@
             "evidence_refs": {
               "type": "array",
               "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "summary"
-                ],
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "enum": [
-                      "run_manifest",
-                      "codex_task_report",
-                      "log_event",
-                      "hook_observation",
-                      "subagent_run",
-                      "changed_file",
-                      "validation_command",
-                      "evaluation_note"
-                    ]
-                  },
-                  "path": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "selector": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "event_id": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "summary": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
+                "$ref": "#/$defs/evidence_ref"
               }
             }
           }
@@ -636,49 +389,7 @@
           "evidence_refs": {
             "type": "array",
             "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "kind",
-                "summary"
-              ],
-              "properties": {
-                "kind": {
-                  "type": "string",
-                  "enum": [
-                    "run_manifest",
-                    "codex_task_report",
-                    "log_event",
-                    "hook_observation",
-                    "subagent_run",
-                    "changed_file",
-                    "validation_command",
-                    "evaluation_note"
-                  ]
-                },
-                "path": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "selector": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "event_id": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "summary": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
+              "$ref": "#/$defs/evidence_ref"
             }
           },
           "detail": {
@@ -712,49 +423,7 @@
           "evidence_refs": {
             "type": "array",
             "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "kind",
-                "summary"
-              ],
-              "properties": {
-                "kind": {
-                  "type": "string",
-                  "enum": [
-                    "run_manifest",
-                    "codex_task_report",
-                    "log_event",
-                    "hook_observation",
-                    "subagent_run",
-                    "changed_file",
-                    "validation_command",
-                    "evaluation_note"
-                  ]
-                },
-                "path": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "selector": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "event_id": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "summary": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
+              "$ref": "#/$defs/evidence_ref"
             }
           },
           "expected_impact": {

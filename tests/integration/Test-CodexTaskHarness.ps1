@@ -187,7 +187,8 @@ function Assert-RunManifestContainsCommand {
     param(
         [string]$Path,
         [string]$ExpectedCommand,
-        [string]$ExpectedStatus
+        [string]$ExpectedStatus,
+        [string]$ExpectedEvidencePattern = $null
     )
 
     if (-not (Test-Path $Path)) {
@@ -201,6 +202,9 @@ function Assert-RunManifestContainsCommand {
     }
     if ([string]::IsNullOrWhiteSpace([string]$match[0].evidence)) {
         throw "Expected non-empty validation command evidence"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedEvidencePattern) -and ([string]$match[0].evidence -notmatch [regex]::Escape($ExpectedEvidencePattern))) {
+        throw "Expected validation evidence to contain '$ExpectedEvidencePattern', got '$($match[0].evidence)'"
     }
 }
 
@@ -495,8 +499,22 @@ try {
         'EVALUATION_MISMATCH'
     ) -ExtraEnv $envMap
     if ($requireEvaluationMismatch.ExitCode -eq 0) { throw "require-evaluation run-id mismatch case unexpectedly succeeded" }
-    $requireEvaluationMismatchManifest = Get-Content -Raw (Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationMismatchRunId "run.json"))) | ConvertFrom-Json
+    $requireEvaluationMismatchReportsDir = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationMismatchRunId "reports"))
+    if (Test-Path $requireEvaluationMismatchReportsDir) {
+        $requireEvaluationMismatchReportPath = (Get-ChildItem -Path $requireEvaluationMismatchReportsDir -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+        if (-not [string]::IsNullOrWhiteSpace($requireEvaluationMismatchReportPath)) {
+            Assert-ReportStatus -Path $requireEvaluationMismatchReportPath -ExpectedStatus 'evaluation_invalid' | Out-Null
+        }
+    }
+    $requireEvaluationMismatchManifestPath = Join-Path $templateRoot (Join-Path ".codex\\runs" (Join-Path $requireEvaluationMismatchRunId "run.json"))
+    $requireEvaluationMismatchManifest = Get-Content -Raw $requireEvaluationMismatchManifestPath | ConvertFrom-Json
     if ($requireEvaluationMismatchManifest.run_id -ne $requireEvaluationMismatchRunId) { throw "Expected mismatch manifest run_id $requireEvaluationMismatchRunId, got $($requireEvaluationMismatchManifest.run_id)" }
+    if (@($requireEvaluationMismatchManifest.validation.commands).Count -gt 0) {
+        Assert-RunManifestContainsCommand -Path $requireEvaluationMismatchManifestPath -ExpectedCommand 'evaluation validation' -ExpectedStatus 'failed' -ExpectedEvidencePattern 'run_id mismatch'
+    }
+    elseif ($requireEvaluationMismatch.Combined -notmatch [regex]::Escape('run_id mismatch')) {
+        throw "Expected run_id mismatch evidence in manifest command or process output, got: $($requireEvaluationMismatch.Combined)"
+    }
 
     $evaluationTemplateNoManifestReport = Join-Path $tempRoot "evaluation-template-no-manifest.report.json"
     $evaluationTemplateNoManifest = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(

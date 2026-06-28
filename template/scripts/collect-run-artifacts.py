@@ -359,7 +359,7 @@ def load_manifest_candidate(path: Path):
 
 def merge_manifests(default_data, existing_data, base_data):
     manifest = copy.deepcopy(default_data)
-    for source in (existing_data or {}, base_data or {}):
+    for source in (base_data or {}, existing_data or {}):
         for key in ("schema_version", "run_id", "task_type", "workflow_level", "preset", "runtime", "repo", "branch", "base_branch", "evaluation_path", "status", "primary_failure_category"):
             value = source.get(key)
             if value is not None:
@@ -396,7 +396,12 @@ def main():
 
     default_data = default_manifest(repo_root, args.run_id)
     existing_data = load_manifest_candidate(manifest_path)
-    base_data = load_manifest_candidate(Path(args.base_manifest)) if args.base_manifest else None
+    base_manifest_path = None
+    if args.base_manifest:
+        base_manifest_path = Path(args.base_manifest)
+        if not base_manifest_path.is_absolute():
+            base_manifest_path = repo_root / base_manifest_path
+    base_data = load_manifest_candidate(base_manifest_path) if base_manifest_path else None
     manifest = merge_manifests(default_data, existing_data, base_data)
     manifest["run_id"] = args.run_id
 

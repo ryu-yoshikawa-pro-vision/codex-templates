@@ -156,10 +156,11 @@ assert_manifest_contains_command() {
   local path="$1"
   local expected_command="$2"
   local expected_status="$3"
-  "$python_cmd" - "$path" "$expected_command" "$expected_status" <<'PY'
+  local expected_evidence_pattern="${4:-}"
+  "$python_cmd" - "$path" "$expected_command" "$expected_status" "$expected_evidence_pattern" <<'PY'
 import json
 import sys
-path, expected_command, expected_status = sys.argv[1:4]
+path, expected_command, expected_status, expected_evidence_pattern = sys.argv[1:5]
 data = json.load(open(path, encoding="utf-8"))
 commands = data["validation"]["commands"]
 matches = [command for command in commands if command["command"] == expected_command and command["status"] == expected_status]
@@ -167,6 +168,8 @@ if not matches:
     raise SystemExit(f"expected command {expected_command}/{expected_status}, got {commands}")
 if not matches[0]["evidence"]:
     raise SystemExit("expected non-empty validation evidence")
+if expected_evidence_pattern and expected_evidence_pattern not in matches[0]["evidence"]:
+    raise SystemExit(f"expected evidence to contain {expected_evidence_pattern!r}, got {matches[0]['evidence']!r}")
 PY
 }
 
@@ -361,13 +364,9 @@ code=$?
 set -e
 [[ $code -ne 0 ]]
 require_evaluation_mismatch_report="$(find "$template_root/.codex/runs/$require_evaluation_mismatch_run_id/reports" -type f -name 'codex-task-*.report.json' | sort | tail -n 1)"
-"$python_cmd" - "$template_root/.codex/runs/$require_evaluation_mismatch_run_id/run.json" <<'PY'
-import json
-import sys
-data = json.load(open(sys.argv[1], encoding="utf-8"))
-if data["status"] != "failed":
-    raise SystemExit(f"expected failed run status, got {data['status']!r}")
-PY
+assert_status "$require_evaluation_mismatch_report" evaluation_invalid
+assert_manifest_state "$template_root/.codex/runs/$require_evaluation_mismatch_run_id/run.json" failed failed false "" "evaluation validation" failed
+assert_manifest_contains_command "$template_root/.codex/runs/$require_evaluation_mismatch_run_id/run.json" "evaluation validation" "failed" "run_id mismatch"
 
 set +e
 bash "$wrapper" --report-path "$temp_root/evaluation-template-no-manifest.report.json" --log-path "$temp_root/evaluation-template-no-manifest.jsonl" --evaluation-template --skip-verify "EVALUATION_TEMPLATE_NO_MANIFEST" >"$temp_root/evaluation-template-no-manifest.out" 2>&1

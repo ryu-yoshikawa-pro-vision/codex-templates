@@ -18,7 +18,7 @@
 - consumer-facing wrapper は `--run-id` / `-RunId` を受け取り、run がある作業では `.codex/runs/<run_id>/artifacts|reports|logs` に出力を集約する。
 - consumer-facing template は observation baseline として `spec/hook-observation.schema.json` / `template/.codex/templates/hook-observation.schema.json`、`spec/subagent-run.schema.json` / `template/.codex/templates/subagent-run.schema.json`、`template/docs/reference/hook-observation.md`、`template/docs/reference/subagent-observation.md`、optional `template/.codex/hooks/observe.*` を持つ。
 - hook observation JSONL と subagent run record は evidence artifact であり、最終 interpretation の source of truth は引き続き `evaluation.json` とする。`collect-run-artifacts.*` は `run.json` に report / hook / subagent / evaluation summary を集約するが、低レベル artifact 自体は置き換えない。
-- consumer-facing `evaluation.schema.json` は既存 `evidence` 文字列を維持したまま、optional `evidence_refs` により run manifest / report / log / subagent / validation command への structured reference を持てる。
+- consumer-facing `evaluation.schema.json` は既存 `evidence` 文字列を維持したまま、`$defs.evidence_ref` を正本として optional `evidence_refs` を各 dimension / finding / improvement candidate から参照する。runtime validator も internal `$ref` を解決できることを前提にする。
 - command-based deletion は禁止する。`apply_patch` は差分単位で確認できる通常の編集手段として許可し、tracked runtime artifact の配布除外は明示された `git rm --cached -- <path>` の index-only migration に限定する。
 - `implementation_worker` でも削除、rename、移動、git mutation、delete / rename を含む patch operation、スコープ外リファクタリングは禁止する。writable subagent は原則 1 タスクにつき 1 つだけ使う。
 - auto-net でも削除、git add/commit/push/rm/reset/clean、remote script piping、外部 resource deletion は禁止する。PreToolUse hook は補助防御として扱い、唯一の安全境界にはしない。
@@ -54,10 +54,11 @@
 - consumer repo 側の workflow 詳細は `template/.agents/skills/*/references/` に置き、`template/docs/agent/` は廃止した。
 - consumer repo 側の subagent 定義は `template/.codex/agents/` にあり、`implementation_worker` は親 agent がスコープを確定した後の限定実装だけに使う。
 - consumer repo 側の非対話実装では `template/scripts/codex-task.* --run-id <run_id>` が output/report/log を run-local 成果物として残し、Docker runtime は `CODEX_DOCKER_IMAGE` 必須の experimental path とする。
+- `template/scripts/codex-task.ps1` は `--record-run-manifest` 有効時に collector 実行を必須とし、`python` / `python3` / `py` を探索して `run.json` aggregate section の欠落を残さない。
 - template 適用後の初期化補助として `template/codex-project.toml` と `template/scripts/init-project.*` を持つ。
 - runtime artifact の既定保存先は Git 追跡対象外。`template/.codex/artifacts/`, `template/.codex/reports/`, `template/.codex/logs/*.jsonl`, `template/.codex/runs/` は配布対象外にする。
 - source repo の historical documents は過去時点の path を含みうる。現在の正本は `spec/` と本ファイルで判断する。
 - template contract の検証は `spec/` と `template/scripts/verify*` / `tests/smoke/*` の両方で行う。
 - observation / subagent baseline の検証は `tools/validate-spec.*`、`template/scripts/verify`、`tests/integration/test-observation-baseline.*` で schema sync、reference docs、optional hook の JSONL 出力を確認する。
-- run artifact aggregation の検証は `tests/integration/test-run-artifact-aggregation.sh` と `tests/integration/Test-RunArtifactAggregation.ps1` で collector parity、structured evidence schema、hook / subagent summary を確認する。
+- run artifact aggregation の検証は `tests/integration/test-run-artifact-aggregation.sh` と `tests/integration/Test-RunArtifactAggregation.ps1` で collector parity、relative `--base-manifest` 解決、structured evidence schema、hook / subagent summary を確認する。
 - auto-net contract の検証は safe default、明示 preset、profile、rules-auto-net、削除禁止を合わせて確認する。

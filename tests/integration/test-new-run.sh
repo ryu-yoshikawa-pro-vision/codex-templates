@@ -75,6 +75,8 @@ if data["subagents"]["summary"] != {
     "used_in_final_plan": 0,
 }:
     raise SystemExit(f"unexpected subagents defaults: {data['subagents']}")
+if data["subagents"]["records"] != []:
+    raise SystemExit(f"unexpected subagent records defaults: {data['subagents']['records']}")
 PY
 }
 

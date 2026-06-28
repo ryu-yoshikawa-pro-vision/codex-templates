@@ -507,7 +507,10 @@ expect_enum_set(
     taxonomy_categories,
     "spec/evaluation.schema.json failure_categories items",
 )
-evidence_ref_schema = evaluation_props["dimensions"]["properties"]["task_completion"]["properties"]["evidence_refs"]["items"]
+evaluation_defs = evaluation_schema.get("$defs", {})
+ensure(isinstance(evaluation_defs, dict), "spec/evaluation.schema.json must define $defs")
+evidence_ref_schema = evaluation_defs.get("evidence_ref")
+ensure(isinstance(evidence_ref_schema, dict), "spec/evaluation.schema.json must define $defs.evidence_ref")
 expect_required_fields(
     evidence_ref_schema,
     ["kind", "summary"],
@@ -832,6 +835,10 @@ for name in dimension_names:
     dimension_schema = dimensions_schema["properties"][name]
     expect_required_fields(dimension_schema, ["rating", "evidence"], f"spec/evaluation.schema.json dimensions.{name}")
     expect_property_keys(dimension_schema, ["rating", "evidence", "evidence_refs"], f"spec/evaluation.schema.json dimensions.{name}")
+    ensure(
+        dimension_schema["properties"]["evidence_refs"]["items"].get("$ref") == "#/$defs/evidence_ref",
+        f"spec/evaluation.schema.json dimensions.{name}.evidence_refs must reference #/$defs/evidence_ref",
+    )
     expect_enum_contains(
         dimension_schema["properties"]["rating"]["enum"],
         ["pass", "warn", "fail", "not_evaluated"],
@@ -848,6 +855,10 @@ expect_property_keys(
     findings_item,
     ["category", "severity", "evidence", "evidence_refs", "detail"],
     "spec/evaluation.schema.json findings item",
+)
+ensure(
+    findings_item["properties"]["evidence_refs"]["items"].get("$ref") == "#/$defs/evidence_ref",
+    "spec/evaluation.schema.json findings.evidence_refs must reference #/$defs/evidence_ref",
 )
 expect_enum_set(
     findings_item["properties"]["category"]["enum"],
@@ -870,6 +881,10 @@ expect_property_keys(
     improvement_item,
     ["target", "evidence", "evidence_refs", "expected_impact", "recommendation"],
     "spec/evaluation.schema.json improvement_candidates item",
+)
+ensure(
+    improvement_item["properties"]["evidence_refs"]["items"].get("$ref") == "#/$defs/evidence_ref",
+    "spec/evaluation.schema.json improvement_candidates.evidence_refs must reference #/$defs/evidence_ref",
 )
 
 run_manifest_props = run_manifest_schema.get("properties", {})
@@ -1023,6 +1038,26 @@ expect_required_fields(
     ],
     "spec/run-manifest.schema.json subagents.records item",
 )
+expect_enum_set(
+    subagent_record_schema["properties"]["role"]["enum"],
+    subagent_props["role"]["enum"],
+    "spec/run-manifest.schema.json subagents.records.role",
+)
+expect_enum_set(
+    subagent_record_schema["properties"]["mode"]["enum"],
+    subagent_props["mode"]["enum"],
+    "spec/run-manifest.schema.json subagents.records.mode",
+)
+expect_enum_set(
+    subagent_record_schema["properties"]["status"]["enum"],
+    subagent_props["status"]["enum"],
+    "spec/run-manifest.schema.json subagents.records.status",
+)
+expect_enum_set(
+    subagent_record_schema["properties"]["parent_decision"]["enum"],
+    subagent_props["parent_decision"]["properties"]["action"]["enum"] + [None],
+    "spec/run-manifest.schema.json subagents.records.parent_decision",
+)
 subagent_summary_schema = subagents_schema["properties"]["summary"]
 expect_required_fields(
     subagent_summary_schema,
@@ -1084,13 +1119,16 @@ ensure(
     "template/.codex/templates/RUN_MANIFEST.json hook_observations defaults are out of contract",
 )
 ensure(
-    run_manifest_template.get("subagents", {}).get("summary")
+    run_manifest_template.get("subagents")
     == {
-        "total": 0,
-        "read_only": 0,
-        "writable": 0,
-        "scope_violations": 0,
-        "used_in_final_plan": 0,
+        "records": [],
+        "summary": {
+            "total": 0,
+            "read_only": 0,
+            "writable": 0,
+            "scope_violations": 0,
+            "used_in_final_plan": 0,
+        },
     },
     "template/.codex/templates/RUN_MANIFEST.json subagents.summary defaults are out of contract",
 )

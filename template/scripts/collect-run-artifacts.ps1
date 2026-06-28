@@ -4,21 +4,25 @@ param(
     [string]$RunsRoot,
     [string[]]$HookLog,
     [string]$ManifestPath,
-    [string]$BaseManifest,
+[string]$BaseManifest,
     [switch]$Strict
 )
 
-$python = if (Get-Command python -ErrorAction SilentlyContinue) {
-    "python"
-}
-elseif (Get-Command py -ErrorAction SilentlyContinue) {
-    "py"
-}
-else {
+function Get-PythonCommand {
+    foreach ($candidate in @("python", "python3", "py")) {
+        $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
+        if (-not $cmd) {
+            continue
+        }
+        return $cmd.Source
+    }
+
     throw "Python is required to collect run artifacts"
 }
 
+$python = Get-PythonCommand
 $scriptPath = Join-Path $PSScriptRoot "collect-run-artifacts.py"
+$scriptPath = (Resolve-Path $scriptPath).Path
 $argsList = @($scriptPath, "--run-id", $RunId)
 if ($RunsRoot) { $argsList += @("--runs-root", $RunsRoot) }
 foreach ($path in @($HookLog)) {
