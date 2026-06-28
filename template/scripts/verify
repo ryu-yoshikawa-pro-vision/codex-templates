@@ -96,6 +96,8 @@ check_template_contract() {
   [[ -f scripts/codex-task.sh ]] || return 1
   [[ -f scripts/codex-sandbox.ps1 ]] || return 1
   [[ -f scripts/codex-sandbox.sh ]] || return 1
+  [[ -f scripts/new-run.ps1 ]] || return 1
+  [[ -f scripts/new-run.sh ]] || return 1
   [[ -f scripts/init-project.ps1 ]] || return 1
   [[ -f scripts/init-project.sh ]] || return 1
   [[ -f scripts/validate-output-schema.py ]] || return 1
@@ -131,6 +133,9 @@ check_template_contract() {
   contains "docs/reference/harness-improvement-loop.md" AGENTS.md || return 1
   contains "docs/reference/codex-safety-harness.md" AGENTS.md || return 1
   contains "docs/reference/codex-implementation-harness.md" AGENTS.md || return 1
+  contains "scripts/new-run.sh" AGENTS.md || return 1
+  contains "scripts/new-run.ps1" AGENTS.md || return 1
+  contains "run.json" AGENTS.md || return 1
   contains "Report file" AGENTS.md || return 1
   contains "command-based deletion" AGENTS.md || return 1
   contains "implementation_worker" AGENTS.md || return 1
@@ -149,6 +154,9 @@ check_template_contract() {
   contains "Open questions" PLANS.md || return 1
   contains "Ambiguity handling" PLANS.md || return 1
   contains "mandatory-question" PLANS.md || return 1
+  contains "Blocking questions" PLANS.md || return 1
+  contains "Assumptions allowed" PLANS.md || return 1
+  contains "Follow-up notes" PLANS.md || return 1
   contains ".agents/skills/code-review/SKILL.md" CODE_REVIEW.md || return 1
   contains ".agents/skills/code-review/references/review-workflow.md" CODE_REVIEW.md || return 1
   contains "findings-first" CODE_REVIEW.md || return 1
@@ -228,21 +236,28 @@ check_template_contract() {
   contains "hook-observation JSONL" docs/reference/run-artifacts.md || return 1
   contains "subagent-run.json" docs/reference/run-artifacts.md || return 1
   contains "--allowed-files" scripts/codex-task.sh || return 1
+  contains "--allowed-dirs" scripts/codex-task.sh || return 1
+  contains "--allowed-globs" scripts/codex-task.sh || return 1
   contains "--expected-changed-files" scripts/codex-task.sh || return 1
+  contains "--expected-missing" scripts/codex-task.sh || return 1
   contains "--evaluation-template" scripts/codex-task.sh || return 1
   contains "--require-evaluation" scripts/codex-task.sh || return 1
   contains "--require-clean-git" scripts/codex-task.sh || return 1
   contains "--require-run-id" scripts/codex-task.sh || return 1
   contains "--max-iterations" scripts/codex-task.sh || contains "repair-loop workflows" docs/reference/run-artifacts.md || return 1
   contains "AllowedFiles" scripts/codex-task.ps1 || contains "--allowed-files" scripts/codex-task.ps1 || return 1
+  contains "AllowedDirs" scripts/codex-task.ps1 || contains "--allowed-dirs" scripts/codex-task.ps1 || return 1
+  contains "AllowedGlobs" scripts/codex-task.ps1 || contains "--allowed-globs" scripts/codex-task.ps1 || return 1
   contains "ExpectedChangedFiles" scripts/codex-task.ps1 || contains "--expected-changed-files" scripts/codex-task.ps1 || return 1
+  contains "ExpectedMissing" scripts/codex-task.ps1 || contains "--expected-missing" scripts/codex-task.ps1 || return 1
   contains "EvaluationTemplate" scripts/codex-task.ps1 || contains "--evaluation-template" scripts/codex-task.ps1 || return 1
   contains "RequireEvaluation" scripts/codex-task.ps1 || contains "--require-evaluation" scripts/codex-task.ps1 || return 1
   contains "RequireCleanGit" scripts/codex-task.ps1 || contains "--require-clean-git" scripts/codex-task.ps1 || return 1
   contains "RequireRunId" scripts/codex-task.ps1 || contains "--require-run-id" scripts/codex-task.ps1 || return 1
   contains "MaxIterations" scripts/codex-task.ps1 || contains "--max-iterations" scripts/codex-task.ps1 || contains "repair-loop workflows" docs/reference/run-artifacts.md || return 1
-  contains "TASK-006B" docs/reference/change-scope-policy.md || return 1
-  contains "exact path" docs/reference/change-scope-policy.md || return 1
+  contains "allowed_dirs" docs/reference/change-scope-policy.md || return 1
+  contains "allowed_globs" docs/reference/change-scope-policy.md || return 1
+  contains "expected_missing" docs/reference/change-scope-policy.md || return 1
   contains "--run-id" docs/reference/change-scope-policy.md || return 1
   contains "--record-run-manifest" docs/reference/change-scope-policy.md || return 1
   contains "run.json" docs/reference/change-scope-policy.md || return 1
@@ -260,11 +275,19 @@ check_template_contract() {
   contains "not_evaluated" docs/reference/evaluation.md || return 1
   contains "allowed_files" docs/reference/change-scope-policy.md || return 1
   contains "expected_changed_files" docs/reference/change-scope-policy.md || return 1
+  contains "allowed_dirs" docs/reference/change-scope-policy.md || return 1
+  contains "allowed_globs" docs/reference/change-scope-policy.md || return 1
   contains ".codex/runs/" docs/reference/change-scope-policy.md || return 1
   contains "repo root" docs/reference/change-scope-policy.md || return 1
   contains "scope check" docs/reference/change-scope-policy.md || return 1
   contains "--require-clean-git" docs/reference/change-scope-policy.md || return 1
   contains "spec/change-scope-policy.json" docs/reference/change-scope-policy.md || return 1
+  contains "scripts/new-run.sh" docs/reference/codex-implementation-harness.md || return 1
+  contains "scripts/new-run.ps1" docs/reference/codex-implementation-harness.md || return 1
+  contains "--allowed-dirs" docs/reference/codex-implementation-harness.md || return 1
+  contains "--allowed-globs" docs/reference/codex-implementation-harness.md || return 1
+  contains "--expected-missing" docs/reference/codex-implementation-harness.md || return 1
+  contains "passed_with_warnings" docs/reference/codex-implementation-harness.md || return 1
   contains "JSONL" docs/reference/hook-observation.md || return 1
   contains "CODEX_OBSERVATION_LOG" docs/reference/hook-observation.md || return 1
   contains "blocking" docs/reference/hook-observation.md || return 1

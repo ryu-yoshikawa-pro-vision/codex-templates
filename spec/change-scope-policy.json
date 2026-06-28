@@ -1,13 +1,15 @@
 {
   "schema_version": 1,
   "catalog_type": "static_change_scope_policy_catalog",
-  "notes": "This catalog defines the baseline change scope contract enforced by codex-task. Validators check catalog presence and invariants, while glob matching remains deferred beyond the TASK-006B exact-path baseline.",
+  "notes": "This catalog defines the change scope contract enforced by codex-task, including exact file paths, allowed directories, limited globs, and expected-missing warn/fail behavior.",
   "path_normalization": {
     "canonical_format": "repo_relative_posix",
     "windows_separator_normalization": true,
     "absolute_paths_for_comparison": false,
+    "absolute_paths_in_scope_inputs": false,
     "prevent_repo_escape": true,
-    "case_sensitive": true
+    "case_sensitive": true,
+    "directory_trailing_slash_equivalent": true
   },
   "changed_file_kinds": [
     "modified",
@@ -24,13 +26,42 @@
   "allowed_files": {
     "meaning": "maximum_change_boundary",
     "match_mode": "exact_path",
-    "glob_support": "deferred",
     "scope_violation_when_not_allowed": true
   },
+  "allowed_dirs": {
+    "meaning": "allow_descendants_of_directory",
+    "match_mode": "directory_prefix",
+    "directory_boundary_required": true,
+    "scope_violation_when_not_allowed": true
+  },
+  "allowed_globs": {
+    "meaning": "allow_paths_matching_limited_glob",
+    "match_mode": "limited_glob",
+    "supported_tokens": [
+      "*",
+      "**",
+      "?"
+    ],
+    "scope_violation_when_not_allowed": true
+  },
+  "scope_precedence": [
+    "allowed_files",
+    "allowed_dirs",
+    "allowed_globs"
+  ],
   "expected_changed_files": {
     "meaning": "expected_required_changes",
     "must_be_subset_of_allowed_files": "recommended",
-    "missing_expected_change_severity": "warning_or_failure_candidate"
+    "missing_behavior_options": [
+      "warn",
+      "fail"
+    ],
+    "default_missing_behavior": "fail"
+  },
+  "validation_warning_record": {
+    "manifest_location": "validation.warnings[]",
+    "warning_type": "expected_changed_file_missing",
+    "warning_status": "passed_with_warnings"
   },
   "deleted_files": {
     "included_in_changed_files": true,
@@ -53,7 +84,7 @@
   },
   "deferred": {
     "runner_enforcement": false,
-    "glob_matching": true,
+    "glob_matching": false,
     "changed_files_collection": false
   }
 }

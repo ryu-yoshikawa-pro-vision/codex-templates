@@ -1,6 +1,6 @@
 schema_version = 1
 name = "codex-project"
-template_version = "0.9.0"
+template_version = "0.10.0"
 timezone = "Asia/Tokyo"
 default_run_root = ".codex/runs"
 
@@ -49,13 +49,35 @@ network_access_in_workspace_write = false
 use_run_artifacts = true
 requires_saved_plan = false
 requires_durable_report = false
+tasks_can_be_simplified = true
+report_can_be_final_block = true
+run_manifest = "optional"
+requires_evaluation = false
+scope_expectation = "optional"
+escalate_to_standard_when = [
+  "external communication is required",
+  "delete or rename is requested",
+  "migration is involved",
+  "security or permission behavior changes",
+  "public contract changes"
+]
 
 [workflow_levels.standard]
 use_run_artifacts = true
 requires_saved_plan = true
 requires_durable_report = false
+tasks_can_be_simplified = false
+report_can_be_final_block = false
+run_manifest = "recommended"
+requires_evaluation = false
+scope_expectation = "recommended"
 
 [workflow_levels.strict]
 use_run_artifacts = true
 requires_saved_plan = true
 requires_durable_report = "only_if_explicit_or_dod"
+tasks_can_be_simplified = false
+report_can_be_final_block = false
+run_manifest = "required"
+requires_evaluation = true
+scope_expectation = "required"

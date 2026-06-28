@@ -2,6 +2,11 @@
   "run": {
     "id_format": "YYYYMMDD-HHMMSS-JST",
     "location": ".codex/runs/<run_id>/",
+    "initializer_scripts": [
+      "template/scripts/new-run.sh",
+      "template/scripts/new-run.ps1"
+    ],
+    "manifest_template_source": "template/.codex/templates/RUN_MANIFEST.json",
     "template_sources": [
       "template/.codex/templates/PLAN.md",
       "template/.codex/templates/TASKS.md",
@@ -50,6 +55,8 @@
     "template/.codex/templates/REPORT.md",
     "template/scripts/init-project.ps1",
     "template/scripts/init-project.sh",
+    "template/scripts/new-run.ps1",
+    "template/scripts/new-run.sh",
     "template/scripts/codex-task.ps1",
     "template/scripts/codex-task.sh",
     "template/scripts/codex-sandbox.ps1",

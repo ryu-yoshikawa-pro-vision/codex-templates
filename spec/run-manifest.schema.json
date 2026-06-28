@@ -43,7 +43,8 @@
         "review",
         "implementation",
         "investigation",
-        "repair"
+        "repair",
+        "harness-improvement"
       ],
       "description": "High-level task classification for the run."
     },
@@ -124,7 +125,8 @@
       "additionalProperties": false,
       "required": [
         "status",
-        "commands"
+        "commands",
+        "warnings"
       ],
       "properties": {
         "status": {
@@ -132,6 +134,7 @@
           "enum": [
             "not_run",
             "passed",
+            "passed_with_warnings",
             "failed",
             "skipped",
             "blocked"
@@ -174,6 +177,34 @@
               "evidence": {
                 "type": "string",
                 "minLength": 1
+              }
+            }
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "description": "Non-fatal validation warnings observed during the run.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "path"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             }
           }

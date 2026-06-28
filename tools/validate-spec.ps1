@@ -398,8 +398,10 @@ $pathNormalization = $changeScopePolicy.path_normalization
 Assert-Condition ($pathNormalization.canonical_format -eq "repo_relative_posix") "spec/change-scope-policy.json path_normalization.canonical_format is out of contract"
 Assert-Condition ($pathNormalization.windows_separator_normalization -eq $true) "spec/change-scope-policy.json path_normalization.windows_separator_normalization is out of contract"
 Assert-Condition ($pathNormalization.absolute_paths_for_comparison -eq $false) "spec/change-scope-policy.json path_normalization.absolute_paths_for_comparison is out of contract"
+Assert-Condition ($pathNormalization.absolute_paths_in_scope_inputs -eq $false) "spec/change-scope-policy.json path_normalization.absolute_paths_in_scope_inputs is out of contract"
 Assert-Condition ($pathNormalization.prevent_repo_escape -eq $true) "spec/change-scope-policy.json path_normalization.prevent_repo_escape is out of contract"
 Assert-Condition ($pathNormalization.case_sensitive -eq $true) "spec/change-scope-policy.json path_normalization.case_sensitive is out of contract"
+Assert-Condition ($pathNormalization.directory_trailing_slash_equivalent -eq $true) "spec/change-scope-policy.json path_normalization.directory_trailing_slash_equivalent is out of contract"
 
 Expect-EnumSet -Values $changeScopePolicy.changed_file_kinds -Expected @(
     "modified",
@@ -414,11 +416,23 @@ Expect-EnumSet -Values $changeScopePolicy.generated_artifact_exclusions -Expecte
 
 Assert-Condition ($changeScopePolicy.allowed_files.meaning -eq "maximum_change_boundary") "spec/change-scope-policy.json allowed_files.meaning is out of contract"
 Assert-Condition ($changeScopePolicy.allowed_files.match_mode -eq "exact_path") "spec/change-scope-policy.json allowed_files.match_mode is out of contract"
-Assert-Condition ($changeScopePolicy.allowed_files.glob_support -eq "deferred") "spec/change-scope-policy.json allowed_files.glob_support is out of contract"
 Assert-Condition ($changeScopePolicy.allowed_files.scope_violation_when_not_allowed -eq $true) "spec/change-scope-policy.json allowed_files.scope_violation_when_not_allowed is out of contract"
+Assert-Condition ($changeScopePolicy.allowed_dirs.meaning -eq "allow_descendants_of_directory") "spec/change-scope-policy.json allowed_dirs.meaning is out of contract"
+Assert-Condition ($changeScopePolicy.allowed_dirs.match_mode -eq "directory_prefix") "spec/change-scope-policy.json allowed_dirs.match_mode is out of contract"
+Assert-Condition ($changeScopePolicy.allowed_dirs.directory_boundary_required -eq $true) "spec/change-scope-policy.json allowed_dirs.directory_boundary_required is out of contract"
+Assert-Condition ($changeScopePolicy.allowed_dirs.scope_violation_when_not_allowed -eq $true) "spec/change-scope-policy.json allowed_dirs.scope_violation_when_not_allowed is out of contract"
+Assert-Condition ($changeScopePolicy.allowed_globs.meaning -eq "allow_paths_matching_limited_glob") "spec/change-scope-policy.json allowed_globs.meaning is out of contract"
+Assert-Condition ($changeScopePolicy.allowed_globs.match_mode -eq "limited_glob") "spec/change-scope-policy.json allowed_globs.match_mode is out of contract"
+Expect-EnumSet -Values $changeScopePolicy.allowed_globs.supported_tokens -Expected @("*", "**", "?") -Label "spec/change-scope-policy.json allowed_globs.supported_tokens"
+Assert-Condition ($changeScopePolicy.allowed_globs.scope_violation_when_not_allowed -eq $true) "spec/change-scope-policy.json allowed_globs.scope_violation_when_not_allowed is out of contract"
+Expect-EnumSet -Values $changeScopePolicy.scope_precedence -Expected @("allowed_files", "allowed_dirs", "allowed_globs") -Label "spec/change-scope-policy.json scope_precedence"
 Assert-Condition ($changeScopePolicy.expected_changed_files.meaning -eq "expected_required_changes") "spec/change-scope-policy.json expected_changed_files.meaning is out of contract"
 Assert-Condition ($changeScopePolicy.expected_changed_files.must_be_subset_of_allowed_files -eq "recommended") "spec/change-scope-policy.json expected_changed_files.must_be_subset_of_allowed_files is out of contract"
-Assert-Condition ($changeScopePolicy.expected_changed_files.missing_expected_change_severity -eq "warning_or_failure_candidate") "spec/change-scope-policy.json expected_changed_files.missing_expected_change_severity is out of contract"
+Expect-EnumSet -Values $changeScopePolicy.expected_changed_files.missing_behavior_options -Expected @("warn", "fail") -Label "spec/change-scope-policy.json expected_changed_files.missing_behavior_options"
+Assert-Condition ($changeScopePolicy.expected_changed_files.default_missing_behavior -eq "fail") "spec/change-scope-policy.json expected_changed_files.default_missing_behavior is out of contract"
+Assert-Condition ($changeScopePolicy.validation_warning_record.manifest_location -eq "validation.warnings[]") "spec/change-scope-policy.json validation_warning_record.manifest_location is out of contract"
+Assert-Condition ($changeScopePolicy.validation_warning_record.warning_type -eq "expected_changed_file_missing") "spec/change-scope-policy.json validation_warning_record.warning_type is out of contract"
+Assert-Condition ($changeScopePolicy.validation_warning_record.warning_status -eq "passed_with_warnings") "spec/change-scope-policy.json validation_warning_record.warning_status is out of contract"
 Assert-Condition ($changeScopePolicy.deleted_files.included_in_changed_files -eq $true) "spec/change-scope-policy.json deleted_files.included_in_changed_files is out of contract"
 Assert-Condition ($changeScopePolicy.deleted_files.requires_allowed_path -eq $true) "spec/change-scope-policy.json deleted_files.requires_allowed_path is out of contract"
 Assert-Condition ($changeScopePolicy.renamed_files.evaluate_old_path -eq $true) "spec/change-scope-policy.json renamed_files.evaluate_old_path is out of contract"
@@ -431,7 +445,7 @@ Assert-Condition ($changeScopePolicy.run_artifacts.excluded_from_scope_check -eq
 Assert-Condition ($changeScopePolicy.run_artifacts.may_be_recorded_in_manifest -eq $true) "spec/change-scope-policy.json run_artifacts.may_be_recorded_in_manifest is out of contract"
 Assert-Condition ($changeScopePolicy.run_artifacts.must_not_be_mixed_with_source_changes -eq $true) "spec/change-scope-policy.json run_artifacts.must_not_be_mixed_with_source_changes is out of contract"
 Assert-Condition ($changeScopePolicy.deferred.runner_enforcement -eq $false) "spec/change-scope-policy.json deferred.runner_enforcement is out of contract"
-Assert-Condition ($changeScopePolicy.deferred.glob_matching -eq $true) "spec/change-scope-policy.json deferred.glob_matching is out of contract"
+Assert-Condition ($changeScopePolicy.deferred.glob_matching -eq $false) "spec/change-scope-policy.json deferred.glob_matching is out of contract"
 Assert-Condition ($changeScopePolicy.deferred.changed_files_collection -eq $false) "spec/change-scope-policy.json deferred.changed_files_collection is out of contract"
 
 $taxonomyEntries = Normalize-ToArray $failureTaxonomy.categories
@@ -685,7 +699,7 @@ Expect-PropertyKeys -Schema $runManifestSchema -Fields @(
     "primary_failure_category"
 ) -Label "spec/run-manifest.schema.json"
 
-Expect-EnumContains -Values $runManifestSchema.properties.task_type.enum -Expected @("plan", "review", "implementation", "investigation", "repair") -Label "spec/run-manifest.schema.json task_type"
+Expect-EnumContains -Values $runManifestSchema.properties.task_type.enum -Expected @("plan", "review", "implementation", "investigation", "repair", "harness-improvement") -Label "spec/run-manifest.schema.json task_type"
 Expect-EnumContains -Values $runManifestSchema.properties.workflow_level.enum -Expected @("lightweight", "standard", "strict") -Label "spec/run-manifest.schema.json workflow_level"
 Expect-EnumContains -Values $runManifestSchema.properties.preset.enum -Expected @("safe", "readonly", "auto-net") -Label "spec/run-manifest.schema.json preset"
 Expect-EnumContains -Values $runManifestSchema.properties.runtime.enum -Expected @("host", "docker-sandbox", "sdk") -Label "spec/run-manifest.schema.json runtime"
@@ -693,14 +707,17 @@ Expect-EnumContains -Values $runManifestSchema.properties.status.enum -Expected 
 Expect-EnumSet -Values $runManifestSchema.properties.primary_failure_category.enum -Expected ($taxonomyCategories + @($null)) -Label "spec/run-manifest.schema.json primary_failure_category"
 
 $validationSchema = $runManifestSchema.properties.validation
-Expect-RequiredFields -Schema $validationSchema -Fields @("status", "commands") -Label "spec/run-manifest.schema.json validation"
-Expect-PropertyKeys -Schema $validationSchema -Fields @("status", "commands") -Label "spec/run-manifest.schema.json validation"
-Expect-EnumContains -Values $validationSchema.properties.status.enum -Expected @("not_run", "passed", "failed", "skipped", "blocked") -Label "spec/run-manifest.schema.json validation.status"
+Expect-RequiredFields -Schema $validationSchema -Fields @("status", "commands", "warnings") -Label "spec/run-manifest.schema.json validation"
+Expect-PropertyKeys -Schema $validationSchema -Fields @("status", "commands", "warnings") -Label "spec/run-manifest.schema.json validation"
+Expect-EnumContains -Values $validationSchema.properties.status.enum -Expected @("not_run", "passed", "passed_with_warnings", "failed", "skipped", "blocked") -Label "spec/run-manifest.schema.json validation.status"
 
 $validationCommandItem = $validationSchema.properties.commands.items
 Expect-RequiredFields -Schema $validationCommandItem -Fields @("command", "exit_code", "status", "evidence") -Label "spec/run-manifest.schema.json validation.commands item"
 Expect-PropertyKeys -Schema $validationCommandItem -Fields @("command", "exit_code", "status", "evidence") -Label "spec/run-manifest.schema.json validation.commands item"
 Expect-EnumContains -Values $validationCommandItem.properties.status.enum -Expected @("not_run", "passed", "failed", "skipped", "blocked") -Label "spec/run-manifest.schema.json validation.commands[].status"
+$validationWarningItem = $validationSchema.properties.warnings.items
+Expect-RequiredFields -Schema $validationWarningItem -Fields @("type", "path") -Label "spec/run-manifest.schema.json validation.warnings item"
+Expect-PropertyKeys -Schema $validationWarningItem -Fields @("type", "path", "message") -Label "spec/run-manifest.schema.json validation.warnings item"
 
 $safetySchema = $runManifestSchema.properties.safety
 Expect-RequiredFields -Schema $safetySchema -Fields @("network", "delete_attempt_blocked", "git_mutation_attempt_blocked", "scope_violation") -Label "spec/run-manifest.schema.json safety"
@@ -714,7 +731,7 @@ Assert-Condition ($runManifestTemplate.schema_version -eq 1) "template/.codex/te
 Assert-Condition ($runManifestTemplate.run_id -ne "") "template/.codex/templates/RUN_MANIFEST.json run_id must not be empty"
 Assert-Condition ($runManifestTemplate.status -eq "pending") "template/.codex/templates/RUN_MANIFEST.json status must default to pending"
 Assert-Condition ($null -eq $runManifestTemplate.primary_failure_category) "template/.codex/templates/RUN_MANIFEST.json primary_failure_category must default to null"
-Assert-Condition (($runManifestTemplate.validation -is [pscustomobject]) -and ($runManifestTemplate.validation.status -eq "not_run") -and (@(Normalize-ToArray $runManifestTemplate.validation.commands).Count -eq 0)) "template/.codex/templates/RUN_MANIFEST.json validation defaults are out of contract"
+Assert-Condition (($runManifestTemplate.validation -is [pscustomobject]) -and ($runManifestTemplate.validation.status -eq "not_run") -and (@(Normalize-ToArray $runManifestTemplate.validation.commands).Count -eq 0) -and (@(Normalize-ToArray $runManifestTemplate.validation.warnings).Count -eq 0)) "template/.codex/templates/RUN_MANIFEST.json validation defaults are out of contract"
 Assert-Condition ($runManifestTemplate.safety -is [pscustomobject]) "template/.codex/templates/RUN_MANIFEST.json safety must be an object"
 $safetyTemplateKeys = @($runManifestTemplate.safety.PSObject.Properties.Name | Sort-Object)
 $expectedSafetyKeys = @("delete_attempt_blocked", "git_mutation_attempt_blocked", "network", "scope_violation") | Sort-Object

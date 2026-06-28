@@ -14,6 +14,10 @@
 
 ### Added
 
+- `scripts/new-run.sh` と `scripts/new-run.ps1` を追加し、run directory と `run.json` の初期化を自動化。
+- `codex-task` に `--allowed-dirs` / `--allowed-globs` を追加し、directory 単位と limited glob の scope 指定をサポート。
+- `codex-task` に `--expected-missing warn|fail` を追加し、変更不要だった expected file を warning として表現できるようにした。
+- `run.json.validation.warnings` と `validation.status = passed_with_warnings` を追加し、non-fatal validation warning を機械記録できるようにした。
 - Repair loop skill と reference docs を追加し、Review -> Repair -> Validate の bounded workflow を標準化。
 - Harness improvement skill と reference docs を追加し、評価結果からハーネス改善候補へ変換する workflow を標準化。
 - Repair loop / harness improvement の examples と validation tests を追加。
@@ -39,6 +43,9 @@
 
 ### Changed
 
+- `template/AGENTS.md`、`template/PLANS.md`、`template/docs/reference/codex-implementation-harness.md`、`template/docs/reference/change-scope-policy.md`、`template/docs/guides/quickstart.md` を更新し、lightweight / standard / strict の運用差分、run 初期化手順、Plan ambiguity 分類を明文化。
+- `template/codex-project.toml` の workflow metadata を更新し、run manifest / evaluation / scope expectation の違いを明示。
+- `spec/change-scope-policy.json`、`spec/run-manifest.schema.json`、`spec/workflow.json` を更新し、new-run、flexible scope、warning manifest を contract に追加。
 - `template/docs/reference/codex-safety-harness.md` に `apply_patch` の operation policy 表を追加。
 - `template/docs/guides/quickstart.md` から consumer update guide へ誘導するように更新。
 - `tools/validate-spec.sh`、`tools/validate-spec.ps1`、`template/scripts/verify` を拡張し、新規 schema / template / static catalog / reference docs の整合性を検証するように更新。
@@ -49,6 +56,8 @@
 
 ### Migration notes
 
+- 既存 consumer repo がこの更新を取り込む場合は、`scripts/new-run.sh`、`scripts/new-run.ps1`、`scripts/codex-task.sh`、`scripts/codex-task.ps1`、`.codex/templates/RUN_MANIFEST.json`、`docs/reference/codex-implementation-harness.md`、`docs/reference/change-scope-policy.md`、`AGENTS.md`、`PLANS.md`、`codex-project.toml` を合わせて同期する。
+- 既存 consumer repo が `expected-missing=warn` と flexible scope を使う場合は、`spec/change-scope-policy.json` に対応する reference docs と validator/verify の更新も取り込む。
 - 既存 consumer repo が repair / improvement workflow を取り込む場合は、`.agents/skills/repair-loop/`、`.agents/skills/harness-improvement/`、`docs/reference/repair-loop.md`、`docs/reference/harness-improvement-loop.md`、`examples/repair-loop/`、`examples/harness-improvement/`、`scripts/verify` を同期対象に含める。
 - 既存 consumer repo が更新後の `template/scripts/verify` を取り込む場合は、`.codex/templates/RUN_MANIFEST.json`、`.codex/templates/EVALUATION.md`、`docs/reference/run-artifacts.md`、`docs/reference/failure-taxonomy.md`、`docs/reference/evaluation.md`、`docs/reference/change-scope-policy.md` も同期対象に含める。
 - 既存 consumer repo が `codex-task` 更新を取り込む場合は、`scripts/codex-task.sh`、`scripts/codex-task.ps1`、`.codex/templates/RUN_MANIFEST.json`、`codex-project.toml` を合わせて同期する。

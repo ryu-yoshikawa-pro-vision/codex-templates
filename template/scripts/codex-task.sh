@@ -33,12 +33,18 @@ evaluation_file_path=""
 cwd_for_report="$repo_root"
 declare -a prompt_parts=()
 declare -a allowed_files=()
+declare -a allowed_dirs=()
+declare -a allowed_globs=()
 declare -a expected_changed_files=()
 declare -a changed_files=()
 declare -a validation_command_names=()
 declare -a validation_command_exit_codes=()
 declare -a validation_command_statuses=()
 declare -a validation_command_evidences=()
+declare -a validation_warning_types=()
+declare -a validation_warning_paths=()
+declare -a validation_warning_messages=()
+expected_missing_behavior="fail"
 
 timestamp="$(date +%Y%m%d-%H%M%S)"
 output_file="$artifacts_dir/codex-task-${timestamp}.json"
@@ -133,6 +139,20 @@ add_validation_command() {
   esac
 }
 
+add_validation_warning() {
+  local warning_type="$1"
+  local warning_path="$2"
+  local warning_message="$3"
+
+  validation_warning_types+=("$warning_type")
+  validation_warning_paths+=("$warning_path")
+  validation_warning_messages+=("$warning_message")
+
+  if [[ "$validation_status" != "blocked" && "$validation_status" != "failed" ]]; then
+    validation_status="passed_with_warnings"
+  fi
+}
+
 json_validation_commands() {
   local idx first=1
   printf '['
@@ -147,6 +167,27 @@ json_validation_commands() {
     printf '        "exit_code": %s,\n' "${validation_command_exit_codes[$idx]}"
     printf '        "status": "%s",\n' "$(json_escape "${validation_command_statuses[$idx]}")"
     printf '        "evidence": "%s"\n' "$(json_escape "${validation_command_evidences[$idx]}")"
+    printf '      }'
+  done
+  if (( ! first )); then
+    printf '\n    '
+  fi
+  printf ']'
+}
+
+json_validation_warnings() {
+  local idx first=1
+  printf '['
+  for idx in "${!validation_warning_types[@]}"; do
+    if (( first )); then
+      first=0
+    else
+      printf ','
+    fi
+    printf '\n      {\n'
+    printf '        "type": "%s",\n' "$(json_escape "${validation_warning_types[$idx]}")"
+    printf '        "path": "%s",\n' "$(json_escape "${validation_warning_paths[$idx]}")"
+    printf '        "message": "%s"\n' "$(json_escape "${validation_warning_messages[$idx]}")"
     printf '      }'
   done
   if (( ! first )); then
@@ -256,6 +297,52 @@ normalize_scope_path() {
   printf '%s' "$normalized"
 }
 
+normalize_directory_scope_path() {
+  local raw="$1"
+  local option_name="$2"
+  local trimmed="${raw%/}"
+  trimmed="${trimmed%\\}"
+  normalize_scope_path "$trimmed" "$option_name"
+}
+
+normalize_scope_glob() {
+  local raw="$1"
+  local option_name="$2"
+
+  if [[ -z "$raw" ]]; then
+    fail_with_status "invalid_args" "$option_name requires a non-empty path"
+  fi
+
+  local normalized_input="${raw//\\//}"
+  if [[ "$normalized_input" == /* || "$normalized_input" =~ ^[A-Za-z]:/ || "$normalized_input" =~ ^// ]]; then
+    fail_with_status "invalid_args" "$option_name requires a repo-relative path: $raw"
+  fi
+
+  local -a segments=()
+  local segment
+  IFS='/' read -r -a raw_segments <<< "$normalized_input"
+  for segment in "${raw_segments[@]}"; do
+    if [[ -z "$segment" || "$segment" == "." ]]; then
+      continue
+    fi
+    if [[ "$segment" == ".." ]]; then
+      fail_with_status "invalid_args" "$option_name path escapes repo root: $raw"
+    fi
+    segments+=("$segment")
+  done
+
+  if ((${#segments[@]} == 0)); then
+    fail_with_status "invalid_args" "$option_name requires a repo-relative path: $raw"
+  fi
+
+  local normalized
+  local old_ifs="$IFS"
+  IFS='/'
+  normalized="${segments[*]}"
+  IFS="$old_ifs"
+  printf '%s' "$normalized"
+}
+
 append_normalized_scope_paths() {
   local -n _target=$1
   local raw_list="$2"
@@ -268,6 +355,101 @@ append_normalized_scope_paths() {
     normalized="$(normalize_scope_path "$item" "$option_name")"
     _target+=("$normalized")
   done
+}
+
+append_normalized_directory_scope_paths() {
+  local -n _target=$1
+  local raw_list="$2"
+  local option_name="$3"
+  local -a items=()
+  local item normalized
+
+  IFS=',' read -r -a items <<< "$raw_list"
+  for item in "${items[@]}"; do
+    normalized="$(normalize_directory_scope_path "$item" "$option_name")"
+    _target+=("$normalized")
+  done
+}
+
+append_normalized_scope_globs() {
+  local -n _target=$1
+  local raw_list="$2"
+  local option_name="$3"
+  local -a items=()
+  local item normalized
+
+  IFS=',' read -r -a items <<< "$raw_list"
+  for item in "${items[@]}"; do
+    normalized="$(normalize_scope_glob "$item" "$option_name")"
+    _target+=("$normalized")
+  done
+}
+
+glob_pattern_to_regex() {
+  local pattern="$1"
+  local regex="^"
+  local i=0 length=${#pattern} char next
+  while (( i < length )); do
+    char="${pattern:i:1}"
+    case "$char" in
+      '*')
+        next=""
+        if (( i + 1 < length )); then
+          next="${pattern:i+1:1}"
+        fi
+        if [[ "$next" == "*" ]]; then
+          regex+=".*"
+          ((i += 2))
+        else
+          regex+="[^/]*"
+          ((i += 1))
+        fi
+        ;;
+      '?')
+        regex+="[^/]"
+        ((i += 1))
+        ;;
+      '.'|'+'|'('|')'|'{'|'}'|'['|']'|'^'|'$'|'|'|'\\')
+        regex+="\\$char"
+        ((i += 1))
+        ;;
+      *)
+        regex+="$char"
+        ((i += 1))
+        ;;
+    esac
+  done
+  regex+="$"
+  printf '%s' "$regex"
+}
+
+path_matches_allowed_dir() {
+  local path="$1"
+  local allowed_dir="$2"
+  [[ "$path" == "$allowed_dir" || "$path" == "$allowed_dir/"* ]]
+}
+
+path_matches_allowed_glob() {
+  local path="$1"
+  local pattern="$2"
+  local regex
+  regex="$(glob_pattern_to_regex "$pattern")"
+  [[ "$path" =~ $regex ]]
+}
+
+path_matches_allowed_scope() {
+  local path="$1"
+  local allowed
+  for allowed in "${allowed_files[@]}"; do
+    [[ "$path" == "$allowed" ]] && return 0
+  done
+  for allowed in "${allowed_dirs[@]}"; do
+    path_matches_allowed_dir "$path" "$allowed" && return 0
+  done
+  for allowed in "${allowed_globs[@]}"; do
+    path_matches_allowed_glob "$path" "$allowed" && return 0
+  done
+  return 1
 }
 
 normalized_path() {
@@ -325,7 +507,7 @@ write_run_manifest() {
   (( manifest_started )) || return 0
   [[ -n "$manifest_path" ]] || return 0
 
-  local branch report_ref network_enabled validation_commands_json changed_files_json
+  local branch report_ref network_enabled validation_commands_json validation_warnings_json changed_files_json
   branch="$(git_branch)"
   report_ref="$(to_repo_relative_path "$report_path")"
   network_enabled=false
@@ -333,8 +515,8 @@ write_run_manifest() {
     network_enabled=true
   fi
   changed_files_json="$(json_string_array changed_files)"
-
   validation_commands_json="$(json_validation_commands)"
+  validation_warnings_json="$(json_validation_warnings)"
 
   ensure_parent_dir "$manifest_path"
   cat > "$manifest_path" <<EOF
@@ -355,7 +537,8 @@ write_run_manifest() {
   "changed_files": $changed_files_json,
   "validation": {
     "status": "$(json_escape "$validation_status")",
-    "commands": $validation_commands_json
+    "commands": $validation_commands_json,
+    "warnings": $validation_warnings_json
   },
   "safety": {
     "network": $network_enabled,
@@ -411,18 +594,14 @@ collect_changed_files() {
 }
 
 run_scope_checks() {
-  local -A allowed_lookup=()
   local -A changed_lookup=()
   local -a violations=()
   local -a missing_expected=()
-  local path evidence
+  local path evidence warning_message
 
-  if ((${#allowed_files[@]} > 0)); then
-    for path in "${allowed_files[@]}"; do
-      allowed_lookup["$path"]=1
-    done
+  if ((${#allowed_files[@]} > 0 || ${#allowed_dirs[@]} > 0 || ${#allowed_globs[@]} > 0)); then
     for path in "${changed_files[@]}"; do
-      if [[ -z "${allowed_lookup[$path]:-}" ]]; then
+      if ! path_matches_allowed_scope "$path"; then
         violations+=("$path")
       fi
     done
@@ -452,14 +631,23 @@ run_scope_checks() {
     if ((${#missing_expected[@]} > 0)); then
       sort_unique_array missing_expected
       evidence="expected files were not changed: $(join_by ', ' "${missing_expected[@]}")"
-      report_status="expected_changes_missing"
-      add_validation_command "expected changed files check" 1 "failed" "$evidence"
-      run_status="failed"
-      safety_scope_violation=false
-      write_log "expected_changes_missing" ",\"evidence\":\"$(json_escape "$evidence")\""
-      write_report
-      write_run_manifest
-      exit 1
+      if [[ "$expected_missing_behavior" == "fail" ]]; then
+        report_status="expected_changes_missing"
+        add_validation_command "expected changed files check" 1 "failed" "$evidence"
+        run_status="failed"
+        safety_scope_violation=false
+        write_log "expected_changes_missing" ",\"evidence\":\"$(json_escape "$evidence")\""
+        write_report
+        write_run_manifest
+        exit 1
+      fi
+
+      for path in "${missing_expected[@]}"; do
+        warning_message="expected file was not changed: $path"
+        add_validation_warning "expected_changed_file_missing" "$path" "$warning_message"
+      done
+      printf 'Warning: %s\n' "$evidence" >&2
+      write_log "expected_changes_missing_warning" ",\"evidence\":\"$(json_escape "$evidence")\""
     fi
   fi
 }
@@ -834,9 +1022,24 @@ parse_args() {
         append_normalized_scope_paths allowed_files "$2" "--allowed-files"
         shift 2
         ;;
+      --allowed-dirs)
+        [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--allowed-dirs requires a value"
+        append_normalized_directory_scope_paths allowed_dirs "$2" "--allowed-dirs"
+        shift 2
+        ;;
+      --allowed-globs)
+        [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--allowed-globs requires a value"
+        append_normalized_scope_globs allowed_globs "$2" "--allowed-globs"
+        shift 2
+        ;;
       --expected-changed-files)
         [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--expected-changed-files requires a value"
         append_normalized_scope_paths expected_changed_files "$2" "--expected-changed-files"
+        shift 2
+        ;;
+      --expected-missing)
+        [[ $# -ge 2 ]] || fail_with_status "invalid_args" "--expected-missing requires a value"
+        expected_missing_behavior="$2"
         shift 2
         ;;
       --record-run-manifest)
@@ -883,10 +1086,19 @@ parse_args() {
 
 apply_run_paths() {
   sort_unique_array allowed_files
+  sort_unique_array allowed_dirs
+  sort_unique_array allowed_globs
   sort_unique_array expected_changed_files
+
+  if [[ "$expected_missing_behavior" != "warn" && "$expected_missing_behavior" != "fail" ]]; then
+    fail_with_status "invalid_args" "--expected-missing must be warn or fail"
+  fi
 
   if ((${#allowed_files[@]} > 0)) && { (( ! record_run_manifest )) || [[ -z "$run_id" ]]; }; then
     fail_with_status "invalid_args" "--allowed-files requires --run-id and --record-run-manifest"
+  fi
+  if ((${#allowed_dirs[@]} > 0 || ${#allowed_globs[@]} > 0)) && { (( ! record_run_manifest )) || [[ -z "$run_id" ]]; }; then
+    fail_with_status "invalid_args" "scope options require --run-id and --record-run-manifest"
   fi
   if ((${#expected_changed_files[@]} > 0)) && { (( ! record_run_manifest )) || [[ -z "$run_id" ]]; }; then
     fail_with_status "invalid_args" "--expected-changed-files requires --run-id and --record-run-manifest"
@@ -941,7 +1153,7 @@ apply_run_paths() {
 
 validate_metadata() {
   case "$task_type" in
-    plan|review|implementation|investigation|repair) ;;
+    plan|review|implementation|investigation|repair|harness-improvement) ;;
     *) fail_with_status "invalid_args" "Invalid --task-type: $task_type" ;;
   esac
 

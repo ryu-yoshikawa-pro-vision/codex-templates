@@ -236,12 +236,20 @@ ensure(
     "spec/change-scope-policy.json path_normalization.absolute_paths_for_comparison is out of contract",
 )
 ensure(
+    path_normalization.get("absolute_paths_in_scope_inputs") is False,
+    "spec/change-scope-policy.json path_normalization.absolute_paths_in_scope_inputs is out of contract",
+)
+ensure(
     path_normalization.get("prevent_repo_escape") is True,
     "spec/change-scope-policy.json path_normalization.prevent_repo_escape is out of contract",
 )
 ensure(
     path_normalization.get("case_sensitive") is True,
     "spec/change-scope-policy.json path_normalization.case_sensitive is out of contract",
+)
+ensure(
+    path_normalization.get("directory_trailing_slash_equivalent") is True,
+    "spec/change-scope-policy.json path_normalization.directory_trailing_slash_equivalent is out of contract",
 )
 
 expect_enum_set(
@@ -273,12 +281,51 @@ ensure(
     "spec/change-scope-policy.json allowed_files.match_mode is out of contract",
 )
 ensure(
-    allowed_files.get("glob_support") == "deferred",
-    "spec/change-scope-policy.json allowed_files.glob_support is out of contract",
-)
-ensure(
     allowed_files.get("scope_violation_when_not_allowed") is True,
     "spec/change-scope-policy.json allowed_files.scope_violation_when_not_allowed is out of contract",
+)
+
+allowed_dirs = change_scope_policy.get("allowed_dirs", {})
+ensure(
+    allowed_dirs.get("meaning") == "allow_descendants_of_directory",
+    "spec/change-scope-policy.json allowed_dirs.meaning is out of contract",
+)
+ensure(
+    allowed_dirs.get("match_mode") == "directory_prefix",
+    "spec/change-scope-policy.json allowed_dirs.match_mode is out of contract",
+)
+ensure(
+    allowed_dirs.get("directory_boundary_required") is True,
+    "spec/change-scope-policy.json allowed_dirs.directory_boundary_required is out of contract",
+)
+ensure(
+    allowed_dirs.get("scope_violation_when_not_allowed") is True,
+    "spec/change-scope-policy.json allowed_dirs.scope_violation_when_not_allowed is out of contract",
+)
+
+allowed_globs = change_scope_policy.get("allowed_globs", {})
+ensure(
+    allowed_globs.get("meaning") == "allow_paths_matching_limited_glob",
+    "spec/change-scope-policy.json allowed_globs.meaning is out of contract",
+)
+ensure(
+    allowed_globs.get("match_mode") == "limited_glob",
+    "spec/change-scope-policy.json allowed_globs.match_mode is out of contract",
+)
+expect_enum_set(
+    allowed_globs.get("supported_tokens", []),
+    ["*", "**", "?"],
+    "spec/change-scope-policy.json allowed_globs.supported_tokens",
+)
+ensure(
+    allowed_globs.get("scope_violation_when_not_allowed") is True,
+    "spec/change-scope-policy.json allowed_globs.scope_violation_when_not_allowed is out of contract",
+)
+
+expect_enum_set(
+    change_scope_policy.get("scope_precedence", []),
+    ["allowed_files", "allowed_dirs", "allowed_globs"],
+    "spec/change-scope-policy.json scope_precedence",
 )
 
 expected_changed_files = change_scope_policy.get("expected_changed_files", {})
@@ -290,9 +337,28 @@ ensure(
     expected_changed_files.get("must_be_subset_of_allowed_files") == "recommended",
     "spec/change-scope-policy.json expected_changed_files.must_be_subset_of_allowed_files is out of contract",
 )
+expect_enum_set(
+    expected_changed_files.get("missing_behavior_options", []),
+    ["warn", "fail"],
+    "spec/change-scope-policy.json expected_changed_files.missing_behavior_options",
+)
 ensure(
-    expected_changed_files.get("missing_expected_change_severity") == "warning_or_failure_candidate",
-    "spec/change-scope-policy.json expected_changed_files.missing_expected_change_severity is out of contract",
+    expected_changed_files.get("default_missing_behavior") == "fail",
+    "spec/change-scope-policy.json expected_changed_files.default_missing_behavior is out of contract",
+)
+
+validation_warning_record = change_scope_policy.get("validation_warning_record", {})
+ensure(
+    validation_warning_record.get("manifest_location") == "validation.warnings[]",
+    "spec/change-scope-policy.json validation_warning_record.manifest_location is out of contract",
+)
+ensure(
+    validation_warning_record.get("warning_type") == "expected_changed_file_missing",
+    "spec/change-scope-policy.json validation_warning_record.warning_type is out of contract",
+)
+ensure(
+    validation_warning_record.get("warning_status") == "passed_with_warnings",
+    "spec/change-scope-policy.json validation_warning_record.warning_status is out of contract",
 )
 
 deleted_files = change_scope_policy.get("deleted_files", {})
@@ -353,7 +419,7 @@ ensure(
     "spec/change-scope-policy.json deferred.runner_enforcement is out of contract",
 )
 ensure(
-    deferred.get("glob_matching") is True,
+    deferred.get("glob_matching") is False,
     "spec/change-scope-policy.json deferred.glob_matching is out of contract",
 )
 ensure(
@@ -823,7 +889,7 @@ expect_property_keys(
 )
 expect_enum_contains(
     run_manifest_props["task_type"]["enum"],
-    ["plan", "review", "implementation", "investigation", "repair"],
+    ["plan", "review", "implementation", "investigation", "repair", "harness-improvement"],
     "spec/run-manifest.schema.json task_type",
 )
 expect_enum_contains(
@@ -847,11 +913,11 @@ expect_enum_contains(
     "spec/run-manifest.schema.json status",
 )
 validation_schema = run_manifest_props["validation"]
-expect_required_fields(validation_schema, ["status", "commands"], "spec/run-manifest.schema.json validation")
-expect_property_keys(validation_schema, ["status", "commands"], "spec/run-manifest.schema.json validation")
+expect_required_fields(validation_schema, ["status", "commands", "warnings"], "spec/run-manifest.schema.json validation")
+expect_property_keys(validation_schema, ["status", "commands", "warnings"], "spec/run-manifest.schema.json validation")
 expect_enum_contains(
     validation_schema["properties"]["status"]["enum"],
-    ["not_run", "passed", "failed", "skipped", "blocked"],
+    ["not_run", "passed", "passed_with_warnings", "failed", "skipped", "blocked"],
     "spec/run-manifest.schema.json validation.status",
 )
 validation_command_item = validation_schema["properties"]["commands"]["items"]
@@ -869,6 +935,17 @@ expect_enum_contains(
     validation_command_item["properties"]["status"]["enum"],
     ["not_run", "passed", "failed", "skipped", "blocked"],
     "spec/run-manifest.schema.json validation.commands[].status",
+)
+validation_warning_item = validation_schema["properties"]["warnings"]["items"]
+expect_required_fields(
+    validation_warning_item,
+    ["type", "path"],
+    "spec/run-manifest.schema.json validation.warnings item",
+)
+expect_property_keys(
+    validation_warning_item,
+    ["type", "path", "message"],
+    "spec/run-manifest.schema.json validation.warnings item",
 )
 
 safety_schema = run_manifest_props["safety"]
@@ -900,7 +977,9 @@ ensure(
     isinstance(run_manifest_template.get("validation"), dict)
     and run_manifest_template["validation"].get("status") == "not_run"
     and isinstance(run_manifest_template["validation"].get("commands"), list)
-    and len(run_manifest_template["validation"]["commands"]) == 0,
+    and len(run_manifest_template["validation"]["commands"]) == 0
+    and isinstance(run_manifest_template["validation"].get("warnings"), list)
+    and len(run_manifest_template["validation"]["warnings"]) == 0,
     "template/.codex/templates/RUN_MANIFEST.json validation defaults are out of contract",
 )
 ensure(
