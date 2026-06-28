@@ -51,7 +51,7 @@
   ],
   "expected_changed_files": {
     "meaning": "expected_required_changes",
-    "must_be_subset_of_allowed_files": "recommended",
+    "must_be_subset_of_allowed_scope": "recommended",
     "missing_behavior_options": [
       "warn",
       "fail"

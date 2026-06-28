@@ -74,6 +74,13 @@ def expect_enum_set(values, expected, label):
     )
 
 
+def expect_sequence(values, expected, label):
+    ensure(
+        list(values) == list(expected),
+        f"{label} sequence mismatch: expected {list(expected)}, got {list(values)}",
+    )
+
+
 def run_schema_validation(schema_rel, output_rel):
     subprocess.check_call(
         [
@@ -322,7 +329,7 @@ ensure(
     "spec/change-scope-policy.json allowed_globs.scope_violation_when_not_allowed is out of contract",
 )
 
-expect_enum_set(
+expect_sequence(
     change_scope_policy.get("scope_precedence", []),
     ["allowed_files", "allowed_dirs", "allowed_globs"],
     "spec/change-scope-policy.json scope_precedence",
@@ -334,8 +341,8 @@ ensure(
     "spec/change-scope-policy.json expected_changed_files.meaning is out of contract",
 )
 ensure(
-    expected_changed_files.get("must_be_subset_of_allowed_files") == "recommended",
-    "spec/change-scope-policy.json expected_changed_files.must_be_subset_of_allowed_files is out of contract",
+    expected_changed_files.get("must_be_subset_of_allowed_scope") == "recommended",
+    "spec/change-scope-policy.json expected_changed_files.must_be_subset_of_allowed_scope is out of contract",
 )
 expect_enum_set(
     expected_changed_files.get("missing_behavior_options", []),
@@ -913,7 +920,7 @@ expect_enum_contains(
     "spec/run-manifest.schema.json status",
 )
 validation_schema = run_manifest_props["validation"]
-expect_required_fields(validation_schema, ["status", "commands", "warnings"], "spec/run-manifest.schema.json validation")
+expect_required_fields(validation_schema, ["status", "commands"], "spec/run-manifest.schema.json validation")
 expect_property_keys(validation_schema, ["status", "commands", "warnings"], "spec/run-manifest.schema.json validation")
 expect_enum_contains(
     validation_schema["properties"]["status"]["enum"],

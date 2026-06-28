@@ -149,7 +149,7 @@ if [[ -e "$run_root" ]]; then
   exit 1
 fi
 
-mkdir -p "$run_root"
+mkdir "$run_root"
 cp "$repo_root/.codex/templates/TASKS.md" "$run_root/TASKS.md"
 cp "$repo_root/.codex/templates/REPORT.md" "$run_root/REPORT.md"
 if (( ! no_plan )); then

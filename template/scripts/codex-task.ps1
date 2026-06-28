@@ -568,7 +568,7 @@ function Test-PathMatchesAllowedDir {
         [Parameter(Mandatory = $true)][string]$AllowedDir
     )
 
-    return $Path -eq $AllowedDir -or $Path.StartsWith($AllowedDir + '/', [System.StringComparison]::Ordinal)
+    return $Path -ceq $AllowedDir -or $Path.StartsWith($AllowedDir + '/', [System.StringComparison]::Ordinal)
 }
 
 function Test-PathMatchesAllowedScope {
@@ -578,7 +578,7 @@ function Test-PathMatchesAllowedScope {
     )
 
     foreach ($allowed in @($State.allowed_files)) {
-        if ($Path -eq $allowed) {
+        if ($Path -ceq $allowed) {
             return $true
         }
     }
@@ -590,7 +590,7 @@ function Test-PathMatchesAllowedScope {
     }
 
     foreach ($pattern in @($State.allowed_globs)) {
-        if ($Path -match (Convert-LimitedGlobToRegex -Pattern $pattern)) {
+        if ($Path -cmatch (Convert-LimitedGlobToRegex -Pattern $pattern)) {
             return $true
         }
     }
@@ -695,7 +695,7 @@ function Invoke-ScopeChecks {
 
         if ($violations.Count -gt 0) {
             $orderedViolations = @(Get-SortedUniqueStrings -Values @($violations))
-            $evidence = "changed files outside allowed_files: " + ($orderedViolations -join ', ')
+            $evidence = "changed files outside allowed scope: " + ($orderedViolations -join ', ')
             $Report.status = "scope_violation"
             Add-ValidationCommand -State $State -Command "change scope check" -ExitCode 1 -Status "blocked" -Evidence $evidence
             $State.run_status = "failed"
@@ -1584,7 +1584,7 @@ if ($state.output_schema) {
 if ($state.skip_verify) {
     $report.status = "verify_skipped"
     $state.run_status = "completed"
-    if ($state.validation_status -eq 'not_run') {
+    if ($state.validation_status -ceq 'not_run') {
         $state.validation_status = 'skipped'
     }
 }
@@ -1602,7 +1602,7 @@ else {
     if ([string]::IsNullOrWhiteSpace($verifyCommand)) {
         $report.status = "verify_skipped"
         $state.run_status = "completed"
-        if ($state.validation_status -eq 'not_run') {
+        if ($state.validation_status -ceq 'not_run') {
             $state.validation_status = 'skipped'
         }
         Write-TaskLog -Path $state.log_path -Event "verify_skipped" -Data @{}

@@ -76,7 +76,8 @@
 - `expected_changed_files` は「必ず変更されるべきファイル」を表します。
 - `allowed_files` とは意味が違います。
 - `expected_changed_files` が変更されていない場合の既定動作は `fail` です。
-- `expected_changed_files` は `allowed_files` の subset であることが望ましいです。
+- `expected_changed_files` は `allowed_files` / `allowed_dirs` / `allowed_globs` を合わせた allowed scope の subset であることが望ましいです。
+  - catalog 上の key は `must_be_subset_of_allowed_scope` です。
 - `--require-evaluation` や `--require-clean-git` を併用しても、`.codex/runs/` の generated artifact は source scope に混ぜません。
 
 ### expected_missing behavior

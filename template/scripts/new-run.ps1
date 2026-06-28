@@ -55,20 +55,28 @@ if (Test-Path -LiteralPath $runRoot) {
     throw "Run directory already exists and will not be overwritten: .codex/runs/$RunId"
 }
 
-New-Item -ItemType Directory -Path $runRoot | Out-Null
-Copy-Item -LiteralPath (Join-Path $repoRoot ".codex\templates\TASKS.md") -Destination (Join-Path $runRoot "TASKS.md")
-Copy-Item -LiteralPath (Join-Path $repoRoot ".codex\templates\REPORT.md") -Destination (Join-Path $runRoot "REPORT.md")
-if (-not $NoPlan) {
-    Copy-Item -LiteralPath (Join-Path $repoRoot ".codex\templates\PLAN.md") -Destination (Join-Path $runRoot "PLAN.md")
-}
+try {
+    New-Item -ItemType Directory -Path $runRoot | Out-Null
+    Copy-Item -LiteralPath (Join-Path $repoRoot ".codex\templates\TASKS.md") -Destination (Join-Path $runRoot "TASKS.md")
+    Copy-Item -LiteralPath (Join-Path $repoRoot ".codex\templates\REPORT.md") -Destination (Join-Path $runRoot "REPORT.md")
+    if (-not $NoPlan) {
+        Copy-Item -LiteralPath (Join-Path $repoRoot ".codex\templates\PLAN.md") -Destination (Join-Path $runRoot "PLAN.md")
+    }
 
-if (-not $NoRunManifest) {
-    $manifestTemplate = Get-Content -Raw -LiteralPath (Join-Path $repoRoot ".codex\templates\RUN_MANIFEST.json") | ConvertFrom-Json
-    $manifestTemplate.run_id = $RunId
-    $manifestTemplate.task_type = $TaskType
-    $manifestTemplate.workflow_level = $WorkflowLevel
-    $manifestTemplate.preset = $Preset
-    ($manifestTemplate | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath (Join-Path $runRoot "run.json")
+    if (-not $NoRunManifest) {
+        $manifestTemplate = Get-Content -Raw -LiteralPath (Join-Path $repoRoot ".codex\templates\RUN_MANIFEST.json") | ConvertFrom-Json
+        $manifestTemplate.run_id = $RunId
+        $manifestTemplate.task_type = $TaskType
+        $manifestTemplate.workflow_level = $WorkflowLevel
+        $manifestTemplate.preset = $Preset
+        ($manifestTemplate | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath (Join-Path $runRoot "run.json")
+    }
+}
+catch {
+    if (Test-Path -LiteralPath $runRoot) {
+        Remove-Item -LiteralPath $runRoot -Recurse -Force
+    }
+    throw
 }
 
 Write-Host "Initialized run: .codex/runs/$RunId"

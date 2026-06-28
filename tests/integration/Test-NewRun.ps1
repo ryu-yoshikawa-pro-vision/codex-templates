@@ -84,6 +84,17 @@ try {
 
     $invalidWorkflow = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @('-WorkflowLevel', 'invalid')
     if ($invalidWorkflow.ExitCode -eq 0) { throw "Invalid workflow level unexpectedly succeeded" }
+
+    Move-Item -LiteralPath (Join-Path $templateRoot ".codex\\templates\\RUN_MANIFEST.json") -Destination (Join-Path $templateRoot ".codex\\templates\\RUN_MANIFEST.json.bak")
+    try {
+        $rollbackRunId = "20260628-113102-JST"
+        $rollback = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @('-RunId', $rollbackRunId)
+        if ($rollback.ExitCode -eq 0) { throw "Rollback failure case unexpectedly succeeded" }
+        if (Test-Path (Join-Path $templateRoot ".codex\\runs\\$rollbackRunId")) { throw "Run directory should be removed after failure rollback" }
+    }
+    finally {
+        Move-Item -LiteralPath (Join-Path $templateRoot ".codex\\templates\\RUN_MANIFEST.json.bak") -Destination (Join-Path $templateRoot ".codex\\templates\\RUN_MANIFEST.json")
+    }
 }
 finally {
     Pop-Location

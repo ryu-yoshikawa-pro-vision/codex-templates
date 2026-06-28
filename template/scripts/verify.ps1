@@ -141,11 +141,19 @@ function Test-TemplateContract {
     if ($implementationHarness -notmatch [regex]::Escape("--allowed-dirs")) { throw "implementation harness doc missing allowed-dirs guidance" }
     if ($implementationHarness -notmatch [regex]::Escape("--allowed-globs")) { throw "implementation harness doc missing allowed-globs guidance" }
     if ($implementationHarness -notmatch [regex]::Escape("--expected-missing")) { throw "implementation harness doc missing expected-missing guidance" }
+    $newRunBash = Get-Content -Raw scripts/new-run.sh
+    $newRunPowerShell = Get-Content -Raw scripts/new-run.ps1
+    if ($newRunBash -notmatch [regex]::Escape("Existing run directories are never overwritten")) { throw "new-run.sh missing non-overwrite contract" }
+    if ($newRunPowerShell -notmatch [regex]::Escape("Run directory already exists and will not be overwritten")) { throw "new-run.ps1 missing non-overwrite contract" }
     $changeScope = Get-Content -Raw docs/reference/change-scope-policy.md
     if ($changeScope -notmatch [regex]::Escape("allowed_dirs")) { throw "change-scope doc missing allowed_dirs guidance" }
     if ($changeScope -notmatch [regex]::Escape("allowed_globs")) { throw "change-scope doc missing allowed_globs guidance" }
     if ($changeScope -notmatch [regex]::Escape("expected_missing")) { throw "change-scope doc missing expected_missing guidance" }
+    if ($changeScope -notmatch [regex]::Escape("must_be_subset_of_allowed_scope")) { throw "change-scope doc missing allowed scope subset contract" }
     if ($changeScope -notmatch [regex]::Escape("--record-run-manifest")) { throw "change-scope doc missing record-run-manifest guidance" }
+    $runArtifacts = Get-Content -Raw docs/reference/run-artifacts.md
+    if ($runArtifacts -notmatch [regex]::Escape("--max-iterations")) { throw "run-artifacts doc missing max-iterations guidance" }
+    if ($runArtifacts -notmatch [regex]::Escape("repair loop")) { throw "run-artifacts doc missing repair loop guidance" }
 
     $config = Get-Content -Raw .codex/config.toml
     if ($config -notmatch [regex]::Escape('sandbox_mode = "workspace-write"')) { throw "config missing workspace-write sandbox" }

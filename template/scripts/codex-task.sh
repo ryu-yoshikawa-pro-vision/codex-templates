@@ -607,7 +607,7 @@ run_scope_checks() {
     done
     if ((${#violations[@]} > 0)); then
       sort_unique_array violations
-      evidence="changed files outside allowed_files: $(join_by ', ' "${violations[@]}")"
+      evidence="changed files outside allowed scope: $(join_by ', ' "${violations[@]}")"
       report_status="scope_violation"
       add_validation_command "change scope check" 1 "blocked" "$evidence"
       run_status="failed"

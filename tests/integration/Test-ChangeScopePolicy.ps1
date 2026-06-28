@@ -115,7 +115,21 @@ try {
     Assert-ManifestState -Path (Join-Path $templateRoot ".codex\\runs\\$allowedDirRunId\\run.json") -ExpectedRunStatus 'completed' -ExpectedValidationStatus 'skipped' -ExpectedScopeViolation $false -ExpectedChangedFiles @('docs/reference/codex-implementation-harness.md')
     Restore-TemplateFile -RelativePath 'docs/reference/codex-implementation-harness.md'
 
-    $allowedGlobRunId = "20260628-114101-JST"
+    $allowedDirViolationRunId = "20260628-114101-JST"
+    $allowedDirViolation = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $allowedDirViolationRunId,
+        '--record-run-manifest',
+        '--allowed-dirs', 'docs/reference',
+        '--skip-verify',
+        'ALLOWED_DIR_VIOLATION'
+    ) -ExtraEnv (@{ CODEX_BIN = $fakeCodex; FAKE_CODEX_WRITE_FILES = 'docs/reference-guide.md' })
+    if ($allowedDirViolation.ExitCode -eq 0) { throw "allowed-dirs violation case unexpectedly succeeded" }
+    $allowedDirViolationReport = (Get-ChildItem -Path (Join-Path $templateRoot ".codex\\runs\\$allowedDirViolationRunId\\reports") -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $allowedDirViolationReport -ExpectedStatus 'scope_violation'
+    Assert-ManifestState -Path (Join-Path $templateRoot ".codex\\runs\\$allowedDirViolationRunId\\run.json") -ExpectedRunStatus 'failed' -ExpectedValidationStatus 'blocked' -ExpectedScopeViolation $true -ExpectedChangedFiles @('docs/reference-guide.md')
+    Restore-TemplateFile -RelativePath 'docs/reference-guide.md'
+
+    $allowedGlobRunId = "20260628-114102-JST"
     $allowedGlob = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
         '--run-id', $allowedGlobRunId,
         '--record-run-manifest',
@@ -129,7 +143,7 @@ try {
     Assert-ManifestState -Path (Join-Path $templateRoot ".codex\\runs\\$allowedGlobRunId\\run.json") -ExpectedRunStatus 'completed' -ExpectedValidationStatus 'skipped' -ExpectedScopeViolation $false -ExpectedChangedFiles @('scripts/codex-task.ps1')
     Restore-TemplateFile -RelativePath 'scripts/codex-task.ps1'
 
-    $expectedWarnRunId = "20260628-114102-JST"
+    $expectedWarnRunId = "20260628-114103-JST"
     $expectedWarn = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
         '--run-id', $expectedWarnRunId,
         '--record-run-manifest',
@@ -144,6 +158,78 @@ try {
     $expectedWarnManifest = Get-Content -Raw (Join-Path $templateRoot ".codex\\runs\\$expectedWarnRunId\\run.json") | ConvertFrom-Json
     if ($expectedWarnManifest.validation.status -ne 'passed_with_warnings') { throw "Expected passed_with_warnings, got $($expectedWarnManifest.validation.status)" }
     if (@($expectedWarnManifest.validation.warnings).Count -lt 1) { throw "Expected at least one warning record" }
+
+    $taskTypeRunId = "20260628-114104-JST"
+    $taskType = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $taskTypeRunId,
+        '--record-run-manifest',
+        '--task-type', 'harness-improvement',
+        '--skip-verify',
+        'HARNESS_TASK_TYPE'
+    ) -ExtraEnv $baseEnv
+    if ($taskType.ExitCode -ne 0) { throw "harness-improvement task type case failed unexpectedly: $($taskType.Combined)" }
+    $taskTypeManifest = Get-Content -Raw (Join-Path $templateRoot ".codex\\runs\\$taskTypeRunId\\run.json") | ConvertFrom-Json
+    if ($taskTypeManifest.task_type -ne 'harness-improvement') { throw "Expected harness-improvement task type, got $($taskTypeManifest.task_type)" }
+
+    foreach ($invalidDir in @('../outside', 'C:\temp\outside')) {
+        $invalidDirResult = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+            '--report-path', (Join-Path $tempRoot 'invalid-dir.report.json'),
+            '--log-path', (Join-Path $tempRoot 'invalid-dir.jsonl'),
+            '--allowed-dirs', $invalidDir,
+            '--skip-verify',
+            'INVALID_DIR'
+        ) -ExtraEnv $baseEnv
+        if ($invalidDirResult.ExitCode -eq 0) { throw "invalid allowed-dirs case unexpectedly succeeded for $invalidDir" }
+        Assert-ReportStatus -Path (Join-Path $tempRoot 'invalid-dir.report.json') -ExpectedStatus 'invalid_args'
+    }
+
+    foreach ($invalidGlob in @('../*.md', 'C:\temp\*.md')) {
+        $invalidGlobResult = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+            '--report-path', (Join-Path $tempRoot 'invalid-glob.report.json'),
+            '--log-path', (Join-Path $tempRoot 'invalid-glob.jsonl'),
+            '--allowed-globs', $invalidGlob,
+            '--skip-verify',
+            'INVALID_GLOB'
+        ) -ExtraEnv $baseEnv
+        if ($invalidGlobResult.ExitCode -eq 0) { throw "invalid allowed-globs case unexpectedly succeeded for $invalidGlob" }
+        Assert-ReportStatus -Path (Join-Path $tempRoot 'invalid-glob.report.json') -ExpectedStatus 'invalid_args'
+    }
+
+    $allowedDirNoManifest = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--report-path', (Join-Path $tempRoot 'allowed-dir-missing-manifest.report.json'),
+        '--log-path', (Join-Path $tempRoot 'allowed-dir-missing-manifest.jsonl'),
+        '--allowed-dirs', 'docs/reference',
+        '--skip-verify',
+        'ALLOWED_DIR_NO_MANIFEST'
+    ) -ExtraEnv $baseEnv
+    if ($allowedDirNoManifest.ExitCode -eq 0) { throw "allowed-dirs without manifest unexpectedly succeeded" }
+    if ($allowedDirNoManifest.Combined -notmatch [regex]::Escape('scope options require --run-id and --record-run-manifest')) { throw "allowed-dirs missing manifest message missing" }
+    Assert-ReportStatus -Path (Join-Path $tempRoot 'allowed-dir-missing-manifest.report.json') -ExpectedStatus 'invalid_args'
+
+    $allowedGlobNoManifest = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--report-path', (Join-Path $tempRoot 'allowed-glob-missing-manifest.report.json'),
+        '--log-path', (Join-Path $tempRoot 'allowed-glob-missing-manifest.jsonl'),
+        '--allowed-globs', 'scripts/codex-task.*',
+        '--skip-verify',
+        'ALLOWED_GLOB_NO_MANIFEST'
+    ) -ExtraEnv $baseEnv
+    if ($allowedGlobNoManifest.ExitCode -eq 0) { throw "allowed-globs without manifest unexpectedly succeeded" }
+    if ($allowedGlobNoManifest.Combined -notmatch [regex]::Escape('scope options require --run-id and --record-run-manifest')) { throw "allowed-globs missing manifest message missing" }
+    Assert-ReportStatus -Path (Join-Path $tempRoot 'allowed-glob-missing-manifest.report.json') -ExpectedStatus 'invalid_args'
+
+    $caseSensitiveRunId = "20260628-114105-JST"
+    $caseSensitive = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
+        '--run-id', $caseSensitiveRunId,
+        '--record-run-manifest',
+        '--allowed-dirs', 'Docs/reference',
+        '--skip-verify',
+        'CASE_SENSITIVE_SCOPE'
+    ) -ExtraEnv (@{ CODEX_BIN = $fakeCodex; FAKE_CODEX_WRITE_FILES = 'docs/reference/codex-implementation-harness.md' })
+    if ($caseSensitive.ExitCode -eq 0) { throw "case-sensitive scope case unexpectedly succeeded" }
+    $caseSensitiveReport = (Get-ChildItem -Path (Join-Path $templateRoot ".codex\\runs\\$caseSensitiveRunId\\reports") -Filter "codex-task-*.report.json" | Sort-Object Name | Select-Object -Last 1).FullName
+    Assert-ReportStatus -Path $caseSensitiveReport -ExpectedStatus 'scope_violation'
+    Assert-ManifestState -Path (Join-Path $templateRoot ".codex\\runs\\$caseSensitiveRunId\\run.json") -ExpectedRunStatus 'failed' -ExpectedValidationStatus 'blocked' -ExpectedScopeViolation $true -ExpectedChangedFiles @('docs/reference/codex-implementation-harness.md')
+    Restore-TemplateFile -RelativePath 'docs/reference/codex-implementation-harness.md'
 
     $invalidExpected = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @(
         '--report-path', (Join-Path $tempRoot 'invalid-expected-missing.report.json'),

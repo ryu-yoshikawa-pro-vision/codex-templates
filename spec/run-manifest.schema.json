@@ -125,8 +125,7 @@
       "additionalProperties": false,
       "required": [
         "status",
-        "commands",
-        "warnings"
+        "commands"
       ],
       "properties": {
         "status": {

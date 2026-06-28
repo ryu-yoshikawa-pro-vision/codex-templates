@@ -229,6 +229,25 @@ function Expect-EnumSet {
     }
 }
 
+function Expect-Sequence {
+    param(
+        $Values,
+        [object[]]$Expected,
+        [string]$Label
+    )
+
+    $actual = Normalize-ToArray $Values
+    if ($actual.Count -ne $Expected.Count) {
+        throw "$Label sequence length mismatch: expected $($Expected.Count), got $($actual.Count)"
+    }
+
+    for ($index = 0; $index -lt $Expected.Count; $index++) {
+        if ([string]$actual[$index] -cne [string]$Expected[$index]) {
+            throw "${Label} sequence mismatch at index ${index}: expected '$($Expected[$index])', got '$($actual[$index])'"
+        }
+    }
+}
+
 function Invoke-OutputSchemaValidation {
     param(
         [string]$SchemaRelativePath,
@@ -425,9 +444,9 @@ Assert-Condition ($changeScopePolicy.allowed_globs.meaning -eq "allow_paths_matc
 Assert-Condition ($changeScopePolicy.allowed_globs.match_mode -eq "limited_glob") "spec/change-scope-policy.json allowed_globs.match_mode is out of contract"
 Expect-EnumSet -Values $changeScopePolicy.allowed_globs.supported_tokens -Expected @("*", "**", "?") -Label "spec/change-scope-policy.json allowed_globs.supported_tokens"
 Assert-Condition ($changeScopePolicy.allowed_globs.scope_violation_when_not_allowed -eq $true) "spec/change-scope-policy.json allowed_globs.scope_violation_when_not_allowed is out of contract"
-Expect-EnumSet -Values $changeScopePolicy.scope_precedence -Expected @("allowed_files", "allowed_dirs", "allowed_globs") -Label "spec/change-scope-policy.json scope_precedence"
+Expect-Sequence -Values $changeScopePolicy.scope_precedence -Expected @("allowed_files", "allowed_dirs", "allowed_globs") -Label "spec/change-scope-policy.json scope_precedence"
 Assert-Condition ($changeScopePolicy.expected_changed_files.meaning -eq "expected_required_changes") "spec/change-scope-policy.json expected_changed_files.meaning is out of contract"
-Assert-Condition ($changeScopePolicy.expected_changed_files.must_be_subset_of_allowed_files -eq "recommended") "spec/change-scope-policy.json expected_changed_files.must_be_subset_of_allowed_files is out of contract"
+Assert-Condition ($changeScopePolicy.expected_changed_files.must_be_subset_of_allowed_scope -eq "recommended") "spec/change-scope-policy.json expected_changed_files.must_be_subset_of_allowed_scope is out of contract"
 Expect-EnumSet -Values $changeScopePolicy.expected_changed_files.missing_behavior_options -Expected @("warn", "fail") -Label "spec/change-scope-policy.json expected_changed_files.missing_behavior_options"
 Assert-Condition ($changeScopePolicy.expected_changed_files.default_missing_behavior -eq "fail") "spec/change-scope-policy.json expected_changed_files.default_missing_behavior is out of contract"
 Assert-Condition ($changeScopePolicy.validation_warning_record.manifest_location -eq "validation.warnings[]") "spec/change-scope-policy.json validation_warning_record.manifest_location is out of contract"
@@ -707,7 +726,7 @@ Expect-EnumContains -Values $runManifestSchema.properties.status.enum -Expected 
 Expect-EnumSet -Values $runManifestSchema.properties.primary_failure_category.enum -Expected ($taxonomyCategories + @($null)) -Label "spec/run-manifest.schema.json primary_failure_category"
 
 $validationSchema = $runManifestSchema.properties.validation
-Expect-RequiredFields -Schema $validationSchema -Fields @("status", "commands", "warnings") -Label "spec/run-manifest.schema.json validation"
+Expect-RequiredFields -Schema $validationSchema -Fields @("status", "commands") -Label "spec/run-manifest.schema.json validation"
 Expect-PropertyKeys -Schema $validationSchema -Fields @("status", "commands", "warnings") -Label "spec/run-manifest.schema.json validation"
 Expect-EnumContains -Values $validationSchema.properties.status.enum -Expected @("not_run", "passed", "passed_with_warnings", "failed", "skipped", "blocked") -Label "spec/run-manifest.schema.json validation.status"
 
