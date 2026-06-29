@@ -162,6 +162,11 @@ function Assert-Condition {
     }
 }
 
+function Test-SemVer {
+    param([Parameter(Mandatory = $true)][string]$Value)
+    return ($Value -match '^\d+\.\d+\.\d+$')
+}
+
 function Get-EnumValueKey {
     param($Value)
 
@@ -260,19 +265,33 @@ function Invoke-OutputSchemaValidation {
 
     $pythonPath = $null
     $pythonArgs = @()
-    foreach ($candidate in @("python", "python3", "py")) {
-        $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
+    $pythonCandidates = @(
+        @{ Command = "python3"; Args = @() },
+        @{ Command = "python"; Args = @() },
+        @{ Command = "py"; Args = @("-3") }
+    )
+    foreach ($candidate in $pythonCandidates) {
+        $cmd = Get-Command $candidate.Command -ErrorAction SilentlyContinue
         if (-not $cmd) {
             continue
         }
-        & $cmd.Path --version *> $null
+
+        $commandPath = if ($cmd.Path) { $cmd.Path } elseif ($cmd.Source) { $cmd.Source } else { $cmd.Name }
+        $checkArgs = @($candidate.Args) + @("-c", "import sys; raise SystemExit(0 if sys.version_info[0] >= 3 else 1)")
+        try {
+            & $commandPath @checkArgs *> $null
+        }
+        catch {
+            continue
+        }
         if ($LASTEXITCODE -eq 0) {
-            $pythonPath = $cmd.Path
+            $pythonPath = $commandPath
+            $pythonArgs = @($candidate.Args)
             break
         }
     }
     if (-not $pythonPath) {
-        throw "python, python3, or py is required"
+        throw "Python 3 is required"
     }
 
     & $pythonPath @pythonArgs $validator $schemaPath $outputPath
@@ -375,14 +394,28 @@ $requiredPaths = @(
     "template/.codex/templates/evaluation.schema.json",
     "template/.codex/templates/hook-observation.schema.json",
     "template/.codex/templates/subagent-run.schema.json",
+    "template/.codex/hooks/pre_tool_use_policy.py",
+    "template/.codex/hooks/pre_tool_use_policy.ps1",
     "template/docs/reference/run-artifacts.md",
     "template/docs/reference/failure-taxonomy.md",
     "template/docs/reference/evaluation.md",
     "template/docs/reference/change-scope-policy.md",
     "template/docs/reference/hook-observation.md",
     "template/docs/reference/subagent-observation.md",
+    "template/docs/reference/codex-safety-harness.md",
+    "template/docs/reference/codex-implementation-harness.md",
+    "template/docs/guides/consumer-update.md",
+    "template/scripts/cleanup-runs.sh",
+    "template/scripts/cleanup-runs.ps1",
     "template/.codex/hooks/observe.sh",
-    "template/.codex/hooks/observe.ps1"
+    "template/.codex/hooks/observe.ps1",
+    "tools/plan-consumer-update.sh",
+    "tools/plan-consumer-update.ps1",
+    "tests/integration/test-cleanup-runs.sh",
+    "tests/integration/Test-CleanupRuns.ps1",
+    "tests/integration/test-plan-consumer-update.sh",
+    "tests/integration/Test-PlanConsumerUpdate.ps1",
+    ".github/workflows/validate-template.yml"
 )
 
 foreach ($path in $requiredPaths) {
@@ -786,6 +819,70 @@ Assert-Condition (-not (Compare-Object -ReferenceObject $expectedSafetyKeys -Dif
 Assert-Condition (($runManifestTemplate.artifact_summary.codex_task_report_count -eq 0) -and ($runManifestTemplate.artifact_summary.hook_event_count -eq 0) -and ($runManifestTemplate.artifact_summary.subagent_run_count -eq 0) -and ($runManifestTemplate.artifact_summary.evaluation_present -eq $false)) "template/.codex/templates/RUN_MANIFEST.json artifact_summary defaults are out of contract"
 Assert-Condition (Test-JsonStructureEqual -Left $runManifestTemplate.hook_observations -Right ([pscustomobject]@{ log_paths = @(); event_counts = [pscustomobject]@{}; blocking_event_count = 0; safety_blocked_count = 0; observation_error_count = 0 })) "template/.codex/templates/RUN_MANIFEST.json hook_observations defaults are out of contract"
 Assert-Condition (Test-JsonStructureEqual -Left $runManifestTemplate.subagents -Right ([pscustomobject]@{ records = @(); summary = [pscustomobject]@{ total = 0; read_only = 0; writable = 0; scope_violations = 0; used_in_final_plan = 0 } })) "template/.codex/templates/RUN_MANIFEST.json subagents defaults are out of contract"
+
+$templateProjectToml = Get-Content -Raw (Join-Path $repoRoot "template/codex-project.toml")
+$templateVersionMatch = [regex]::Match($templateProjectToml, '^template_version\s*=\s*"([^"]+)"', [System.Text.RegularExpressions.RegexOptions]::Multiline)
+Assert-Condition $templateVersionMatch.Success "template/codex-project.toml must define template_version"
+$templateVersion = $templateVersionMatch.Groups[1].Value
+Assert-Condition (Test-SemVer -Value $templateVersion) "template_version must be semver, got $templateVersion"
+
+Assert-Contains -RelativePath "template/AGENTS.md" -Patterns @(
+    "command-based deletion",
+    "implementation_worker",
+    "writable subagent",
+    "auto-net",
+    "git mutation"
+)
+Assert-Contains -RelativePath "README.md" -Patterns @(
+    "verify --strict-harness",
+    "plan-consumer-update",
+    "cleanup-runs",
+    "Major:",
+    "Minor:",
+    "Patch:"
+)
+Assert-Contains -RelativePath "CHANGELOG.md" -Patterns @(
+    "## $templateVersion",
+    "verify --strict-harness",
+    "cleanup-runs",
+    "plan-consumer-update"
+)
+Assert-Contains -RelativePath "MIGRATION.md" -Patterns @(
+    "## $templateVersion",
+    "strict-harness",
+    "cleanup-runs",
+    "plan-consumer-update"
+)
+Assert-Contains -RelativePath "template/docs/guides/consumer-update.md" -Patterns @(
+    "plan-consumer-update",
+    "--exclude-protected",
+    "cleanup-runs"
+)
+Assert-Contains -RelativePath "template/docs/reference/run-artifacts.md" -Patterns @(
+    "scripts/cleanup-runs.sh",
+    "scripts/cleanup-runs.ps1",
+    "--confirm-delete-generated-runs"
+)
+Assert-Contains -RelativePath "template/docs/reference/codex-safety-harness.md" -Patterns @(
+    "cleanup-runs",
+    "strict-harness"
+)
+Assert-Contains -RelativePath "template/docs/reference/codex-implementation-harness.md" -Patterns @(
+    "--strict-harness",
+    "-StrictHarness"
+)
+Assert-Contains -RelativePath ".github/workflows/validate-template.yml" -Patterns @(
+    "permissions:",
+    "contents: read",
+    "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+    "persist-credentials: false",
+    "bash template/scripts/verify --strict-harness",
+    "bash tests/integration/test-cleanup-runs.sh",
+    "bash tests/integration/test-plan-consumer-update.sh",
+    "powershell -ExecutionPolicy Bypass -File template/scripts/verify.ps1 -StrictHarness",
+    "powershell -ExecutionPolicy Bypass -File tests/integration/Test-CleanupRuns.ps1",
+    "powershell -ExecutionPolicy Bypass -File tests/integration/Test-PlanConsumerUpdate.ps1"
+)
 
 Assert-Contains -RelativePath "template/.codex/templates/EVALUATION.md" -Patterns @(
     "evaluation.json",

@@ -1,6 +1,6 @@
 schema_version = 1
 name = "codex-project"
-template_version = "0.10.0"
+template_version = "0.11.0"
 timezone = "Asia/Tokyo"
 default_run_root = ".codex/runs"
 

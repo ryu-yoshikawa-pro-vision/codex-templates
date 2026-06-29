@@ -9,10 +9,14 @@ temp_root="$(mktemp -d "${TMPDIR:-/tmp}/codex-task-test.XXXXXX")"
 template_root="$temp_root/template"
 wrapper="$template_root/scripts/codex-task.sh"
 sandbox_wrapper="$template_root/scripts/codex-sandbox.sh"
-python_cmd="python3"
-if ! command -v python3 >/dev/null 2>&1; then
-  python_cmd="python"
-fi
+python_cmd=""
+for candidate in python3 python; do
+  if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c "import sys; raise SystemExit(0 if sys.version_info[0] >= 3 else 1)" >/dev/null 2>&1; then
+    python_cmd="$candidate"
+    break
+  fi
+done
+[[ -n "$python_cmd" ]] || { echo "python3 or python is required" >&2; exit 1; }
 
 cleanup() {
   case "$temp_root" in

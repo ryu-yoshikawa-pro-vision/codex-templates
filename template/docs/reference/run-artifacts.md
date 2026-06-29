@@ -92,6 +92,17 @@ Both are validated by schema / validator.
 - 人間向けの実行 summary です。
 - 機械判定の正本にはしません。
 
+## Cleanup workflow
+
+- `scripts/cleanup-runs.sh` / `scripts/cleanup-runs.ps1` は generated run artifact の整理候補を一覧化する maintainer / operator 補助 command です。
+- 既定動作は preview-only です。`--dry-run` / `-DryRun` を省略しても削除は行いません。
+- 実際の削除には `--confirm-delete-generated-runs` / `-ConfirmDeleteGeneratedRuns` が必要です。
+- `--older-than-days` / `-OlderThanDays` で古い candidate に絞れます。負数は受け付けません。
+- 削除対象は `.codex/runs/<run_id>/`、`.codex/logs/*.jsonl`、`.codex/observations/hooks.jsonl` の既知 generated artifact だけに限定します。
+- `run_id` pattern は `YYYYMMDD-HHMMSS-JST` です。pattern を満たさない directory は cleanup 対象にしません。
+- symlink / reparse point や repo root 外へ逃げる candidate は拒否します。
+- cleanup 実行後も summary を stdout に表示します。
+
 ### JSONL logs
 
 - runner / Codex / hooks による低レベルイベントログです。
