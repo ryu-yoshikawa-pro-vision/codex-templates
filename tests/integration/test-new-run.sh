@@ -6,9 +6,9 @@ template_source_root="$source_repo_root/template"
 temp_root="$(mktemp -d "${TMPDIR:-/tmp}/codex-new-run-test.XXXXXX")"
 template_root="$temp_root/template"
 wrapper="$template_root/scripts/new-run.sh"
-python_cmd="python3"
-if ! command -v python3 >/dev/null 2>&1; then
-  python_cmd="python"
+python_cmd="python"
+if ! command -v python >/dev/null 2>&1; then
+  python_cmd="python3"
 fi
 
 cleanup() {

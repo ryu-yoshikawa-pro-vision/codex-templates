@@ -37,6 +37,10 @@
 - `scripts/verify`
   - 品質ゲート実行の統一エントリポイント
   - execpolicy 判定、bash wrapper preflight、bash/PowerShell テスト（可能環境のみ）を実行
+  - source repo maintainer は配布前に `--strict-harness` / `-StrictHarness` を追加実行し、spec / version / CI / update-planning contract も確認する
+- `scripts/cleanup-runs.sh` / `scripts/cleanup-runs.ps1`
+  - generated run artifact cleanup の preview / confirm entry point
+  - デフォルトで削除せず、明示 confirm がある場合だけ既知 artifact を削除する
 
 関連する上位ガイド:
 - `docs/reference/codex-implementation-harness.md`
@@ -101,6 +105,7 @@ bash scripts/codex-safe.sh --preset auto-net
 ## 削除禁止
 - プロジェクト配下の読み取りとファイル作成・編集は、通常の作業では承認なしで行ってよい。
 - shell / PowerShell / git command による削除は禁止する。対象例は `rm`, `del`, `erase`, `Remove-Item`, `rmdir`, `unlink`, 通常の `git rm`。
+- `cleanup-runs` は generated run artifact の限定 cleanup 用例外 command だが、preview-only default、confirm 必須、repo root 外 / symlink candidate 拒否を満たす前提でのみ使う。
 - `auto-net` では `git add`, `git commit`, `git push`, `git rm`, `git reset`, `git clean` も forbidden にする。
 - `auto-net` では delete / rename を含む patch operation も禁止する。不要に見えるファイルは削除候補として `REPORT.md` に記録する。
 - `implementation_worker` も削除、rename、移動、git mutation、delete / rename を含む patch operation を行わない。

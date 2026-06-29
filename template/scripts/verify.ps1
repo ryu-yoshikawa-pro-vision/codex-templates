@@ -1,5 +1,7 @@
 [CmdletBinding()]
-param()
+param(
+    [switch]$StrictHarness
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -71,13 +73,16 @@ function Test-TemplateContract {
         "scripts/codex-sandbox.sh",
         "scripts/new-run.ps1",
         "scripts/new-run.sh",
+        "scripts/cleanup-runs.ps1",
+        "scripts/cleanup-runs.sh",
         "scripts/init-project.ps1",
         "scripts/init-project.sh",
         "scripts/validate-output-schema.py",
         ".agents/skills/feature-plan/references/planning-workflow.md",
         ".agents/skills/code-review/references/review-workflow.md",
         "docs/reference/codex-safety-harness.md",
-        "docs/reference/codex-implementation-harness.md"
+        "docs/reference/codex-implementation-harness.md",
+        "docs/guides/consumer-update.md"
     )
     foreach ($path in $required) {
         if (-not (Test-Path $path)) {
@@ -138,6 +143,8 @@ function Test-TemplateContract {
     $implementationHarness = Get-Content -Raw docs/reference/codex-implementation-harness.md
     if ($implementationHarness -notmatch [regex]::Escape("scripts/new-run.sh")) { throw "implementation harness doc missing bash new-run guidance" }
     if ($implementationHarness -notmatch [regex]::Escape("scripts/new-run.ps1")) { throw "implementation harness doc missing PowerShell new-run guidance" }
+    if ($implementationHarness -notmatch [regex]::Escape("--strict-harness")) { throw "implementation harness doc missing strict verify guidance" }
+    if ($implementationHarness -notmatch [regex]::Escape("-StrictHarness")) { throw "implementation harness doc missing PowerShell strict verify guidance" }
     if ($implementationHarness -notmatch [regex]::Escape("--allowed-dirs")) { throw "implementation harness doc missing allowed-dirs guidance" }
     if ($implementationHarness -notmatch [regex]::Escape("--allowed-globs")) { throw "implementation harness doc missing allowed-globs guidance" }
     if ($implementationHarness -notmatch [regex]::Escape("--expected-missing")) { throw "implementation harness doc missing expected-missing guidance" }
@@ -163,6 +170,12 @@ function Test-TemplateContract {
     if ($runArtifacts -notmatch [regex]::Escape("--max-iterations")) { throw "run-artifacts doc missing max-iterations guidance" }
     if ($runArtifacts -notmatch [regex]::Escape("repair loop")) { throw "run-artifacts doc missing repair loop guidance" }
     if ($runArtifacts -notmatch [regex]::Escape("collect-run-artifacts")) { throw "run-artifacts doc missing collector guidance" }
+    if ($runArtifacts -notmatch [regex]::Escape("scripts/cleanup-runs.sh")) { throw "run-artifacts doc missing cleanup-runs.sh guidance" }
+    if ($runArtifacts -notmatch [regex]::Escape("scripts/cleanup-runs.ps1")) { throw "run-artifacts doc missing cleanup-runs.ps1 guidance" }
+    if ($runArtifacts -notmatch [regex]::Escape("--confirm-delete-generated-runs")) { throw "run-artifacts doc missing cleanup confirm guidance" }
+    $consumerUpdate = Get-Content -Raw docs/guides/consumer-update.md
+    if ($consumerUpdate -notmatch [regex]::Escape("plan-consumer-update")) { throw "consumer-update doc missing planning guidance" }
+    if ($consumerUpdate -notmatch [regex]::Escape("--exclude-protected")) { throw "consumer-update doc missing exclude-protected guidance" }
     $evaluationDoc = Get-Content -Raw docs/reference/evaluation.md
     if ($evaluationDoc -notmatch [regex]::Escape("evidence_refs")) { throw "evaluation doc missing evidence_refs guidance" }
     $evaluationTemplate = Get-Content -Raw .codex/templates/EVALUATION.md
@@ -186,6 +199,43 @@ function Test-TemplateContract {
     if ($config -notmatch [regex]::Escape('network_access = true')) { throw "config missing auto-net network" }
     if ($config -notmatch [regex]::Escape('codex_hooks = true')) { throw "config missing hook feature flag" }
     if ($config -notmatch [regex]::Escape('pre_tool_use_policy.ps1')) { throw "config missing pre-tool hook command" }
+}
+
+function Test-StrictHarnessContract {
+    $sourceRepoRoot = (Resolve-Path (Join-Path $repoRoot "..")).Path
+    foreach ($path in @(
+        "README.md",
+        "CHANGELOG.md",
+        "MIGRATION.md",
+        "tools/validate-spec.sh",
+        "tools/validate-spec.ps1",
+        "tools/plan-consumer-update.sh",
+        "tools/plan-consumer-update.ps1",
+        "tests/integration/test-cleanup-runs.sh",
+        "tests/integration/Test-CleanupRuns.ps1",
+        "tests/integration/test-plan-consumer-update.sh",
+        "tests/integration/Test-PlanConsumerUpdate.ps1",
+        ".github/workflows/validate-template.yml"
+    )) {
+        if (-not (Test-Path (Join-Path $sourceRepoRoot $path))) {
+            throw "Missing strict harness source-repo path: $path"
+        }
+    }
+
+    $readme = Get-Content -Raw (Join-Path $sourceRepoRoot "README.md")
+    if ($readme -notmatch [regex]::Escape("verify --strict-harness")) { throw "README missing strict verify guidance" }
+    if ($readme -notmatch [regex]::Escape("plan-consumer-update")) { throw "README missing consumer update planning guidance" }
+    if ($readme -notmatch [regex]::Escape("cleanup-runs")) { throw "README missing cleanup guidance" }
+
+    $workflow = Get-Content -Raw (Join-Path $sourceRepoRoot ".github/workflows/validate-template.yml")
+    if ($workflow -notmatch [regex]::Escape("template/scripts/verify --strict-harness")) { throw "Workflow missing strict verify command" }
+    if ($workflow -notmatch [regex]::Escape("tests/integration/test-cleanup-runs.sh")) { throw "Workflow missing cleanup-runs test" }
+    if ($workflow -notmatch [regex]::Escape("tests/integration/test-plan-consumer-update.sh")) { throw "Workflow missing plan-consumer-update test" }
+
+    & powershell.exe -ExecutionPolicy Bypass -File (Join-Path $sourceRepoRoot "tools/validate-spec.ps1")
+    if ($LASTEXITCODE -ne 0) {
+        throw "tools/validate-spec.ps1 failed"
+    }
 }
 
 function Test-ExecpolicyBaseline {
@@ -222,6 +272,10 @@ function Test-PowerShellHasCodex {
 }
 
 Invoke-Check "template contract files" { Test-TemplateContract }
+
+if ($StrictHarness) {
+    Invoke-Check "strict harness source-repo contract" { Test-StrictHarnessContract }
+}
 
 if (Get-Command codex -ErrorAction SilentlyContinue) {
     Invoke-Check "execpolicy baseline decisions" { Test-ExecpolicyBaseline }
