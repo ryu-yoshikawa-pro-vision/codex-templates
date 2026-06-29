@@ -29,6 +29,9 @@
 - source repo の run 進捗と実行ログは `.codex/runs/<run_id>/REPORT.md` と `.codex/runs/<run_id>/logs/` に残す。
 - `maintainers/PROJECT_CONTEXT.md` を更新したら、更新履歴を `maintainers/history/` の同一セッションファイルへ追記する。
 - consumer-facing 契約変更では `spec/` を先に更新し、`tools/validate-spec.*` で整合を確認する。
+- source repo maintainer 向けの release / maintenance gate は通常の consumer-facing `template/scripts/verify*` に加えて、`template/scripts/verify --strict-harness` / `verify.ps1 -StrictHarness` を実行し、source repo 専用 file、spec・docs・version・CI・update planning contract まで確認する。
+- consumer update は `tools/plan-consumer-update.*` で protected path と manual review を先に計画し、`tools/sync-template.* --plan-only --exclude-protected` と `--exclude-protected` で overlay 適用可否を判断する。
+- generated run artifact の整理は `template/scripts/cleanup-runs.*` のみを使い、preview-only default、confirm 必須、`.codex/` 限定、repo root 外 / symlink / reparse point 拒否を守る。
 - consumer-facing 配布物に関する説明は root ではなく `template/` 配下の文書に置く。
 - root `PLANS.md` と `CODE_REVIEW.md` は source repo 用 contract を定義し、source/consumer 境界、validation、rollback、finding 形式を明示する。
 - consumer-facing `template/PLANS.md` と `template/CODE_REVIEW.md` は mode の索引を保ったまま、required output format を固定する。
@@ -61,4 +64,5 @@
 - template contract の検証は `spec/` と `template/scripts/verify*` / `tests/smoke/*` の両方で行う。
 - observation / subagent baseline の検証は `tools/validate-spec.*`、`template/scripts/verify`、`tests/integration/test-observation-baseline.*` で schema sync、reference docs、optional hook の JSONL 出力を確認する。
 - run artifact aggregation の検証は `tests/integration/test-run-artifact-aggregation.sh` と `tests/integration/Test-RunArtifactAggregation.ps1` で collector parity、relative `--base-manifest` 解決、structured evidence schema、hook / subagent summary を確認する。
+- strict maintenance / release hygiene の検証は `tools/validate-spec.*`、`template/scripts/verify* --strict-harness`、`tests/integration/test-cleanup-runs.sh` / `Test-CleanupRuns.ps1`、`tests/integration/test-plan-consumer-update.sh` / `Test-PlanConsumerUpdate.ps1`、workflow `validate-template.yml` で Bash / PowerShell parity を確認する。
 - auto-net contract の検証は safe default、明示 preset、profile、rules-auto-net、削除禁止を合わせて確認する。
