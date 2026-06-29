@@ -5,9 +5,9 @@ source_repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 template_source_root="$source_repo_root/template"
 temp_root="$(mktemp -d "${TMPDIR:-/tmp}/codex-run-artifacts-test.XXXXXX")"
 template_root="$temp_root/template"
-python_cmd="python"
-if ! command -v python >/dev/null 2>&1; then
-  python_cmd="python3"
+python_cmd="python3"
+if ! command -v python3 >/dev/null 2>&1; then
+  python_cmd="python"
 fi
 
 cleanup() {

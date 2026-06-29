@@ -33,16 +33,6 @@
 - `lightweight` は無制限 mode ではない。
 - 外部通信、削除、rename、移行、権限変更、セキュリティ影響、公開 contract 変更を含む場合は `standard` 以上へ引き上げる。
 
-## Verification tiers
-
-- consumer repo の通常確認:
-  - `bash scripts/verify`
-  - `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1`
-- source repo maintainer の配布前確認:
-  - `bash template/scripts/verify --strict-harness`
-  - `powershell -ExecutionPolicy Bypass -File template/scripts/verify.ps1 -StrictHarness`
-- `--strict-harness` / `-StrictHarness` は source repo layout、spec/template/docs/version/CI 契約を前提にするため、consumer repo では通常 verify を使う。
-
 ## Run 初期化
 
 - Bash:

@@ -4,15 +4,6 @@
 - v2 は破壊的変更です。旧パス互換は提供しません。
 - consumer-facing の公開面は `template/` 配下のみです。
 
-## 0.11.0 - 2026-06-29
-
-- Existing consumer repos can keep using normal `scripts/verify`.
-- Maintainers should run `bash template/scripts/verify --strict-harness` または `powershell -ExecutionPolicy Bypass -File template/scripts/verify.ps1 -StrictHarness` before distributing template updates.
-- Use `bash scripts/cleanup-runs.sh --dry-run` または `powershell -ExecutionPolicy Bypass -File scripts/cleanup-runs.ps1 -DryRun` first. cleanup は明示確認なしでは削除しない。
-- Use `tools/plan-consumer-update.*` before direct `sync-template`.
-- No required manual migration unless the consumer repo wants to adopt cleanup / strict verification / update planning commands.
-- Do not overwrite protected paths such as `docs/PROJECT_CONTEXT.md`, `docs/adr/`, `docs/plans/`, `docs/reports/`, `docs/history/`, `.codex/runs/`, `.env*`.
-
 ## 主な移行
 | 旧パス | 新パス | 用途 |
 | --- | --- | --- |

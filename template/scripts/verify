@@ -1,36 +1,6 @@
 #!/usr/bin/env bash
 set -u -o pipefail
 
-strict_harness=0
-
-usage() {
-  cat <<'EOF'
-usage: bash scripts/verify [--strict-harness]
-
-Options:
-  --strict-harness   Run source-repo maintainer checks in addition to the consumer-facing template contract.
-  --help, -h         Show this help.
-EOF
-}
-
-while (($#)); do
-  case "$1" in
-    --strict-harness)
-      strict_harness=1
-      shift
-      ;;
-    --help|-h)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "Unknown option: $1" >&2
-      usage >&2
-      exit 1
-      ;;
-  esac
-done
-
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source_repo_root="$(cd "$repo_root/.." && pwd -P)"
 cd "$repo_root"
@@ -128,8 +98,6 @@ check_template_contract() {
   [[ -f scripts/codex-sandbox.sh ]] || return 1
   [[ -f scripts/new-run.ps1 ]] || return 1
   [[ -f scripts/new-run.sh ]] || return 1
-  [[ -f scripts/cleanup-runs.ps1 ]] || return 1
-  [[ -f scripts/cleanup-runs.sh ]] || return 1
   [[ -f scripts/init-project.ps1 ]] || return 1
   [[ -f scripts/init-project.sh ]] || return 1
   [[ -f scripts/validate-output-schema.py ]] || return 1
@@ -149,7 +117,6 @@ check_template_contract() {
   [[ -f docs/reference/subagent-observation.md ]] || return 1
   [[ -f docs/reference/repair-loop.md ]] || return 1
   [[ -f docs/reference/harness-improvement-loop.md ]] || return 1
-  [[ -f docs/guides/consumer-update.md ]] || return 1
   [[ -f examples/repair-loop/README.md ]] || return 1
   [[ -f examples/repair-loop/iteration-1-evaluation.json ]] || return 1
   [[ -f examples/repair-loop/iteration-2-evaluation.json ]] || return 1
@@ -325,13 +292,6 @@ check_template_contract() {
   contains "scripts/new-run.ps1" docs/reference/codex-implementation-harness.md || return 1
   contains "Existing run directories are never overwritten" scripts/new-run.sh || return 1
   contains "Run directory already exists and will not be overwritten" scripts/new-run.ps1 || return 1
-  contains "scripts/cleanup-runs.sh" docs/reference/run-artifacts.md || return 1
-  contains "scripts/cleanup-runs.ps1" docs/reference/run-artifacts.md || return 1
-  contains "--confirm-delete-generated-runs" docs/reference/run-artifacts.md || return 1
-  contains "plan-consumer-update" docs/guides/consumer-update.md || return 1
-  contains "--exclude-protected" docs/guides/consumer-update.md || return 1
-  contains "--strict-harness" docs/reference/codex-implementation-harness.md || return 1
-  contains "-StrictHarness" docs/reference/codex-implementation-harness.md || return 1
   contains "--allowed-dirs" docs/reference/codex-implementation-harness.md || return 1
   contains "--allowed-globs" docs/reference/codex-implementation-harness.md || return 1
   contains "--expected-missing" docs/reference/codex-implementation-harness.md || return 1
@@ -369,28 +329,6 @@ check_template_contract() {
   contains "separate follow-up" docs/reference/harness-improvement-loop.md || return 1
   contains "evaluation.json" docs/reference/harness-improvement-loop.md || return 1
   contains "failure taxonomy" docs/reference/harness-improvement-loop.md || return 1
-}
-
-check_strict_harness_contract() {
-  [[ -f "$source_repo_root/README.md" ]] || return 1
-  [[ -f "$source_repo_root/CHANGELOG.md" ]] || return 1
-  [[ -f "$source_repo_root/MIGRATION.md" ]] || return 1
-  [[ -f "$source_repo_root/tools/validate-spec.sh" ]] || return 1
-  [[ -f "$source_repo_root/tools/validate-spec.ps1" ]] || return 1
-  [[ -f "$source_repo_root/tools/plan-consumer-update.sh" ]] || return 1
-  [[ -f "$source_repo_root/tools/plan-consumer-update.ps1" ]] || return 1
-  [[ -f "$source_repo_root/tests/integration/test-cleanup-runs.sh" ]] || return 1
-  [[ -f "$source_repo_root/tests/integration/Test-CleanupRuns.ps1" ]] || return 1
-  [[ -f "$source_repo_root/tests/integration/test-plan-consumer-update.sh" ]] || return 1
-  [[ -f "$source_repo_root/tests/integration/Test-PlanConsumerUpdate.ps1" ]] || return 1
-  [[ -f "$source_repo_root/.github/workflows/validate-template.yml" ]] || return 1
-  contains "verify --strict-harness" "$source_repo_root/README.md" || return 1
-  contains "plan-consumer-update" "$source_repo_root/README.md" || return 1
-  contains "cleanup-runs" "$source_repo_root/README.md" || return 1
-  contains "template/scripts/verify --strict-harness" "$source_repo_root/.github/workflows/validate-template.yml" || return 1
-  contains "tests/integration/test-cleanup-runs.sh" "$source_repo_root/.github/workflows/validate-template.yml" || return 1
-  contains "tests/integration/test-plan-consumer-update.sh" "$source_repo_root/.github/workflows/validate-template.yml" || return 1
-  bash "$source_repo_root/tools/validate-spec.sh"
 }
 
 check_execpolicy_baseline() {
@@ -452,10 +390,6 @@ check_powershell_wrapper_preflight() {
 }
 
 run_check "template contract files" check_template_contract
-
-if (( strict_harness )); then
-  run_check "strict harness source-repo contract" check_strict_harness_contract
-fi
 
 if ! check_codex_available; then
   log_skip "execpolicy checks (codex command not executable)"

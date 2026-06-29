@@ -7,8 +7,7 @@
 - 更新用ブランチを切ってから作業する。
 - まず `CHANGELOG.md` と `MIGRATION.md` を読む。
 - `docs/PROJECT_CONTEXT.md`、`docs/adr/`、`docs/plans/`、`docs/reports/`、`.codex/runs/` は機械的に上書きしない。
-- source repo 側で `plan-consumer-update` を先に実行する。
-- 既存 repo に直接同期する前に、必ず `--plan-only` または dry-run を実行する。
+- 既存 repo に直接同期する前に、必ず dry-run を実行する。
 - 不安がある場合は、一時ディレクトリに同期して差分を手動反映する。
 
 ## 推奨フロー
@@ -16,37 +15,11 @@
 1. consumer repo 側で更新用ブランチを切る。
 2. 現在の `template_version` を確認する。
 3. source repo の `CHANGELOG.md` と `MIGRATION.md` を確認する。
-4. source repo で `tools/plan-consumer-update.*` を実行し、protected path と manual review を確認する。
-5. 一時ディレクトリへ同期するか、`sync-template --exclude-protected` の overlay sync を選ぶ。
-6. consumer 固有ファイルを除外しながら差分を確認する。
-7. 必要な template 差分だけを consumer repo へ反映する。
-8. `bash scripts/verify` または PowerShell 版 verify を実行する。
-9. 必要なら `cleanup-runs` を dry-run で使い、古い generated run artifact の整理候補を確認する。
-10. PRで差分をレビューする。
-
-## 更新計画を出す
-
-Bash:
-
-```bash
-/path/to/codex-templates/tools/plan-consumer-update.sh /path/to/consumer-repo
-/path/to/codex-templates/tools/plan-consumer-update.sh --json /path/to/consumer-repo
-```
-
-PowerShell:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File path\to\codex-templates\tools\plan-consumer-update.ps1 -Destination path\to\consumer-repo
-powershell -ExecutionPolicy Bypass -File path\to\codex-templates\tools\plan-consumer-update.ps1 -Destination path\to\consumer-repo -Json
-```
-
-出力では次を確認する。
-
-- source / consumer の `template_version`
-- protected path
-- candidate updates
-- manual review required
-- 推奨 sync / verify command
+4. 一時ディレクトリへ同期する。
+5. consumer 固有ファイルを除外しながら差分を確認する。
+6. 必要な template 差分だけを consumer repo へ反映する。
+7. `bash scripts/verify` または PowerShell 版 verify を実行する。
+8. PRで差分をレビューする。
 
 ## 一時ディレクトリ同期の例
 
@@ -75,32 +48,16 @@ Write-Host "Synced template to: $target"
 Bash:
 
 ```bash
-/path/to/codex-templates/tools/sync-template.sh --plan-only --exclude-protected --force /path/to/consumer-repo
 /path/to/codex-templates/tools/sync-template.sh --dry-run --force /path/to/consumer-repo
 ```
 
 PowerShell:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File path\to\codex-templates\tools\sync-template.ps1 -Destination path\to\consumer-repo -Force -PlanOnly -ExcludeProtected
 powershell -ExecutionPolicy Bypass -File path\to\codex-templates\tools\sync-template.ps1 -Destination path\to\consumer-repo -Force -DryRun
 ```
 
-protected path を残したまま overlay sync する場合:
-
-Bash:
-
-```bash
-/path/to/codex-templates/tools/sync-template.sh --exclude-protected --force /path/to/consumer-repo
-```
-
-PowerShell:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File path\to\codex-templates\tools\sync-template.ps1 -Destination path\to\consumer-repo -Force -ExcludeProtected
-```
-
-destructive overwrite を使う場合は、削除対象が想定通りの場合だけ、明示確認付きで実行する。
+削除対象が想定通りの場合だけ、明示確認付きで実行する。
 
 Bash:
 
@@ -123,15 +80,12 @@ powershell -ExecutionPolicy Bypass -File path\to\codex-templates\tools\sync-temp
 | `docs/plans/` | consumer repo の計画履歴のため |
 | `docs/reports/` | consumer repo の調査・検証履歴のため |
 | `.codex/runs/` | 実行ログ・作業履歴のため |
-| `docs/history/` | consumer repo の変更履歴のため |
 | 認証情報や環境設定 | template 管理対象ではないため |
 
 ## レビュー観点
 
 - `AGENTS.md` の安全制約が consumer repo の実態と矛盾していないか。
 - `scripts/verify` が consumer repo で実行できるか。
-- `plan-consumer-update` が示した protected path と manual review が妥当か。
-- `sync-template --exclude-protected` で consumer 固有 path が保持されるか。
 - `.codex/config.toml` の sandbox / approval / network 設定が意図通りか。
 - consumer 固有ファイルが削除・上書きされていないか。
 - `template_version` と `CHANGELOG.md` の内容が一致しているか。

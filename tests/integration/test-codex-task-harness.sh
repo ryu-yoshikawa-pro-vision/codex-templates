@@ -9,9 +9,9 @@ temp_root="$(mktemp -d "${TMPDIR:-/tmp}/codex-task-test.XXXXXX")"
 template_root="$temp_root/template"
 wrapper="$template_root/scripts/codex-task.sh"
 sandbox_wrapper="$template_root/scripts/codex-sandbox.sh"
-python_cmd="python"
-if ! command -v python >/dev/null 2>&1; then
-  python_cmd="python3"
+python_cmd="python3"
+if ! command -v python3 >/dev/null 2>&1; then
+  python_cmd="python"
 fi
 
 cleanup() {

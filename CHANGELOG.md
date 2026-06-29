@@ -10,13 +10,10 @@
 - Minor: consumer-facing file、workflow、safety rule、guide、配布手順を追加・拡張する。
 - Patch: 誤字、説明補足、validator の非破壊的修正、source repo 内部の保守。
 
-## 0.11.0 - 2026-06-29
+## Unreleased
 
 ### Added
 
-- `template/scripts/verify --strict-harness` と `template/scripts/verify.ps1 -StrictHarness` を追加し、source repo maintainer 向け strict harness verification を通常 verify から分離。
-- `template/scripts/cleanup-runs.sh` と `template/scripts/cleanup-runs.ps1` を追加し、generated run artifact cleanup を dry-run default / confirm required で実行できるようにした。
-- `tools/plan-consumer-update.sh` と `tools/plan-consumer-update.ps1` を追加し、consumer repo 更新前に version 差分、protected path、candidate updates、manual review を確認できるようにした。
 - `scripts/new-run.sh` と `scripts/new-run.ps1` を追加し、run directory と `run.json` の初期化を自動化。
 - `codex-task` に `--allowed-dirs` / `--allowed-globs` を追加し、directory 単位と limited glob の scope 指定をサポート。
 - `codex-task` に `--expected-missing warn|fail` を追加し、変更不要だった expected file を warning として表現できるようにした。
@@ -46,10 +43,6 @@
 
 ### Changed
 
-- `tools/sync-template.sh` と `tools/sync-template.ps1` に `--plan-only` / `-PlanOnly` と `--exclude-protected` / `-ExcludeProtected` を追加し、consumer 固有 path を保った safe overlay sync を選べるようにした。
-- `tools/validate-spec.sh`、`tools/validate-spec.ps1`、`template/scripts/verify`、`template/scripts/verify.ps1` を更新し、version / changelog / migration 整合性と strict harness verification を固定した。
-- `.github/workflows/validate-template.yml` を更新し、strict verify、cleanup、consumer update planning の Bash / PowerShell parity checks を CI に追加した。
-- `README.md`、`template/docs/guides/consumer-update.md`、`template/docs/reference/run-artifacts.md`、`template/docs/reference/codex-safety-harness.md`、`template/docs/reference/codex-implementation-harness.md` を更新し、strict verify、safe cleanup、consumer update planning の運用を明文化した。
 - `template/AGENTS.md`、`template/PLANS.md`、`template/docs/reference/codex-implementation-harness.md`、`template/docs/reference/change-scope-policy.md`、`template/docs/guides/quickstart.md` を更新し、lightweight / standard / strict の運用差分、run 初期化手順、Plan ambiguity 分類を明文化。
 - `template/codex-project.toml` の workflow metadata を更新し、run manifest / evaluation / scope expectation の違いを明示。
 - `spec/change-scope-policy.json`、`spec/run-manifest.schema.json`、`spec/workflow.json` を更新し、new-run、flexible scope、warning manifest を contract に追加。
@@ -63,14 +56,6 @@
 
 ### Migration notes
 
-- 既存 consumer repo は通常 `scripts/verify` を継続利用できる。template 配布前の maintainer check として strict harness verify を追加する。
-- generated run artifact を整理したい場合は、まず `bash scripts/cleanup-runs.sh --dry-run` または PowerShell 版 dry-run を使う。デフォルトで削除は行わない。
-- 既存 consumer repo 更新前に `tools/plan-consumer-update.*` で version 差分、protected path、manual review 項目を確認する。
-- direct sync を使う場合は、まず `--plan-only` または `--dry-run` を実行し、可能なら `--exclude-protected` / `-ExcludeProtected` を使う。
-- `docs/PROJECT_CONTEXT.md`、`docs/adr/`、`docs/plans/`、`docs/reports/`、`docs/history/`、`.codex/runs/`、`.env*` は上書きしない。
-- no automatic repair loop execution
-- no SDK runner implementation
-- no destructive cleanup by default
 - 既存 consumer repo がこの更新を取り込む場合は、`scripts/new-run.sh`、`scripts/new-run.ps1`、`scripts/codex-task.sh`、`scripts/codex-task.ps1`、`.codex/templates/RUN_MANIFEST.json`、`docs/reference/codex-implementation-harness.md`、`docs/reference/change-scope-policy.md`、`AGENTS.md`、`PLANS.md`、`codex-project.toml` を合わせて同期する。
 - 既存 consumer repo が `expected-missing=warn` と flexible scope を使う場合は、`spec/change-scope-policy.json` に対応する reference docs と validator/verify の更新も取り込む。
 - 既存 consumer repo が repair / improvement workflow を取り込む場合は、`.agents/skills/repair-loop/`、`.agents/skills/harness-improvement/`、`docs/reference/repair-loop.md`、`docs/reference/harness-improvement-loop.md`、`examples/repair-loop/`、`examples/harness-improvement/`、`scripts/verify` を同期対象に含める。

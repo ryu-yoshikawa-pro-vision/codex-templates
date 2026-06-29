@@ -42,29 +42,21 @@
 1. consumer repo 側の現在の `template_version` を確認する。
 2. [`CHANGELOG.md`](CHANGELOG.md) と [`MIGRATION.md`](MIGRATION.md) を確認する。
 3. consumer repo 側で作業ブランチを切る。
-4. source repo 側で更新計画を出す。
-   - Bash: `bash tools/plan-consumer-update.sh <destination>`
-   - PowerShell: `powershell -ExecutionPolicy Bypass -File tools/plan-consumer-update.ps1 -Destination <destination>`
-5. 既存 repo に直接反映する場合は、まず `--plan-only` または dry-run で確認する。
-   - Bash: `bash tools/sync-template.sh --plan-only --exclude-protected --force <destination>`
-   - PowerShell: `powershell -ExecutionPolicy Bypass -File tools/sync-template.ps1 -Destination <destination> -Force -PlanOnly -ExcludeProtected`
-6. protected path を保ったまま overlay sync する場合は `--exclude-protected` を使う。
-   - Bash: `bash tools/sync-template.sh --exclude-protected --force <destination>`
-   - PowerShell: `powershell -ExecutionPolicy Bypass -File tools/sync-template.ps1 -Destination <destination> -Force -ExcludeProtected`
-7. destructive overwrite を使う場合は、dry-run の削除対象が想定通りのときだけ明示確認フラグ付きで実行する。
-8. `docs/PROJECT_CONTEXT.md`、`docs/adr/`、`docs/plans/`、`docs/reports/`、`docs/history/`、`.codex/runs/`、`.env*` は機械的に上書きしない。
-9. consumer repo 側で `bash scripts/verify` または PowerShell 版 verify を実行する。
-10. PR で差分をレビューし、運用ルールや安全制約が consumer repo の実態と矛盾しないことを確認する。
+4. `tools/sync-template.*` を使う場合は、まず dry-run で削除対象を確認する。
+   - Bash: `tools/sync-template.sh --dry-run --force <destination>`
+   - PowerShell: `powershell -ExecutionPolicy Bypass -File tools/sync-template.ps1 -Destination <destination> -Force -DryRun`
+5. dry-run の削除対象が想定通りの場合だけ、明示確認フラグ付きで同期する。
+   - Bash: `tools/sync-template.sh --force --confirm-destructive-overwrite <destination>`
+   - PowerShell: `powershell -ExecutionPolicy Bypass -File tools/sync-template.ps1 -Destination <destination> -Force -ConfirmDestructiveOverwrite`
+6. `docs/PROJECT_CONTEXT.md`、`docs/adr/`、`docs/plans/`、`docs/reports/` など consumer 固有ファイルは機械的に上書きしない。
+7. `bash scripts/verify` または PowerShell 版 verify を実行する。
+8. PR で差分をレビューし、運用ルールや安全制約が consumer repo の実態と矛盾しないことを確認する。
 
 ## sync-template safety
 
 `tools/sync-template.*` で既存ディレクトリへ同期すると、同期先の top-level contents を置き換えるため、誤った destination を指定すると重要ファイルを失うリスクがあります。
 
-- `tools/plan-consumer-update.*` で source / consumer の `template_version`、protected path、候補差分を先に確認する。
-- `template/scripts/cleanup-runs.sh --dry-run` または `template/scripts/cleanup-runs.ps1 -DryRun` で generated run artifact の cleanup 候補を preview できる。
 - `--dry-run` / `-DryRun` で必ず削除対象を確認する。
-- `--plan-only` / `-PlanOnly` は更新計画だけを出し、コピーを行わない。
-- `--exclude-protected` / `-ExcludeProtected` は non-protected path だけを overlay copy し、protected path と destination-only file を残す。
 - 既存 destination に `--force` / `-Force` だけでは同期しない。
 - destructive overwrite には `--confirm-destructive-overwrite` / `-ConfirmDestructiveOverwrite` を追加する。
 - consumer 固有ファイルを残す必要がある場合は、直接同期ではなく別ディレクトリに同期して差分を手動反映する。
@@ -78,9 +70,7 @@
 ## Maintainer ワークフロー
 1. root [`AGENTS.md`](AGENTS.md) に従って source repo を更新する。
 2. consumer-facing ルールを変えるときは `spec/` を先に更新する。
-3. source repo で `bash template/scripts/verify --strict-harness` または `powershell -ExecutionPolicy Bypass -File template/scripts/verify.ps1 -StrictHarness` を実行する。
-4. `tools/validate-spec.*` と `tests/` を通してから完了報告する。
-5. generated run artifact の整理が必要なら `cleanup-runs` は dry-run から使う。
+3. `tools/validate-spec.*` と `tests/` を通してから完了報告する。
 
 ## Versioning
 
@@ -89,13 +79,6 @@
 - Major: 既存 consumer repo の運用や配置に破壊的変更がある。
 - Minor: consumer-facing file、workflow、safety rule、配布手順を追加・拡張する。
 - Patch: 誤字、説明補足、validator の非破壊的修正、内部メンテナンス。
-
-release hygiene:
-- `template/codex-project.toml` の `template_version`
-- [`CHANGELOG.md`](CHANGELOG.md) の同 version entry
-- [`MIGRATION.md`](MIGRATION.md) の同 version entry
-
-これら 3 つは PR 完了前に一致させる。maintainer は template 配布前に strict harness verify を通す。
 
 ## 関連文書
 - 変更履歴: [`CHANGELOG.md`](CHANGELOG.md)

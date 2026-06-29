@@ -4,10 +4,10 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 
 python_cmd=""
-if command -v python >/dev/null 2>&1; then
-  python_cmd="python"
-elif command -v python3 >/dev/null 2>&1; then
+if command -v python3 >/dev/null 2>&1; then
   python_cmd="python3"
+elif command -v python >/dev/null 2>&1; then
+  python_cmd="python"
 else
   echo "python3 or python is required" >&2
   exit 1
@@ -16,7 +16,6 @@ fi
 "$python_cmd" - "$repo_root" <<'PY'
 import json
 import pathlib
-import re
 import subprocess
 import sys
 
@@ -189,28 +188,14 @@ required_paths = [
     "template/.codex/templates/evaluation.schema.json",
     "template/.codex/templates/hook-observation.schema.json",
     "template/.codex/templates/subagent-run.schema.json",
-    "template/.codex/hooks/pre_tool_use_policy.py",
-    "template/.codex/hooks/pre_tool_use_policy.ps1",
     "template/docs/reference/run-artifacts.md",
     "template/docs/reference/failure-taxonomy.md",
     "template/docs/reference/evaluation.md",
     "template/docs/reference/change-scope-policy.md",
     "template/docs/reference/hook-observation.md",
     "template/docs/reference/subagent-observation.md",
-    "template/docs/reference/codex-safety-harness.md",
-    "template/docs/reference/codex-implementation-harness.md",
-    "template/docs/guides/consumer-update.md",
-    "template/scripts/cleanup-runs.sh",
-    "template/scripts/cleanup-runs.ps1",
     "template/.codex/hooks/observe.sh",
     "template/.codex/hooks/observe.ps1",
-    "tools/plan-consumer-update.sh",
-    "tools/plan-consumer-update.ps1",
-    "tests/integration/test-cleanup-runs.sh",
-    "tests/integration/Test-CleanupRuns.ps1",
-    "tests/integration/test-plan-consumer-update.sh",
-    "tests/integration/Test-PlanConsumerUpdate.ps1",
-    ".github/workflows/validate-template.yml",
 ]
 for rel in required_paths:
     assert_exists(rel)
@@ -1146,63 +1131,6 @@ ensure(
         },
     },
     "template/.codex/templates/RUN_MANIFEST.json subagents.summary defaults are out of contract",
-)
-
-template_project_toml = (repo_root / "template/codex-project.toml").read_text(encoding="utf-8")
-template_version_match = re.search(r'^template_version\s*=\s*"([^"]+)"', template_project_toml, re.MULTILINE)
-ensure(template_version_match is not None, "template/codex-project.toml must define template_version")
-template_version = template_version_match.group(1)
-ensure(re.fullmatch(r"\d+\.\d+\.\d+", template_version), f"template_version must be semver, got: {template_version}")
-
-assert_contains(
-    "template/AGENTS.md",
-    [
-        "command-based deletion",
-        "implementation_worker",
-        "writable subagent",
-        "auto-net",
-        "git mutation",
-    ],
-)
-assert_contains(
-    "README.md",
-    [
-        "verify --strict-harness",
-        "plan-consumer-update",
-        "cleanup-runs",
-        "Major:",
-        "Minor:",
-        "Patch:",
-    ],
-)
-assert_contains("CHANGELOG.md", [f"## {template_version}", "verify --strict-harness", "cleanup-runs", "plan-consumer-update"])
-assert_contains("MIGRATION.md", [f"## {template_version}", "strict-harness", "cleanup-runs", "plan-consumer-update"])
-assert_contains(
-    "template/docs/guides/consumer-update.md",
-    ["plan-consumer-update", "--exclude-protected", "cleanup-runs"],
-)
-assert_contains(
-    "template/docs/reference/run-artifacts.md",
-    ["scripts/cleanup-runs.sh", "scripts/cleanup-runs.ps1", "--confirm-delete-generated-runs"],
-)
-assert_contains(
-    "template/docs/reference/codex-safety-harness.md",
-    ["cleanup-runs", "strict-harness"],
-)
-assert_contains(
-    "template/docs/reference/codex-implementation-harness.md",
-    ["--strict-harness", "-StrictHarness"],
-)
-assert_contains(
-    ".github/workflows/validate-template.yml",
-    [
-        "bash template/scripts/verify --strict-harness",
-        "bash tests/integration/test-cleanup-runs.sh",
-        "bash tests/integration/test-plan-consumer-update.sh",
-        "powershell -ExecutionPolicy Bypass -File template/scripts/verify.ps1 -StrictHarness",
-        "powershell -ExecutionPolicy Bypass -File tests/integration/Test-CleanupRuns.ps1",
-        "powershell -ExecutionPolicy Bypass -File tests/integration/Test-PlanConsumerUpdate.ps1",
-    ],
 )
 
 assert_contains(

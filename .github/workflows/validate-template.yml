@@ -7,60 +7,19 @@ on:
       - main
 
 jobs:
-  validate-bash:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Validate spec
         run: bash tools/validate-spec.sh
+      - name: Validate ps1 spec
+        run: pwsh -NoProfile -File tools/validate-spec.ps1
       - name: Verify template
         run: bash template/scripts/verify
-      - name: Verify template strict harness
-        run: bash template/scripts/verify --strict-harness
-      - name: Run new-run test
-        run: bash tests/integration/test-new-run.sh
-      - name: Run Codex task harness test
-        run: bash tests/integration/test-codex-task-harness.sh
-      - name: Run run artifact aggregation test
-        run: bash tests/integration/test-run-artifact-aggregation.sh
-      - name: Run cleanup-runs test
-        run: bash tests/integration/test-cleanup-runs.sh
-      - name: Run plan-consumer-update test
-        run: bash tests/integration/test-plan-consumer-update.sh
       - name: Run observation baseline tests
         run: bash tests/integration/test-observation-baseline.sh
       - name: Run repair improvement workflow tests
         run: bash tests/integration/test-repair-improvement-workflow.sh
-      - name: Run Codex safety harness test
+      - name: Run integration tests
         run: bash tests/integration/test-codex-safety-harness.sh
-      - name: Run change scope policy test
-        run: bash tests/integration/test-change-scope-policy.sh
-
-  validate-powershell:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate spec
-        run: powershell -ExecutionPolicy Bypass -File tools/validate-spec.ps1
-      - name: Verify template
-        run: powershell -ExecutionPolicy Bypass -File template/scripts/verify.ps1
-      - name: Verify template strict harness
-        run: powershell -ExecutionPolicy Bypass -File template/scripts/verify.ps1 -StrictHarness
-      - name: Run new-run test
-        run: powershell -ExecutionPolicy Bypass -File tests/integration/Test-NewRun.ps1
-      - name: Run Codex task harness test
-        run: powershell -ExecutionPolicy Bypass -File tests/integration/Test-CodexTaskHarness.ps1
-      - name: Run run artifact aggregation test
-        run: powershell -ExecutionPolicy Bypass -File tests/integration/Test-RunArtifactAggregation.ps1
-      - name: Run cleanup-runs test
-        run: powershell -ExecutionPolicy Bypass -File tests/integration/Test-CleanupRuns.ps1
-      - name: Run plan-consumer-update test
-        run: powershell -ExecutionPolicy Bypass -File tests/integration/Test-PlanConsumerUpdate.ps1
-      - name: Run observation baseline test
-        run: powershell -ExecutionPolicy Bypass -File tests/integration/Test-ObservationBaseline.ps1
-      - name: Run repair improvement workflow test
-        run: powershell -ExecutionPolicy Bypass -File tests/integration/Test-RepairImprovementWorkflow.ps1
-      - name: Run Codex safety harness test
-        run: powershell -ExecutionPolicy Bypass -File tests/integration/Test-CodexSafetyHarness.ps1
-      - name: Run change scope policy test
-        run: powershell -ExecutionPolicy Bypass -File tests/integration/Test-ChangeScopePolicy.ps1

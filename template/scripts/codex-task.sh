@@ -211,12 +211,12 @@ resolve_path() {
 }
 
 python_cmd() {
-  if command -v python >/dev/null 2>&1; then
-    printf 'python'
-    return
-  fi
   if command -v python3 >/dev/null 2>&1; then
     printf 'python3'
+    return
+  fi
+  if command -v python >/dev/null 2>&1; then
+    printf 'python'
     return
   fi
   printf ''
@@ -456,10 +456,10 @@ normalized_path() {
   local py
   py="$(python_cmd)"
   if [[ -z "$py" ]]; then
-    printf '%s' "$1" | tr '\\' '/'
+    printf '%s' "$1"
     return
   fi
-  "$py" -c 'import os,sys; print(os.path.realpath(sys.argv[1]).replace("\\", "/"))' "$1"
+  "$py" -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1"
 }
 
 git_branch() {
