@@ -53,6 +53,12 @@ function Copy-TreeExcludingProtected {
         }
 
         $destinationPath = Join-Path $DestinationRoot $item.Name
+        if (Test-Path -LiteralPath $destinationPath) {
+            $destinationItem = Get-Item -LiteralPath $destinationPath -Force
+            if ($destinationItem.PSIsContainer -ne $item.PSIsContainer) {
+                throw "ExcludeProtected sync requires manual review for path type conflict: $relativePath"
+            }
+        }
         if ($item.PSIsContainer) {
             if (-not (Test-Path -LiteralPath $destinationPath)) {
                 New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null

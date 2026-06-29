@@ -156,7 +156,6 @@ if ($previewOnly) {
     return
 }
 
-$deletedCount = 0
 foreach ($candidate in $script:candidates) {
     if (Test-IsReparsePoint -LiteralPath $candidate.path) {
         throw "Refusing to delete symlink/reparse-point candidate: $(Get-RepoRelativePath -LiteralPath $candidate.path)"
@@ -167,6 +166,10 @@ foreach ($candidate in $script:candidates) {
     if (Test-HasReparsePointAncestor -LiteralPath $candidate.path -StopAt $repoRoot) {
         throw "Refusing to delete path with symlink/reparse-point ancestor: $(Get-RepoRelativePath -LiteralPath $candidate.path)"
     }
+}
+
+$deletedCount = 0
+foreach ($candidate in $script:candidates) {
     Remove-Item -LiteralPath $candidate.path -Recurse -Force
     $deletedCount++
 }

@@ -115,6 +115,19 @@ try {
     $sync = Invoke-WindowsPowerShellFile -ScriptPath $syncWrapper -Arguments @('-Destination', $consumerRoot, '-Force', '-ExcludeProtected')
     if ($sync.ExitCode -ne 0) { throw "ExcludeProtected sync failed unexpectedly: $($sync.Combined)" }
 
+    $fileDirConflictRoot = Join-Path $tempRoot "consumer-file-dir-conflict"
+    New-Item -ItemType Directory -Force -Path (Join-Path $fileDirConflictRoot "scripts\verify.ps1") | Out-Null
+    $fileDirConflict = Invoke-WindowsPowerShellFile -ScriptPath $syncWrapper -Arguments @('-Destination', $fileDirConflictRoot, '-Force', '-ExcludeProtected')
+    if ($fileDirConflict.ExitCode -eq 0) { throw "ExcludeProtected file/directory conflict unexpectedly succeeded" }
+    if ($fileDirConflict.Combined -notmatch 'path type conflict|manual review') { throw "Missing file/directory conflict message: $($fileDirConflict.Combined)" }
+
+    $dirFileConflictRoot = Join-Path $tempRoot "consumer-dir-file-conflict"
+    New-Item -ItemType Directory -Force -Path (Join-Path $dirFileConflictRoot "docs") | Out-Null
+    Set-Content -Path (Join-Path $dirFileConflictRoot "docs\guides") -Value "conflict"
+    $dirFileConflict = Invoke-WindowsPowerShellFile -ScriptPath $syncWrapper -Arguments @('-Destination', $dirFileConflictRoot, '-Force', '-ExcludeProtected')
+    if ($dirFileConflict.ExitCode -eq 0) { throw "ExcludeProtected directory/file conflict unexpectedly succeeded" }
+    if ($dirFileConflict.Combined -notmatch 'path type conflict|manual review') { throw "Missing directory/file conflict message: $($dirFileConflict.Combined)" }
+
     $sourceAgents = Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $sourceRepoRoot "template\AGENTS.md")
     $destAgents = Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $consumerRoot "AGENTS.md")
     if ($sourceAgents.Hash -ne $destAgents.Hash) { throw "AGENTS.md was not updated from source template" }

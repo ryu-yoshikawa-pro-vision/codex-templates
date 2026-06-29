@@ -265,19 +265,33 @@ function Invoke-OutputSchemaValidation {
 
     $pythonPath = $null
     $pythonArgs = @()
-    foreach ($candidate in @("python", "python3", "py")) {
-        $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
+    $pythonCandidates = @(
+        @{ Command = "python3"; Args = @() },
+        @{ Command = "python"; Args = @() },
+        @{ Command = "py"; Args = @("-3") }
+    )
+    foreach ($candidate in $pythonCandidates) {
+        $cmd = Get-Command $candidate.Command -ErrorAction SilentlyContinue
         if (-not $cmd) {
             continue
         }
-        & $cmd.Path --version *> $null
+
+        $commandPath = if ($cmd.Path) { $cmd.Path } elseif ($cmd.Source) { $cmd.Source } else { $cmd.Name }
+        $checkArgs = @($candidate.Args) + @("-c", "import sys; raise SystemExit(0 if sys.version_info[0] >= 3 else 1)")
+        try {
+            & $commandPath @checkArgs *> $null
+        }
+        catch {
+            continue
+        }
         if ($LASTEXITCODE -eq 0) {
-            $pythonPath = $cmd.Path
+            $pythonPath = $commandPath
+            $pythonArgs = @($candidate.Args)
             break
         }
     }
     if (-not $pythonPath) {
-        throw "python, python3, or py is required"
+        throw "Python 3 is required"
     }
 
     & $pythonPath @pythonArgs $validator $schemaPath $outputPath

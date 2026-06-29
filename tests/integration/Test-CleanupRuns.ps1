@@ -122,6 +122,14 @@ try {
 
     Remove-Item -LiteralPath $symlinkPath -Force
 
+    $safeRunId = "20260603-030303-JST"
+    $safeRunPath = Join-Path $templateRoot ".codex\runs\$safeRunId"
+    New-Item -ItemType Directory -Force -Path (Join-Path $safeRunPath "reports") | Out-Null
+    Set-Content -Path (Join-Path $safeRunPath "REPORT.md") -Value "safe"
+    $safeOldTime = (Get-Date).AddDays(-2)
+    (Get-Item -LiteralPath $safeRunPath).LastWriteTime = $safeOldTime
+    (Get-Item -LiteralPath (Join-Path $safeRunPath "REPORT.md")).LastWriteTime = $safeOldTime
+
     $outsideLogsDir = Join-Path $tempRoot "outside-logs"
     New-Item -ItemType Directory -Force -Path $outsideLogsDir | Out-Null
     $outsideLogPath = Join-Path $outsideLogsDir "codex-safe-ancestor.jsonl"
@@ -140,6 +148,7 @@ try {
     $ancestorCase = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @('-OlderThanDays', '0', '-ConfirmDeleteGeneratedRuns')
     if ($ancestorCase.ExitCode -eq 0) { throw "Ancestor reparse-point delete unexpectedly succeeded" }
     if ($ancestorCase.Combined -notmatch 'Refusing to delete path with symlink/reparse-point ancestor') { throw "Missing ancestor refusal message: $($ancestorCase.Combined)" }
+    if (-not (Test-Path -LiteralPath $safeRunPath)) { throw "Safe run candidate should remain when cleanup validation fails" }
     if (-not (Test-Path -LiteralPath $outsideLogPath)) { throw "Outside log behind junction should remain" }
 }
 finally {
