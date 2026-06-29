@@ -33,6 +33,37 @@ function Test-IsReparsePoint {
     return (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)
 }
 
+function Test-HasReparsePointAncestor {
+    param(
+        [Parameter(Mandatory = $true)][string]$LiteralPath,
+        [Parameter(Mandatory = $true)][string]$StopAt
+    )
+
+    $current = Split-Path -Parent ([System.IO.Path]::GetFullPath($LiteralPath))
+    $stop = [System.IO.Path]::GetFullPath($StopAt).TrimEnd('\', '/')
+
+    while (-not [string]::IsNullOrWhiteSpace($current)) {
+        $normalizedCurrent = [System.IO.Path]::GetFullPath($current).TrimEnd('\', '/')
+        if (-not $normalizedCurrent.StartsWith($stop, [System.StringComparison]::OrdinalIgnoreCase)) {
+            break
+        }
+        if ($normalizedCurrent -eq $stop) {
+            break
+        }
+        if (Test-IsReparsePoint -LiteralPath $normalizedCurrent) {
+            return $true
+        }
+
+        $parent = Split-Path -Parent $normalizedCurrent
+        if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $normalizedCurrent) {
+            break
+        }
+        $current = $parent
+    }
+
+    return $false
+}
+
 function Test-IsOldEnough {
     param([Parameter(Mandatory = $true)][string]$LiteralPath)
 
@@ -132,6 +163,9 @@ foreach ($candidate in $script:candidates) {
     }
     if (-not (Test-IsWithinRepo -LiteralPath $candidate.path)) {
         throw "Refusing to delete path outside repo root: $($candidate.path)"
+    }
+    if (Test-HasReparsePointAncestor -LiteralPath $candidate.path -StopAt $repoRoot) {
+        throw "Refusing to delete path with symlink/reparse-point ancestor: $(Get-RepoRelativePath -LiteralPath $candidate.path)"
     }
     Remove-Item -LiteralPath $candidate.path -Recurse -Force
     $deletedCount++

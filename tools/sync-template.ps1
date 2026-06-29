@@ -121,9 +121,12 @@ if ($DryRun) {
     else {
         Write-Host "DRY RUN: destructive overwrite mode is active; existing top-level contents would be removed."
     }
-    if ($destinationExists -and $Force) {
+    if ($destinationExists -and $Force -and -not $ExcludeProtected) {
         Write-Host "DRY RUN: existing destination top-level entries that would be removed:"
         Get-ChildItem -Force -LiteralPath $target | Sort-Object FullName | ForEach-Object { Write-Host $_.FullName }
+    }
+    elseif ($destinationExists -and $Force) {
+        Write-Host "DRY RUN: existing destination-only entries would be kept."
     }
     elseif ($destinationExists) {
         Write-Host "DRY RUN: destination exists and -Force was not provided; sync would fail."

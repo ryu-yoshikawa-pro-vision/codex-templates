@@ -133,6 +133,46 @@ function Get-CandidateUpdates {
     return @($candidates)
 }
 
+function Get-DestinationOnlyItem {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceRoot,
+        [Parameter(Mandatory = $true)][string]$DestinationRoot,
+        [string]$RelativeBase = ""
+    )
+
+    $items = New-Object System.Collections.Generic.List[string]
+    if (-not (Test-Path -LiteralPath $DestinationRoot)) {
+        return @()
+    }
+
+    foreach ($child in Get-ChildItem -LiteralPath $DestinationRoot -Force | Sort-Object Name) {
+        $relativePath = if ([string]::IsNullOrWhiteSpace($RelativeBase)) { $child.Name } else { "$RelativeBase/$($child.Name)" }
+        if (Test-ProtectedPath -RelativePath $relativePath) {
+            continue
+        }
+
+        $sourcePath = Join-Path $SourceRoot $child.Name
+        if (-not (Test-Path -LiteralPath $sourcePath)) {
+            if ($child.PSIsContainer) {
+                $items.Add("$relativePath/") | Out-Null
+            }
+            else {
+                $items.Add($relativePath) | Out-Null
+            }
+            continue
+        }
+
+        $sourceItem = Get-Item -LiteralPath $sourcePath -Force
+        if ($child.PSIsContainer -and $sourceItem.PSIsContainer) {
+            foreach ($nested in Get-DestinationOnlyItem -SourceRoot $sourcePath -DestinationRoot $child.FullName -RelativeBase $relativePath) {
+                $items.Add($nested) | Out-Null
+            }
+        }
+    }
+
+    return @($items)
+}
+
 function Get-ManualReviewRequired {
     param(
         [Parameter(Mandatory = $true)][string]$SourceRoot,
@@ -145,19 +185,8 @@ function Get-ManualReviewRequired {
         $items.Add($item) | Out-Null
     }
 
-    if (Test-Path -LiteralPath $DestinationRoot) {
-        $sourceTop = @{}
-        foreach ($child in Get-ChildItem -LiteralPath $SourceRoot -Force) {
-            $sourceTop[$child.Name] = $true
-        }
-        foreach ($child in Get-ChildItem -LiteralPath $DestinationRoot -Force | Sort-Object Name) {
-            if (Test-ProtectedPath -RelativePath $child.Name) {
-                continue
-            }
-            if (-not $sourceTop.ContainsKey($child.Name)) {
-                $items.Add($child.Name) | Out-Null
-            }
-        }
+    foreach ($item in Get-DestinationOnlyItem -SourceRoot $SourceRoot -DestinationRoot $DestinationRoot) {
+        $items.Add($item) | Out-Null
     }
 
     return @($items | Sort-Object -Unique)

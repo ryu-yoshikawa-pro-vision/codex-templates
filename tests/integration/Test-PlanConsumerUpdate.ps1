@@ -42,8 +42,11 @@ function Invoke-WindowsPowerShellFile {
 New-Item -ItemType Directory -Force -Path `
     (Join-Path $consumerRoot "docs\adr"), `
     (Join-Path $consumerRoot "docs\plans"), `
+    (Join-Path $consumerRoot "docs\reports"), `
+    (Join-Path $consumerRoot "docs\history"), `
     (Join-Path $consumerRoot ".codex\runs\20260601-010101-JST"), `
-    (Join-Path $consumerRoot ".git") | Out-Null
+    (Join-Path $consumerRoot ".git"), `
+    (Join-Path $consumerRoot "scripts") | Out-Null
 Set-Content -Path (Join-Path $consumerRoot "codex-project.toml") -Value @'
 schema_version = 1
 name = "consumer"
@@ -55,6 +58,9 @@ Set-Content -Path (Join-Path $consumerRoot "docs\adr\decision.md") -Value "KEEP 
 Set-Content -Path (Join-Path $consumerRoot ".codex\runs\20260601-010101-JST\REPORT.md") -Value "KEEP RUN"
 Set-Content -Path (Join-Path $consumerRoot ".env.local") -Value "KEEP ENV"
 Set-Content -Path (Join-Path $consumerRoot "custom.md") -Value "KEEP EXTRA"
+Set-Content -Path (Join-Path $consumerRoot "docs\reports\keep.md") -Value "KEEP REPORT"
+Set-Content -Path (Join-Path $consumerRoot "docs\history\keep.md") -Value "KEEP HISTORY"
+Set-Content -Path (Join-Path $consumerRoot "scripts\old-tool.ps1") -Value "KEEP OLD TOOL"
 Set-Content -Path (Join-Path $consumerRoot ".git\HEAD") -Value "ref: refs/heads/main"
 
 try {
@@ -66,6 +72,7 @@ try {
         'Version change: minor',
         'docs/PROJECT_CONTEXT.md',
         'custom.md',
+        'scripts/old-tool.ps1',
         'powershell -ExecutionPolicy Bypass -File tools/sync-template.ps1',
         'verify.ps1'
     )) {
@@ -86,6 +93,7 @@ try {
     }
     if ('AGENTS.md' -notin @($plan.candidate_updates)) { throw "Expected AGENTS.md in candidate updates: $($plan.candidate_updates -join ', ')" }
     if ('custom.md' -notin @($plan.manual_review_required)) { throw "Expected custom.md in manual review required: $($plan.manual_review_required -join ', ')" }
+    if ('scripts/old-tool.ps1' -notin @($plan.manual_review_required)) { throw "Expected scripts/old-tool.ps1 in manual review required: $($plan.manual_review_required -join ', ')" }
     if (@($plan.recommended_commands).Count -lt 1) { throw "Expected recommended commands" }
 
     $versionOk = Invoke-WindowsPowerShellFile -ScriptPath $planWrapper -Arguments @('-Destination', $consumerRoot, '-TemplateVersion', '0.11.0')
@@ -99,6 +107,11 @@ try {
     if ($syncPreview.ExitCode -ne 0) { throw "PlanOnly sync preview failed unexpectedly: $($syncPreview.Combined)" }
     if ($syncPreview.StdOut -notmatch 'Protected paths:') { throw "Expected protected paths in sync preview: $($syncPreview.StdOut)" }
 
+    $syncDryRun = Invoke-WindowsPowerShellFile -ScriptPath $syncWrapper -Arguments @('-Destination', $consumerRoot, '-Force', '-DryRun', '-ExcludeProtected')
+    if ($syncDryRun.ExitCode -ne 0) { throw "ExcludeProtected dry run failed unexpectedly: $($syncDryRun.Combined)" }
+    if ($syncDryRun.StdOut -notmatch 'existing destination-only entries would be kept') { throw "Expected keep message in exclude-protected dry run: $($syncDryRun.StdOut)" }
+    if ($syncDryRun.StdOut -match 'existing destination top-level entries that would be removed') { throw "ExcludeProtected dry run should not print destructive removal list: $($syncDryRun.StdOut)" }
+
     $sync = Invoke-WindowsPowerShellFile -ScriptPath $syncWrapper -Arguments @('-Destination', $consumerRoot, '-Force', '-ExcludeProtected')
     if ($sync.ExitCode -ne 0) { throw "ExcludeProtected sync failed unexpectedly: $($sync.Combined)" }
 
@@ -107,6 +120,9 @@ try {
     if ($sourceAgents.Hash -ne $destAgents.Hash) { throw "AGENTS.md was not updated from source template" }
     if ((Get-Content -LiteralPath (Join-Path $consumerRoot "docs\PROJECT_CONTEXT.md") -Raw) -notmatch 'KEEP PROJECT CONTEXT') { throw "Protected PROJECT_CONTEXT should remain unchanged" }
     if ((Get-Content -LiteralPath (Join-Path $consumerRoot "custom.md") -Raw) -notmatch 'KEEP EXTRA') { throw "Destination-only custom.md should remain" }
+    if ((Get-Content -LiteralPath (Join-Path $consumerRoot "docs\reports\keep.md") -Raw) -notmatch 'KEEP REPORT') { throw "Protected docs/reports should remain unchanged" }
+    if ((Get-Content -LiteralPath (Join-Path $consumerRoot "docs\history\keep.md") -Raw) -notmatch 'KEEP HISTORY') { throw "Protected docs/history should remain unchanged" }
+    if ((Get-Content -LiteralPath (Join-Path $consumerRoot "scripts\old-tool.ps1") -Raw) -notmatch 'KEEP OLD TOOL') { throw "Destination-only nested file should remain" }
     foreach ($path in @(
         (Join-Path $consumerRoot ".env.local"),
         (Join-Path $consumerRoot ".codex\runs\20260601-010101-JST\REPORT.md")

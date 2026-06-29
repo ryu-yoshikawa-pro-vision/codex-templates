@@ -119,6 +119,28 @@ try {
     if ($symlinkCase.Combined -notmatch 'Refusing to delete symlink/reparse-point candidate') { throw "Missing reparse-point refusal message: $($symlinkCase.Combined)" }
     if (-not (Test-Path -LiteralPath $symlinkPath)) { throw "Reparse-point candidate should remain" }
     if (-not (Test-Path -LiteralPath $outsideDir)) { throw "Outside target should remain" }
+
+    Remove-Item -LiteralPath $symlinkPath -Force
+
+    $outsideLogsDir = Join-Path $tempRoot "outside-logs"
+    New-Item -ItemType Directory -Force -Path $outsideLogsDir | Out-Null
+    $outsideLogPath = Join-Path $outsideLogsDir "codex-safe-ancestor.jsonl"
+    Set-Content -Path $outsideLogPath -Value "outside"
+    (Get-Item -LiteralPath $outsideLogPath).LastWriteTime = (Get-Date).AddDays(-2)
+
+    $logsPath = Join-Path $templateRoot ".codex\logs"
+    Remove-Item -LiteralPath $logsPath -Recurse -Force
+    try {
+        New-Item -ItemType Junction -Path $logsPath -Target $outsideLogsDir | Out-Null
+    }
+    catch {
+        throw "Failed to create junction for ancestor reparse-point test: $($_.Exception.Message)"
+    }
+
+    $ancestorCase = Invoke-WindowsPowerShellFile -ScriptPath $wrapperPath -Arguments @('-OlderThanDays', '0', '-ConfirmDeleteGeneratedRuns')
+    if ($ancestorCase.ExitCode -eq 0) { throw "Ancestor reparse-point delete unexpectedly succeeded" }
+    if ($ancestorCase.Combined -notmatch 'Refusing to delete path with symlink/reparse-point ancestor') { throw "Missing ancestor refusal message: $($ancestorCase.Combined)" }
+    if (-not (Test-Path -LiteralPath $outsideLogPath)) { throw "Outside log behind junction should remain" }
 }
 finally {
     Pop-Location

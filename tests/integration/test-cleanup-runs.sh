@@ -69,17 +69,18 @@ grep -q -- '--older-than-days must be a non-negative integer' "$temp_root/invali
 outside_dir="$temp_root/outside"
 mkdir -p "$outside_dir"
 symlink_run_id="20260602-020202-JST"
-symlink_path_win="$(cygpath -w "$template_root/.codex/runs/$symlink_run_id")"
-outside_dir_win="$(cygpath -w "$outside_dir")"
-powershell.exe -NoProfile -NonInteractive -Command "\$path = '$symlink_path_win'; \$target = '$outside_dir_win'; New-Item -ItemType Junction -Path \$path -Target \$target | Out-Null"
-set +e
-bash "$wrapper" --older-than-days 0 --confirm-delete-generated-runs >"$temp_root/symlink.out" 2>&1
-code=$?
-set -e
-[[ $code -ne 0 ]]
-grep -q 'Refusing to delete symlink/reparse-point candidate' "$temp_root/symlink.out"
-[[ -d "$outside_dir" ]]
-[[ -d ".codex/runs/$new_run_id" ]]
-[[ -d ".codex/runs/$symlink_run_id" ]]
+if ln -s "$outside_dir" "$template_root/.codex/runs/$symlink_run_id" 2>/dev/null && [[ -L ".codex/runs/$symlink_run_id" ]]; then
+  set +e
+  bash "$wrapper" --older-than-days 0 --confirm-delete-generated-runs >"$temp_root/symlink.out" 2>&1
+  code=$?
+  set -e
+  [[ $code -ne 0 ]]
+  grep -q 'Refusing to delete symlink/reparse-point candidate' "$temp_root/symlink.out"
+  [[ -d "$outside_dir" ]]
+  [[ -d ".codex/runs/$new_run_id" ]]
+  [[ -L ".codex/runs/$symlink_run_id" ]]
+else
+  echo "SKIP: POSIX symlink creation unavailable on this platform"
+fi
 
 echo "PASS: cleanup-runs bash checks"

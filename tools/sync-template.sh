@@ -61,14 +61,13 @@ fi
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source_dir="$repo_root/template"
 python_cmd=""
-if command -v python >/dev/null 2>&1; then
-  python_cmd="python"
-elif command -v python3 >/dev/null 2>&1; then
-  python_cmd="python3"
-else
-  echo "python3 or python is required" >&2
-  exit 1
-fi
+for candidate in python3 python; do
+  if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c "import sys; raise SystemExit(0 if sys.version_info[0] >= 3 else 1)" >/dev/null 2>&1; then
+    python_cmd="$candidate"
+    break
+  fi
+done
+[[ -n "$python_cmd" ]] || { echo "python3 or python is required" >&2; exit 1; }
 
 dest="$($python_cmd - "$1" <<'PY'
 import os
@@ -113,9 +112,11 @@ if [[ $dry_run -eq 1 ]]; then
   else
     echo "DRY RUN: destructive overwrite mode is active; existing top-level contents would be removed."
   fi
-  if [[ -e "$dest" && $force -eq 1 ]]; then
+  if [[ -e "$dest" && $force -eq 1 && $exclude_protected -ne 1 ]]; then
     echo "DRY RUN: existing destination top-level entries that would be removed:"
     find "$dest" -mindepth 1 -maxdepth 1 -print | sort
+  elif [[ -e "$dest" && $force -eq 1 ]]; then
+    echo "DRY RUN: existing destination-only entries would be kept."
   elif [[ -e "$dest" ]]; then
     echo "DRY RUN: destination exists and --force was not provided; sync would fail."
   else

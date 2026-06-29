@@ -858,6 +858,10 @@ Assert-Contains -RelativePath "template/docs/reference/codex-implementation-harn
     "-StrictHarness"
 )
 Assert-Contains -RelativePath ".github/workflows/validate-template.yml" -Patterns @(
+    "permissions:",
+    "contents: read",
+    "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+    "persist-credentials: false",
     "bash template/scripts/verify --strict-harness",
     "bash tests/integration/test-cleanup-runs.sh",
     "bash tests/integration/test-plan-consumer-update.sh",

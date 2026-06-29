@@ -6,11 +6,16 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   validate-bash:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
       - name: Validate spec
         run: bash tools/validate-spec.sh
       - name: Verify template
@@ -39,7 +44,9 @@ jobs:
   validate-powershell:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
       - name: Validate spec
         run: powershell -ExecutionPolicy Bypass -File tools/validate-spec.ps1
       - name: Verify template

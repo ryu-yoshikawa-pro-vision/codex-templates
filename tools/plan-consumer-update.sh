@@ -44,14 +44,13 @@ fi
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source_template_root="$repo_root/template"
 python_cmd=""
-if command -v python >/dev/null 2>&1; then
-  python_cmd="python"
-elif command -v python3 >/dev/null 2>&1; then
-  python_cmd="python3"
-else
-  echo "python3 or python is required" >&2
-  exit 1
-fi
+for candidate in python3 python; do
+  if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c "import sys; raise SystemExit(0 if sys.version_info[0] >= 3 else 1)" >/dev/null 2>&1; then
+    python_cmd="$candidate"
+    break
+  fi
+done
+[[ -n "$python_cmd" ]] || { echo "python3 or python is required" >&2; exit 1; }
 
 "$python_cmd" - "$source_template_root" "$1" "$template_version_override" "$json_output" <<'PY'
 import filecmp
@@ -167,14 +166,7 @@ def collect_candidate_updates(source_root: pathlib.Path, destination_root: pathl
 
 def collect_manual_review(source_root: pathlib.Path, destination_root: pathlib.Path, protected_paths):
     manual = list(protected_paths)
-    if destination_root.exists():
-        source_top = {child.name for child in source_root.iterdir()}
-        for child in sorted(destination_root.iterdir(), key=lambda item: item.name):
-            rel = child.name
-            if is_protected(rel):
-                continue
-            if rel not in source_top:
-                manual.append(rel)
+    manual.extend(collect_destination_only(source_root, destination_root))
     deduped = []
     seen = set()
     for item in manual:
@@ -182,6 +174,27 @@ def collect_manual_review(source_root: pathlib.Path, destination_root: pathlib.P
             deduped.append(item)
             seen.add(item)
     return deduped
+
+
+def collect_destination_only(source_root: pathlib.Path, destination_root: pathlib.Path, base: str = ""):
+    if not destination_root.exists():
+        return []
+
+    items = []
+    for child in sorted(destination_root.iterdir(), key=lambda item: item.name):
+        rel = f"{base}/{child.name}" if base else child.name
+        if is_protected(rel):
+            continue
+
+        source_child = source_root / child.name
+        if not source_child.exists():
+            items.append(rel + "/" if child.is_dir() else rel)
+            continue
+
+        if child.is_dir() and source_child.is_dir():
+            items.extend(collect_destination_only(source_child, child, rel))
+
+    return items
 
 
 source_version = parse_template_version(source_template_root / "codex-project.toml")

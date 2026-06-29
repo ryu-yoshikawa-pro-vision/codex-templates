@@ -4,14 +4,13 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 
 python_cmd=""
-if command -v python >/dev/null 2>&1; then
-  python_cmd="python"
-elif command -v python3 >/dev/null 2>&1; then
-  python_cmd="python3"
-else
-  echo "python3 or python is required" >&2
-  exit 1
-fi
+for candidate in python3 python; do
+  if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c "import sys; raise SystemExit(0 if sys.version_info[0] >= 3 else 1)" >/dev/null 2>&1; then
+    python_cmd="$candidate"
+    break
+  fi
+done
+[[ -n "$python_cmd" ]] || { echo "python3 or python is required" >&2; exit 1; }
 
 "$python_cmd" - "$repo_root" <<'PY'
 import json
@@ -1196,6 +1195,10 @@ assert_contains(
 assert_contains(
     ".github/workflows/validate-template.yml",
     [
+        "permissions:",
+        "contents: read",
+        "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+        "persist-credentials: false",
         "bash template/scripts/verify --strict-harness",
         "bash tests/integration/test-cleanup-runs.sh",
         "bash tests/integration/test-plan-consumer-update.sh",
