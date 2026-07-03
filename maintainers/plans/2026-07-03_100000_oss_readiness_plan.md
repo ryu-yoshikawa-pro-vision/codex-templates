@@ -119,11 +119,20 @@ AI エージェントが確認できない GitHub UI 作業は完了扱いしな
 Quick audit は、公開継続に対する即時リスクの有無だけを確認する。
 
 確認対象:
+- root files
 - top-level directory
 - tracked `.codex/` / `.vscode/` / `inputs/`
 - obvious secrets
 - obvious private URLs
 - obvious customer / personal / internal-only information
+
+Root files include:
+- `README.md`
+- `AGENTS.md`
+- `CODE_REVIEW.md`
+- `MIGRATION.md`
+- `PLANS.md`
+- root-level config / md / yml / yaml / json / toml / sh / ps1 files
 
 実施方法:
 - file name / directory name / representative file の確認
@@ -131,6 +140,7 @@ Quick audit は、公開継続に対する即時リスクの有無だけを確�
 - 全履歴や全ファイルの深掘りはしない
 
 Representative file rule:
+- Check all root files matching the root files rule.
 - Check all file names under each target directory.
 - Check all files directly under each target directory root.
 - For nested directories, check README / AGENTS / config / toml / json / yaml / yml / md / sh / ps1 files up to depth 2.
@@ -145,12 +155,19 @@ Representative file rule:
 Detailed audit は、初回 release 前に public repository として残す妥当性を確認する。
 
 確認対象:
+- root files の残置理由
 - top-level directory の残置理由
 - `maintainers/` 配下の履歴文書
 - `examples/` 配下の実データ性
 - `inputs/` 配下の非公開情報
 - `.github/` workflow / template / logs に出る可能性のある情報
 - `.gitignore` と tracked runtime artifact の整合
+
+Detailed audit additional areas:
+- `template/`: consumer-facing distribution surface
+- `tools/`: maintainer / validation scripts
+- `tests/`: test fixtures and expected outputs
+- `spec/`: source of truth for template behavior
 
 実施方法:
 - directory ごとの残置理由を明記する。
@@ -185,7 +202,7 @@ Quick audit / detailed audit の report は、以下の形式を使う。
 
 Allowed values:
 - Audit summary Result: `pass` / `pass-with-manual-checks` / `blocked`
-- Scope Result: `pass` / `warning` / `blocker`
+- Scope Result: `pass` / `warning` / `blocker` / `not-applicable`
 - Finding Severity: `info` / `warning` / `blocker`
 - Release impact: `none` / `manual-check-required` / `requires-separate-pr` / `hold-release`
 
@@ -205,12 +222,17 @@ Allowed values:
 
 | Area | Checked | Method | Result | Notes |
 | --- | --- | --- | --- | --- |
+| `root files` | yes/no | file listing + keyword search | pass/warning/blocker | |
 | `.codex/` | yes/no | file listing + keyword search | pass/warning/blocker | |
 | `.vscode/` | yes/no | file listing + keyword search | pass/warning/blocker | |
 | `inputs/` | yes/no | file listing + keyword search | pass/warning/blocker | |
 | `examples/` | yes/no | file listing + keyword search | pass/warning/blocker | |
 | `maintainers/` | yes/no | file listing + keyword search | pass/warning/blocker | |
 | `.github/` | yes/no | file listing + keyword search | pass/warning/blocker | |
+| `template/` | yes/no/not-applicable | file listing + keyword search | pass/warning/blocker/not-applicable | detailed audit required |
+| `tools/` | yes/no/not-applicable | file listing + keyword search | pass/warning/blocker/not-applicable | detailed audit required |
+| `tests/` | yes/no/not-applicable | file listing + keyword search | pass/warning/blocker/not-applicable | detailed audit required |
+| `spec/` | yes/no/not-applicable | file listing + keyword search | pass/warning/blocker/not-applicable | detailed audit required |
 
 ## Findings
 
@@ -241,6 +263,11 @@ Allowed values:
 ### 5.6 Minimum keyword set for audit
 
 Audit では、少なくとも以下の keyword を検索する。
+
+Keyword search rule:
+- Keyword search must be case-insensitive.
+- Snake case, kebab case, and camel case variants should be treated as equivalent where practical.
+- If the tool cannot perform equivalent matching, record the limitation in the audit report.
 
 Secrets / credentials:
 - `token`
@@ -559,10 +586,12 @@ PR ではなく repository settings で実施する。
 - [ ] README に対象環境、利用パターン、非推奨ユースケース、既知の制約がある。
 - [ ] public surface quick audit report がある。
 - [ ] public surface detailed audit report がある。
+- [ ] root files の確認結果が audit report に記録されている。
 - [ ] public repository に残す directory の理由が説明できる。
 - [ ] `.codex/` 配下に runtime log / run artifact / secret が残っていない。
 - [ ] `inputs/` 配下に非公開情報がない。
 - [ ] `maintainers/` 配下に公開不可情報がない。
+- [ ] `template/` / `tools/` / `tests/` / `spec/` の detailed audit 結果が記録されている。
 - [ ] `bash tools/validate-spec.sh` が成功する、または実行不可理由がある。
 - [ ] `bash template/scripts/verify --strict-harness` が成功する、または実行不可理由がある。
 
@@ -598,6 +627,8 @@ PR ではなく repository settings で実施する。
 - [ ] `SUPPORT.md` が存在する。
 - [ ] Public surface quick audit が完了している。
 - [ ] Public surface detailed audit が完了している。
+- [ ] root files の audit が完了している。
+- [ ] `template/` / `tools/` / `tests/` / `spec/` の detailed audit が完了している。
 - [ ] Secret scanning alerts を確認済み。
 - [ ] GitHub Actions logs の秘密情報確認が完了している。
 - [ ] `bash tools/validate-spec.sh` が成功、または実行不可理由が明記されている。
@@ -635,6 +666,7 @@ README / docs 変更時の追加確認:
 - PR 1 に Public surface quick audit を含める。
 - PR 2 に Public surface detailed audit を含める。
 - `maintainers/` は残してよいが、公開前提の監査を必須にする。
+- root files も audit 対象に含める。
 - 迷う情報は削除ではなく、まず audit report に分類する。
 
 ### リスク 2: Safety harness を過信させる
@@ -678,6 +710,7 @@ README / docs 変更時の追加確認:
 - Audit report format を固定する。
 - severity / release impact / required action を必須項目にする。
 - allowed values を固定する。
+- keyword search は case-insensitive にする。
 - `blocker` がある場合は release を保留する。
 
 ### リスク 8: PR 1 で blocker があるのに community files 整備まで進める
