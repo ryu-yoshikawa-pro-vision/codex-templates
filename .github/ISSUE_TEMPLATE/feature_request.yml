@@ -1,0 +1,68 @@
+name: Feature request
+description: Suggest an improvement or addition
+labels: ["enhancement"]
+
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this feature solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: change
+    attributes:
+      label: Proposed change
+      description: Describe the feature or change you'd like to see
+    validations:
+      required: true
+
+  - type: textarea
+    id: users
+    attributes:
+      label: Target user
+      description: Who would benefit from this change?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Which part of the repository does this affect?
+      multiple: true
+      options:
+        - docs
+        - template
+        - scripts
+        - hooks
+        - rules
+        - tests
+    validations:
+      required: true
+
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety impact
+      description: How does this change affect safety guardrails?
+    validations:
+      required: true
+
+  - type: textarea
+    id: maintenance
+    attributes:
+      label: Maintenance cost
+      description: Estimated effort to maintain this feature
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any alternative solutions or workarounds you've considered
+    validations:
+      required: false
