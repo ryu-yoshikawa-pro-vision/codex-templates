@@ -44,6 +44,8 @@ License copyright holder:
 - AI agent must not invent the copyright holder.
 - Use the repository owner / maintainer-approved holder only.
 - Default proposal: `Copyright 2026 ryu-yoshikawa-pro-vision`.
+- PR 1 must use the default proposal unless the maintainer explicitly instructs otherwise.
+- PR 1 body must list the copyright holder as a maintainer confirmation item.
 - If maintainer prefers personal attribution, replace with maintainer-approved legal name before merging.
 
 ### 4.2 Public-facing surface
@@ -253,6 +255,11 @@ Allowed values:
 - Separate PR required: yes/no
 ```
 
+PR 1 quick audit handling for detailed-only areas:
+- In PR 1 quick audit report, `template/`, `tools/`, `tests/`, and `spec/` may be marked `not-applicable` because detailed inspection is reserved for PR 2.
+- Even in PR 1, if file names or immediately visible top-level entries under those areas indicate secret, credential, log, artifact, trace, recording, archive, or customer data, record the item as a finding.
+- Do not silently ignore suspicious file names only because the area is marked `not-applicable` for detailed audit.
+
 ### 5.5 `.gitignore` と tracked file の扱い
 
 - 新規に runtime artifact / local-only file を除外するだけの `.gitignore` 追記は PR 2 で実施してよい。
@@ -268,6 +275,12 @@ Keyword search rule:
 - Keyword search must be case-insensitive.
 - Snake case, kebab case, and camel case variants should be treated as equivalent where practical.
 - If the tool cannot perform equivalent matching, record the limitation in the audit report.
+
+Keyword hit handling:
+- Keyword hits must not be silently ignored.
+- If a keyword hit is clearly safe in context, record it in Findings or Scope Notes with severity `info` and explain why it is safe.
+- If context is unclear, classify it as `warning` or `blocker` according to 5.3 and leave a maintainer decision or separate action.
+- Do not paste suspected secrets or credentials in full. Mask values and record only the path, line or section if available, category, and required action.
 
 Secrets / credentials:
 - `token`
@@ -495,6 +508,7 @@ Execution order:
 - `docs/oss-readiness-checklist.md` が 6.4 の required structure を満たしている。
 - `bash tools/validate-spec.sh` と `bash template/scripts/verify --strict-harness` が成功する、または実行不可理由が PR 本文に明記されている。
 - PR 本文に `Manual checks required` セクションがある。
+- PR 本文に LICENSE copyright holder confirmation item がある。
 
 ### PR 2: OSS release readiness
 
@@ -615,6 +629,7 @@ PR ではなく repository settings で実施する。
 - [ ] GitHub Private Vulnerability Reporting を有効化するか判断した。
 - [ ] history rewrite が必要な事象がないか判断した。
 - [ ] detailed audit で問題が見つかった場合、release を保留するか判断した。
+- [ ] LICENSE copyright holder が maintainer-approved holder であることを確認した。
 
 ## 10. v0.1.0 release 前提条件
 
@@ -689,6 +704,7 @@ README / docs 変更時の追加確認:
 - `Apache-2.0` として固定する。
 - LICENSE なしの状態を継続しない。
 - copyright holder を AI エージェントが推測しない。
+- PR 本文に maintainer confirmation item を残す。
 
 ### リスク 5: AI エージェントが GitHub UI 確認を完了扱いする
 
@@ -711,6 +727,7 @@ README / docs 変更時の追加確認:
 - severity / release impact / required action を必須項目にする。
 - allowed values を固定する。
 - keyword search は case-insensitive にする。
+- keyword hit を黙殺せず、safe 判定でも Findings または Scope Notes に理由付きで記録する。
 - `blocker` がある場合は release を保留する。
 
 ### リスク 8: PR 1 で blocker があるのに community files 整備まで進める
@@ -719,6 +736,12 @@ README / docs 変更時の追加確認:
 - PR 1 は quick audit を最初に実施する。
 - blocker が見つかった場合は quick audit report のみ作成して停止する。
 - LICENSE / README / community files は blocker 対応を別対応に切り出した後に進める。
+
+### リスク 9: Quick audit で detailed-only area を完全に見落とす
+
+対策:
+- PR 1 では `template/` / `tools/` / `tests/` / `spec/` を detailed audit required として `not-applicable` にできる。
+- ただし、ファイル名または top-level entry から明らかに secret / log / artifact / trace / customer data と分かるものは、PR 1 でも finding に記録する。
 
 ## 13. 推奨する次アクション
 
