@@ -35,12 +35,12 @@ This checklist tracks the tasks required to make `codex-templates` ready for pub
 | A-10 | Quick audit report exists | done | `maintainers/reports/2026-07-03_public_surface_quick_audit.md` |
 | A-11 | README links point to existing files | done | Verified in this PR |
 | A-12 | Issue/PR templates are valid YAML/MD | done | Verified in this PR |
-| A-13 | SECURITY/SUPPORT/CONTRIBUTING cross-reference is not circular | done | Verifed in this PR |
+| A-13 | SECURITY/SUPPORT/CONTRIBUTING cross-reference is not circular | done | Verified in this PR |
 | A-14 | No secrets in keyword-scanned files | done | Quick audit pass |
-| A-15 | `bash tools/validate-spec.sh` passes | manual | Requires Bash environment |
-| A-16 | `bash template/scripts/verify --strict-harness` passes | manual | Requires Bash environment |
-| A-17 | `tools/validate-spec.ps1` passes | manual | Requires PowerShell environment |
-| A-18 | `template/scripts/verify.ps1 -StrictHarness` passes | manual | Requires PowerShell environment |
+| A-15 | `bash tools/validate-spec.sh` passes | done | Passed in GitHub Actions `Validate template` run #66 |
+| A-16 | `bash template/scripts/verify --strict-harness` passes | done | Passed in GitHub Actions `Validate template` run #66 |
+| A-17 | `tools/validate-spec.ps1` passes | done | Passed in GitHub Actions `Validate template` run #66 |
+| A-18 | `template/scripts/verify.ps1 -StrictHarness` passes | done | Passed in GitHub Actions `Validate template` run #66 |
 
 ## Manual GitHub UI checks
 
@@ -79,7 +79,7 @@ This checklist tracks the tasks required to make `codex-templates` ready for pub
 | R-04 | Detailed audit report created | todo | PR 2 scope |
 | R-05 | Release note draft created | todo | PR 2 scope |
 | R-06 | All manual checks completed | todo | Requires maintainer |
-| R-07 | All automated checks passing | todo | |
+| R-07 | All automated checks passing | todo | PR 1 validation passed; final release readiness confirmation remains PR 2 scope |
 | R-08 | Versioning decision made | todo | PR 2 scope |
 | R-09 | v0.1.0 release created | todo | Manual GitHub UI action |
 

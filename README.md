@@ -34,8 +34,8 @@ This repository provides a structured template and safety harness for running [C
 The recommended way to use this template is to copy the contents of `template/` into your consumer repository:
 
 ```bash
-# Copy template contents into your repo root
-cp -r path/to/codex-templates/template/* your-repo/
+# Copy template contents, including dotfiles, into your repo root
+cp -a path/to/codex-templates/template/. your-repo/
 cd your-repo
 
 # Run validation
