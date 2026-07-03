@@ -26,4 +26,8 @@ This project does not guarantee real-time moderation. Reports will be reviewed a
 
 ## Reporting
 
-If you experience or witness unacceptable behavior, please contact the maintainers through a GitHub issue or discussion. All reports will be handled with discretion.
+Do not include sensitive personal details in public issues or discussions.
+
+If you experience or witness unacceptable behavior, use a private reporting channel when one is available. If no private channel is currently listed, open a minimal public issue asking maintainers to provide a private reporting channel, without naming people involved, sharing personal information, or including sensitive details.
+
+All reports will be handled with discretion on a best-effort basis.
