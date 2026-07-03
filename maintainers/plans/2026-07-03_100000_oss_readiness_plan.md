@@ -25,6 +25,7 @@
 - Git history rewrite はこの計画では行わない。秘密情報が見つかった場合は、まず credential rotation と影響範囲整理を優先し、history rewrite は別途明示判断する。
 - OSS 公開に合わせて過度に production-ready を主張しない。
 - GitHub repository settings、topics、release 作成など UI / 設定作業は PR ではなく手動作業として扱う。
+- 公開不可情報の削除、移動、履歴修正、credential rotation は本計画の PR には含めない。問題が見つかった場合は別 PR / 別対応へ切り出す。
 
 ## 4. 基本方針
 
@@ -86,7 +87,269 @@ OSS 化後の運用負荷を無制限に増やさないため、以下を前提�
 - 破壊的操作、sandbox bypass、approval bypass、危険な unattended execution を促す提案は受け付けない。
 - maintainer の運用負荷を大きく増やす機能追加は、実装前に Issue / Discussion で必要性と保守コストを確認する。
 
-## 5. PR 分割
+### 4.6 Versioning rule
+
+GitHub release version と template version を混同しない。
+
+- GitHub release `v0.1.0` は、repository が OSS-ready になった初回 GitHub release を表す。
+- `template/codex-project.toml` の `template_version` は、consumer-facing template contract を表す。
+- README / LICENSE / community files / audit reports だけの変更では `template_version` を更新しない。
+- `template/` 配下の consumer-facing behavior、contract、workflow、safety rule、distribution content を変える場合は、`template_version` 更新要否を明示判断する。
+- `template_version` を更新しない場合、PR 2 の本文または release note draft に「なぜ更新しないか」を明記する。
+
+### 4.7 Manual checks handling
+
+AI エージェントが確認できない GitHub UI 作業は完了扱いしない。
+
+- AI エージェントは manual check を `done` にしてはならない。
+- AI エージェントは PR 本文に `Manual checks required` セクションを作り、GitHub UI で確認すべき項目を列挙する。
+- maintainer が GitHub UI で確認した後に、PR コメントまたは checklist 上で完了を記録する。
+- manual check が release を妨げる場合、PR 2 の release note draft または PR 本文に `Release status: blocked` と明記する。
+
+## 5. Audit 基準
+
+### 5.1 Quick audit の範囲
+
+Quick audit は、公開継続に対する即時リスクの有無だけを確認する。
+
+確認対象:
+- top-level directory
+- tracked `.codex/` / `.vscode/` / `inputs/`
+- obvious secrets
+- obvious private URLs
+- obvious customer / personal / internal-only information
+
+実施方法:
+- file name / directory name / representative file の確認
+- keyword search による危険語句確認
+- 全履歴や全ファイルの深掘りはしない
+
+完了判定:
+- すぐに公開停止、credential rotation、release 保留が必要そうな疑いがあるかを分類できていること。
+- manual check が必要な項目を `Manual checks required` として列挙できていること。
+
+### 5.2 Detailed audit の範囲
+
+Detailed audit は、初回 release 前に public repository として残す妥当性を確認する。
+
+確認対象:
+- top-level directory の残置理由
+- `maintainers/` 配下の履歴文書
+- `examples/` 配下の実データ性
+- `inputs/` 配下の非公開情報
+- `.github/` workflow / template / logs に出る可能性のある情報
+- `.gitignore` と tracked runtime artifact の整合
+
+実施方法:
+- directory ごとの残置理由を明記する。
+- suspicious item があれば severity / release impact / required action を分類する。
+- 削除・履歴修正は行わず、別 PR / 別対応に切り出す。
+
+完了判定:
+- public に残すもの、別対応にするもの、manual check に残すものが分類されていること。
+- `v0.1.0` release 可否が `can-release` / `blocked` / `manual-check-required` のいずれかで明記されていること。
+
+### 5.3 Severity
+
+Audit finding の severity は以下に固定する。
+
+- `blocker`
+  - token / API key / password / credential の可能性がある。
+  - 顧客名、顧客環境、非公開 repository、個人情報が含まれる可能性がある。
+  - Actions logs / artifacts に secret が出た可能性がある。
+  - release を保留する。
+- `warning`
+  - private URL らしき文字列がある。
+  - 内部運用前提の記述があり、外部ユーザーに誤解を与える可能性がある。
+  - safety harness を過信させる表現がある。
+  - release 前に maintainer 判断が必要である。
+- `info`
+  - 公開してよいが、残置理由を記録すべきもの。
+  - `examples/` / `maintainers/` / `inputs/` など、説明が必要な公開物。
+
+### 5.4 Audit report format
+
+Quick audit / detailed audit の report は、以下の形式を使う。
+
+```markdown
+# Public surface audit report
+
+## Audit summary
+
+- Audit type: quick | detailed
+- Date:
+- Branch:
+- Auditor: AI agent
+- Result: pass | pass-with-manual-checks | blocked
+- Release impact: none | hold-release | requires-separate-pr | manual-check-required
+
+## Scope
+
+| Area | Checked | Method | Result | Notes |
+| --- | --- | --- | --- | --- |
+| `.codex/` | yes/no | file listing + keyword search | pass/warn/block | |
+| `.vscode/` | yes/no | file listing + keyword search | pass/warn/block | |
+| `inputs/` | yes/no | file listing + keyword search | pass/warn/block | |
+| `examples/` | yes/no | file listing + keyword search | pass/warn/block | |
+| `maintainers/` | yes/no | file listing + keyword search | pass/warn/block | |
+| `.github/` | yes/no | file listing + keyword search | pass/warn/block | |
+
+## Findings
+
+| ID | Severity | Path | Finding | Required action | Release impact |
+| --- | --- | --- | --- | --- | --- |
+| F-001 | info/warning/blocker | path | description | none/manual/separate-pr/rotate | none/hold |
+
+## Manual checks required
+
+| ID | Check | Reason | Owner |
+| --- | --- | --- | --- |
+| M-001 | Secret scanning alerts | GitHub UI required | maintainer |
+
+## Decision
+
+- Can continue to next PR: yes/no
+- Can create v0.1.0 release: yes/no/not-yet
+- Separate PR required: yes/no
+```
+
+### 5.5 `.gitignore` と tracked file の扱い
+
+- 新規に runtime artifact / local-only file を除外するだけの `.gitignore` 追記は PR 2 で実施してよい。
+- 既に tracked されているファイルの削除、`git rm --cached`、履歴修正は PR 2 では実施しない。
+- tracked file を除外すべきと判断した場合は、別 PR の修正指示に切り出す。
+- `.gitignore` に追加しただけで tracked file が非公開になるとは扱わない。
+
+## 6. Documentation / template 要件
+
+### 6.1 README required structure
+
+`README.md` は以下の構成にする。
+
+1. Project summary
+2. What this repository provides
+3. Who should use this
+4. What this does not guarantee
+5. Quickstart
+6. Repository layout
+7. Execution modes
+   - safe
+   - readonly
+   - auto-net
+8. New repository vs existing consumer repository
+9. Template copy vs fork
+10. Safety model
+11. Do not use this for
+12. Known limitations
+13. Validation
+14. Contributing
+15. Security
+16. Support
+17. License
+
+README に必ず含めること:
+- Codex CLI 向けを主対象にしつつ、coding agent workflow template として再利用できること。
+- 対象 OS / shell の範囲。Bash と PowerShell の両方を扱うこと。
+- 新規 repository に導入する場合と、既存 consumer repository に導入する場合の違い。
+- `template/` をコピーして使うのか、repository を fork して使うのかの使い分け。
+- `safe` / `readonly` / `auto-net` の使い分け。
+- SECURITY / CONTRIBUTING / SUPPORT への導線。
+
+README に書く非推奨ユースケース:
+- sandbox or approval mechanism を bypass する目的で使うこと。
+- production repository に対して未レビューの command を実行すること。
+- run artifact や logs に secrets を保存すること。
+- 広範囲で破壊的な変更を unattended agent に委任すること。
+- hook / wrapper / execpolicy を完全な security boundary とみなすこと。
+
+### 6.2 Community files minimum requirements
+
+`CONTRIBUTING.md` must include:
+- 大きな変更は issue または discussion で先に相談すること。
+- PR scope rule。1 PR に無関係な変更を混ぜないこと。
+- validation commands。
+- issues / PRs / logs に secrets を含めないこと。
+- consumer-facing changes は `template/` と `spec/` の整合が必要であること。
+- wrapper / execpolicy behavior change は明示 scope なしに行わないこと。
+
+`SECURITY.md` must include:
+- vulnerabilities を public issues に書かないこと。
+- dangerous execution paths、sandbox / approval bypass、secret leaks、destructive operation gaps を報告対象に含めること。
+- hooks / wrappers / execpolicy は defense-in-depth であり、完全な security boundary ではないこと。
+- supported versions / best effort statement。
+- maintainer response は best effort であり、明示しない限り SLA はないこと。
+
+`SUPPORT.md` must include:
+- supported: template usage、docs、validation、safe workflow questions。
+- best effort: local shell differences、Codex provider config、unofficial models。
+- not supported: bypassing approvals/sandbox、production destructive automation、billing/quota troubleshooting。
+- security issues should go to `SECURITY.md`。
+
+`CODE_OF_CONDUCT.md` must include:
+- expected behavior。
+- unacceptable behavior。
+- enforcement by maintainer。
+- no guarantee of real-time moderation。
+
+### 6.3 Issue / PR template requirements
+
+`bug_report.yml` must include:
+- Summary
+- Environment
+  - OS
+  - shell
+  - Codex version
+  - template version if known
+- Command / workflow used
+- Expected behavior
+- Actual behavior
+- Logs / artifacts, with reminder to redact secrets
+- Safety impact
+  - none / warning / potential dangerous execution / potential secret exposure
+
+`feature_request.yml` must include:
+- Problem
+- Proposed change
+- Target user
+- Affected area
+  - docs / template / scripts / hooks / rules / tests
+- Safety impact
+- Maintenance cost
+- Alternatives considered
+
+`PULL_REQUEST_TEMPLATE.md` must include:
+- Summary
+- Scope
+- Non-goals
+- Safety impact
+- Validation
+- Documentation updates
+- Checklist
+  - no secrets
+  - no unrelated changes
+  - no behavior change unless stated
+  - README / SECURITY / SUPPORT updated if needed
+
+### 6.4 `docs/oss-readiness-checklist.md` required structure
+
+`docs/oss-readiness-checklist.md` は以下の構成にする。
+
+1. Purpose
+2. How to use this checklist
+3. Status legend
+   - todo
+   - done
+   - blocked
+   - manual
+   - not-applicable
+4. Automated checks
+5. Manual GitHub UI checks
+6. Maintainer decisions
+7. Release prerequisites
+8. Open blockers
+9. Last reviewed date
+
+## 7. PR 分割
 
 OSS readiness は 2 PR にまとめる。1 PR に全てまとめると、community files、public surface audit、release readiness のレビュー観点が混ざりすぎる。4 PR に分けると安全寄りだが、ほとんどが docs / report / checklist のため分割が細かすぎる。したがって、以下の 2 PR を標準とする。
 
@@ -112,31 +375,6 @@ OSS readiness は 2 PR にまとめる。1 PR に全てまとめると、communi
 - `.github/PULL_REQUEST_TEMPLATE.md` を追加する。
 - `docs/oss-readiness-checklist.md` を追加する。
 
-Public surface quick audit で確認すること:
-- `.codex/`, `.vscode/`, `inputs/`, `examples/`, `maintainers/`, `.github/` を重点確認する。
-- token / secret / private URL / private repo 名 / 顧客情報 / 個人情報 / 内部運用だけの記述の有無を確認する。
-- GitHub UI でしか確認できない項目を `Manual check required` として明示する。
-- 結果を `maintainers/reports/{yyyy-mm-dd}_{HHMMSS}_public_surface_quick_audit.md` に保存する。
-
-README に必ず含めること:
-- この repository が何であるか。
-- Codex CLI 向けを主対象にしつつ、coding agent workflow template として再利用できること。
-- 対象ユーザー。
-- 対象 OS / shell の範囲。Bash と PowerShell の両方を扱うこと。
-- 新規 repository に導入する場合と、既存 consumer repository に導入する場合の違い。
-- `template/` をコピーして使うのか、repository を fork して使うのかの使い分け。
-- `safe` / `readonly` / `auto-net` の使い分け。
-- 非推奨ユースケース。
-- 既知の制約。
-- SECURITY / CONTRIBUTING / SUPPORT への導線。
-
-README に書く非推奨ユースケース:
-- sandbox or approval mechanism を bypass する目的で使うこと。
-- production repository に対して未レビューの command を実行すること。
-- run artifact や logs に secrets を保存すること。
-- 広範囲で破壊的な変更を unattended agent に委任すること。
-- hook / wrapper / execpolicy を完全な security boundary とみなすこと。
-
 実施しないこと:
 - wrapper / hook / execpolicy の挙動変更。
 - `template_version` 更新。
@@ -145,19 +383,19 @@ README に書く非推奨ユースケース:
 - ファイル削除。
 - Git history rewrite。
 - credential rotation の代行。
+- tracked file の除外や `git rm --cached`。
 
 完了条件:
+- Quick audit が 5.1 / 5.3 / 5.4 の基準で実施されている。
 - Public surface quick audit report が作成されている。
-- public repository に残る主要 directory の確認結果が report に記録されている。
-- 即時対応が必要な疑いがあれば、対象、理由、推奨対応、手動確認要否が明記されている。
+- blocker finding がある場合、PR 1 は完了扱いにせず、別対応が必要と明記している。
 - AI エージェントでは確認できない項目が、未確認のまま完了扱いされていない。
-- README から、目的・対象ユーザー・quickstart・安全制約・貢献方法・サポート範囲へ到達できる。
-- README に対象環境、利用パターン、非推奨ユースケース、既知の制約が明記されている。
-- OSS community files が root に揃っている。
-- Issue / PR template に秘密情報を貼らない注意がある。
-- SECURITY.md に公開 Issue へ脆弱性詳細を書かない指示がある。
-- `docs/oss-readiness-checklist.md` が automated / manual / maintainer decision に分類されている。
+- README が 6.1 の required structure を満たしている。
+- Community files が 6.2 の minimum requirements を満たしている。
+- Issue / PR templates が 6.3 の requirements を満たしている。
+- `docs/oss-readiness-checklist.md` が 6.4 の required structure を満たしている。
 - `bash tools/validate-spec.sh` と `bash template/scripts/verify --strict-harness` が成功する、または実行不可理由が PR 本文に明記されている。
+- PR 本文に `Manual checks required` セクションがある。
 
 ### PR 2: OSS release readiness
 
@@ -172,18 +410,8 @@ README に書く非推奨ユースケース:
 - `CHANGELOG.md` に OSS 初回公開用の entry を追加する。
 - `MIGRATION.md` 更新要否を判断し、必要であれば「既存 consumer repo への影響なし」を明記する。
 - `template/codex-project.toml` の `template_version` を変更するかどうかを判断する。
-  - consumer-facing contract を変更しない場合は更新しない。
-  - README / community files のみなら version 更新は不要。
-  - template 配布内容に影響する場合のみ patch / minor を検討する。
 - release note draft を `docs/releases/v0.1.0.md` または `maintainers/plans/` に保存する。
 - release 前提条件を `docs/oss-readiness-checklist.md` と照合する。
-
-Public surface detailed audit で確認すること:
-- PR 1 の quick audit より詳細に public repository に残る top-level directory と履歴文書を棚卸しする。
-- `.codex/`, `.vscode/`, `inputs/`, `examples/`, `maintainers/`, `.github/` を重点確認する。
-- token / secret / private URL / private repo 名 / 顧客情報 / 個人情報 / 内部運用だけの記述を確認する。
-- public に残してよい directory / file と、残す理由を説明する。
-- `.gitignore` の不足があれば、追跡済みファイルとの関係を整理してから補正案を出す。
 
 実施しないこと:
 - GitHub release の作成自体。
@@ -193,6 +421,7 @@ Public surface detailed audit で確認すること:
 - 大量削除。
 - 設計変更。
 - 問題が見つかった場合の公開不可情報の削除・移動・履歴修正。
+- tracked file の除外や `git rm --cached`。
 
 問題が見つかった場合:
 - release readiness と混ぜず、別 PR / 別対応として扱う。
@@ -200,16 +429,20 @@ Public surface detailed audit で確認すること:
 - `v0.1.0` release は保留する。
 
 完了条件:
+- Detailed audit が 5.2 / 5.3 / 5.4 の基準で実施されている。
 - Public surface detailed audit report が作成されている。
 - public に残してよい directory / file と、残す理由が説明されている。
-- 秘密情報の疑いがある場合、対応方針が明記され、release 保留条件が明確になっている。
-- `.gitignore` の不足があれば補正案が出ている。
+- `template_version` を更新するかどうかの判断理由が明記されている。
+- `MIGRATION.md` 更新要否の判断理由が明記されている。
+- release note draft が作成されている。
+- blocker finding がある場合、`Release status: blocked` と明記されている。
+- `.gitignore` の不足があれば、5.5 のルールに従って扱われている。
 - AI エージェントが確認できない GitHub UI 項目が manual check として残っている。
 - `v0.1.0` release を手動作成できる説明が揃っている。
 - README / CHANGELOG / MIGRATION / template_version の整合判断が明記されている。
 - release 前提条件の未完了項目が明記されている。
 
-## 6. 手動で実施する GitHub 設定
+## 8. 手動で実施する GitHub 設定
 
 PR ではなく repository settings で実施する。
 
@@ -237,9 +470,9 @@ PR ではなく repository settings で実施する。
 - GitHub Actions logs に秘密情報が出ていないか確認する。
 - 初回 release `v0.1.0` を作成する。
 
-## 7. 公開前チェックリスト
+## 9. 公開前チェックリスト
 
-### 7.1 Automated / PR で確認可能
+### 9.1 Automated / PR で確認可能
 
 - [ ] LICENSE がある。
 - [ ] README が外部ユーザー向けになっている。
@@ -260,7 +493,7 @@ PR ではなく repository settings で実施する。
 - [ ] `bash tools/validate-spec.sh` が成功する、または実行不可理由がある。
 - [ ] `bash template/scripts/verify --strict-harness` が成功する、または実行不可理由がある。
 
-### 7.2 Manual / GitHub UI で確認
+### 9.2 Manual / GitHub UI で確認
 
 - [ ] GitHub Actions logs に秘密情報がない。
 - [ ] Secret scanning alerts を確認した。
@@ -270,7 +503,7 @@ PR ではなく repository settings で実施する。
 - [ ] Issues の有効化状態を確認した。
 - [ ] 初回 release `v0.1.0` を作成した。
 
-### 7.3 Maintainer decision required
+### 9.3 Maintainer decision required
 
 - [ ] `template_version` を更新するか判断した。
 - [ ] `MIGRATION.md` 更新要否を判断した。
@@ -279,7 +512,7 @@ PR ではなく repository settings で実施する。
 - [ ] history rewrite が必要な事象がないか判断した。
 - [ ] detailed audit で問題が見つかった場合、release を保留するか判断した。
 
-## 8. v0.1.0 release 前提条件
+## 10. v0.1.0 release 前提条件
 
 `v0.1.0` release を作成する前に、最低限以下を満たす。
 
@@ -297,7 +530,7 @@ PR ではなく repository settings で実施する。
 - [ ] release note draft が作成済み。
 - [ ] detailed audit で公開不可情報の疑いが残っていない。
 
-## 9. 検証コマンド
+## 11. 検証コマンド
 
 最低限:
 
@@ -319,7 +552,7 @@ README / docs 変更時の追加確認:
 - `.github` templates が YAML として壊れていないこと。
 - SECURITY / SUPPORT / CONTRIBUTING で互いの誘導が循環不全になっていないこと。
 
-## 10. リスクと対策
+## 12. リスクと対策
 
 ### リスク 1: Public であることを軽く見て、内部文脈を残しすぎる
 
@@ -363,7 +596,14 @@ README / docs 変更時の追加確認:
 - 対応は別 PR / 別タスクに切り出す。
 - `v0.1.0` release は保留する。
 
-## 11. 推奨する次アクション
+### リスク 7: Audit が自由作文になり、完了判定が主観化する
+
+対策:
+- Audit report format を固定する。
+- severity / release impact / required action を必須項目にする。
+- `blocker` がある場合は release を保留する。
+
+## 13. 推奨する次アクション
 
 1. この計画書をレビューする。
 2. 問題なければ PR 1 `chore/oss-readiness-baseline` の実装指示を作成する。
