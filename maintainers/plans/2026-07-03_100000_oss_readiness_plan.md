@@ -40,6 +40,12 @@
 
 MIT は採用しない。理由は、軽量さよりも企業・業務利用時の説明しやすさ、特許許諾を含む明確性、safety harness を含む repository としての保守性を優先するためである。
 
+License copyright holder:
+- AI agent must not invent the copyright holder.
+- Use the repository owner / maintainer-approved holder only.
+- Default proposal: `Copyright 2026 ryu-yoshikawa-pro-vision`.
+- If maintainer prefers personal attribution, replace with maintainer-approved legal name before merging.
+
 ### 4.2 Public-facing surface
 
 外部ユーザー向けの入口は以下に集約する。
@@ -121,8 +127,14 @@ Quick audit は、公開継続に対する即時リスクの有無だけを確�
 
 実施方法:
 - file name / directory name / representative file の確認
-- keyword search による危険語句確認
+- 5.6 の minimum keyword set による危険語句確認
 - 全履歴や全ファイルの深掘りはしない
+
+Representative file rule:
+- Check all file names under each target directory.
+- Check all files directly under each target directory root.
+- For nested directories, check README / AGENTS / config / toml / json / yaml / yml / md / sh / ps1 files up to depth 2.
+- Do not inspect binary files unless file name indicates secret, credential, log, artifact, trace, recording, archive, or customer data.
 
 完了判定:
 - すぐに公開停止、credential rotation、release 保留が必要そうな疑いがあるかを分類できていること。
@@ -171,6 +183,12 @@ Audit finding の severity は以下に固定する。
 
 Quick audit / detailed audit の report は、以下の形式を使う。
 
+Allowed values:
+- Audit summary Result: `pass` / `pass-with-manual-checks` / `blocked`
+- Scope Result: `pass` / `warning` / `blocker`
+- Finding Severity: `info` / `warning` / `blocker`
+- Release impact: `none` / `manual-check-required` / `requires-separate-pr` / `hold-release`
+
 ```markdown
 # Public surface audit report
 
@@ -181,24 +199,24 @@ Quick audit / detailed audit の report は、以下の形式を使う。
 - Branch:
 - Auditor: AI agent
 - Result: pass | pass-with-manual-checks | blocked
-- Release impact: none | hold-release | requires-separate-pr | manual-check-required
+- Release impact: none | manual-check-required | requires-separate-pr | hold-release
 
 ## Scope
 
 | Area | Checked | Method | Result | Notes |
 | --- | --- | --- | --- | --- |
-| `.codex/` | yes/no | file listing + keyword search | pass/warn/block | |
-| `.vscode/` | yes/no | file listing + keyword search | pass/warn/block | |
-| `inputs/` | yes/no | file listing + keyword search | pass/warn/block | |
-| `examples/` | yes/no | file listing + keyword search | pass/warn/block | |
-| `maintainers/` | yes/no | file listing + keyword search | pass/warn/block | |
-| `.github/` | yes/no | file listing + keyword search | pass/warn/block | |
+| `.codex/` | yes/no | file listing + keyword search | pass/warning/blocker | |
+| `.vscode/` | yes/no | file listing + keyword search | pass/warning/blocker | |
+| `inputs/` | yes/no | file listing + keyword search | pass/warning/blocker | |
+| `examples/` | yes/no | file listing + keyword search | pass/warning/blocker | |
+| `maintainers/` | yes/no | file listing + keyword search | pass/warning/blocker | |
+| `.github/` | yes/no | file listing + keyword search | pass/warning/blocker | |
 
 ## Findings
 
 | ID | Severity | Path | Finding | Required action | Release impact |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | info/warning/blocker | path | description | none/manual/separate-pr/rotate | none/hold |
+| F-001 | info/warning/blocker | path | description | none/manual/separate-pr/rotate | none/hold-release |
 
 ## Manual checks required
 
@@ -219,6 +237,46 @@ Quick audit / detailed audit の report は、以下の形式を使う。
 - 既に tracked されているファイルの削除、`git rm --cached`、履歴修正は PR 2 では実施しない。
 - tracked file を除外すべきと判断した場合は、別 PR の修正指示に切り出す。
 - `.gitignore` に追加しただけで tracked file が非公開になるとは扱わない。
+
+### 5.6 Minimum keyword set for audit
+
+Audit では、少なくとも以下の keyword を検索する。
+
+Secrets / credentials:
+- `token`
+- `secret`
+- `password`
+- `passwd`
+- `api_key`
+- `apikey`
+- `access_key`
+- `private_key`
+- `refresh_token`
+- `client_secret`
+- `bearer`
+- `authorization`
+
+Private / internal:
+- `private`
+- `internal`
+- `confidential`
+- `customer`
+- `client`
+- `prod`
+- `production`
+- `staging`
+- `localhost`
+- `ngrok`
+- `slack webhook`
+- `incoming webhook`
+
+Repository / service hints:
+- `github.com/`
+- `raw.githubusercontent.com`
+- `api.github.com`
+- `hooks.slack.com`
+- `docs.google.com`
+- `drive.google.com`
 
 ## 6. Documentation / template 要件
 
@@ -255,6 +313,11 @@ README に必ず含めること:
 - `safe` / `readonly` / `auto-net` の使い分け。
 - SECURITY / CONTRIBUTING / SUPPORT への導線。
 
+Quickstart must include:
+- recommended path: copy `template/` contents into a consumer repository.
+- validation command after copy.
+- note that fork is for contributing to this source repository, not the primary consumer installation method.
+
 README に書く非推奨ユースケース:
 - sandbox or approval mechanism を bypass する目的で使うこと。
 - production repository に対して未レビューの command を実行すること。
@@ -278,6 +341,9 @@ README に書く非推奨ユースケース:
 - hooks / wrappers / execpolicy は defense-in-depth であり、完全な security boundary ではないこと。
 - supported versions / best effort statement。
 - maintainer response は best effort であり、明示しない限り SLA はないこと。
+- Preferred reporting channel is GitHub Private Vulnerability Reporting if enabled。
+- If private vulnerability reporting is not enabled, do not open a public issue with sensitive details. Open a minimal issue asking for a private reporting channel, without exploit details, secrets, or reproduction steps。
+- Do not invent a maintainer email address。
 
 `SUPPORT.md` must include:
 - supported: template usage、docs、validation、safe workflow questions。
@@ -362,6 +428,12 @@ OSS readiness は 2 PR にまとめる。1 PR に全てまとめると、communi
 - LICENSE / README / community files / templates / checklist をまとめて整備する。
 - 外部ユーザーが安全制約を誤解せず、利用・貢献・報告の入口に到達できる状態にする。
 
+Execution order:
+1. Run quick audit first.
+2. If blocker is found, create only the quick audit report and stop.
+3. Do not add LICENSE / README / community files until blocker handling is separated.
+4. If no blocker is found, continue with OSS community files and README updates.
+
 含める内容:
 - Public surface quick audit report を作成する。
 - `LICENSE` を追加する。ライセンスは `Apache-2.0` とする。
@@ -386,7 +458,7 @@ OSS readiness は 2 PR にまとめる。1 PR に全てまとめると、communi
 - tracked file の除外や `git rm --cached`。
 
 完了条件:
-- Quick audit が 5.1 / 5.3 / 5.4 の基準で実施されている。
+- Quick audit が 5.1 / 5.3 / 5.4 / 5.6 の基準で実施されている。
 - Public surface quick audit report が作成されている。
 - blocker finding がある場合、PR 1 は完了扱いにせず、別対応が必要と明記している。
 - AI エージェントでは確認できない項目が、未確認のまま完了扱いされていない。
@@ -429,7 +501,7 @@ OSS readiness は 2 PR にまとめる。1 PR に全てまとめると、communi
 - `v0.1.0` release は保留する。
 
 完了条件:
-- Detailed audit が 5.2 / 5.3 / 5.4 の基準で実施されている。
+- Detailed audit が 5.2 / 5.3 / 5.4 / 5.6 の基準で実施されている。
 - Public surface detailed audit report が作成されている。
 - public に残してよい directory / file と、残す理由が説明されている。
 - `template_version` を更新するかどうかの判断理由が明記されている。
@@ -467,6 +539,7 @@ PR ではなく repository settings で実施する。
   - Secret scanning alerts。
   - Dependabot alerts。
   - Code scanning が必要か。
+  - GitHub Private Vulnerability Reporting を有効化するか。
 - GitHub Actions logs に秘密情報が出ていないか確認する。
 - 初回 release `v0.1.0` を作成する。
 
@@ -501,6 +574,7 @@ PR ではなく repository settings で実施する。
 - [ ] About description / topics を設定した。
 - [ ] main branch protection / ruleset を設定した。
 - [ ] Issues の有効化状態を確認した。
+- [ ] GitHub Private Vulnerability Reporting の有効化要否を確認した。
 - [ ] 初回 release `v0.1.0` を作成した。
 
 ### 9.3 Maintainer decision required
@@ -509,6 +583,7 @@ PR ではなく repository settings で実施する。
 - [ ] `MIGRATION.md` 更新要否を判断した。
 - [ ] Discussions を有効化するか判断した。
 - [ ] Code scanning を有効化するか判断した。
+- [ ] GitHub Private Vulnerability Reporting を有効化するか判断した。
 - [ ] history rewrite が必要な事象がないか判断した。
 - [ ] detailed audit で問題が見つかった場合、release を保留するか判断した。
 
@@ -581,6 +656,7 @@ README / docs 変更時の追加確認:
 対策:
 - `Apache-2.0` として固定する。
 - LICENSE なしの状態を継続しない。
+- copyright holder を AI エージェントが推測しない。
 
 ### リスク 5: AI エージェントが GitHub UI 確認を完了扱いする
 
@@ -601,7 +677,15 @@ README / docs 変更時の追加確認:
 対策:
 - Audit report format を固定する。
 - severity / release impact / required action を必須項目にする。
+- allowed values を固定する。
 - `blocker` がある場合は release を保留する。
+
+### リスク 8: PR 1 で blocker があるのに community files 整備まで進める
+
+対策:
+- PR 1 は quick audit を最初に実施する。
+- blocker が見つかった場合は quick audit report のみ作成して停止する。
+- LICENSE / README / community files は blocker 対応を別対応に切り出した後に進める。
 
 ## 13. 推奨する次アクション
 
