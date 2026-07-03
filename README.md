@@ -1,108 +1,179 @@
-# codex-templates Source Repository
+# codex-templates
 
-このリポジトリは consumer repo へ配布する Codex 運用テンプレートの source repository です。利用者が直接読む面は [`template/`](template) に集約し、root は template 自体の保守・仕様・検証を担います。
+Safety-first Codex repository template for planning, review, execution logs, and controlled agent workflows.
 
-## 使い分け
-- consumer-facing template: [`template/`](template)
-- source repo の運用記録と意思決定: [`maintainers/`](maintainers)
-- 単一正本の仕様: [`spec/`](spec)
-- source repo 向け補助ツール: [`tools/`](tools)
-- source repo 向け検証: [`tests/`](tests)
-- 例示資産: [`examples/`](examples)
+## Project summary
 
-## できること / できないこと
+This repository provides a structured template and safety harness for running [Codex CLI](https://github.com/openai/codex) agents with controlled execution modes, defense-in-depth guardrails, and cross-platform support (Bash and PowerShell).
 
-| できること | できないこと |
+## What this repository provides
+
+- A structured template for running [Codex CLI](https://github.com/openai/codex) agents with safety guardrails
+- Wrappers (`codex-safe`, `codex-task`, `codex-sandbox`) for controlled execution modes
+- Execpolicy rules for restricting dangerous operations
+- Pre- and post-tool-use hooks for defense-in-depth
+- Planning, review, and reporting workflow templates
+- Cross-platform support (Bash and PowerShell)
+- Validation scripts to verify template integrity
+
+## Who should use this
+
+- Developers using Codex CLI who want safety guardrails out of the box
+- Teams standardizing agent workflows across repositories
+- Anyone evaluating coding agent templates with safety constraints
+
+## What this does not guarantee
+
+- This is **not** a full sandbox or security boundary
+- Hooks, wrappers, and execpolicy rules are **defense-in-depth**, not a complete protection layer
+- Always review agent-generated changes before applying them
+- You are responsible for your own repository's permissions, secrets, CI/CD, external communication, and billing risks
+
+## Quickstart
+
+The recommended way to use this template is to copy the contents of `template/` into your consumer repository:
+
+```bash
+# Copy template contents, including dotfiles, into your repo root
+cp -a path/to/codex-templates/template/. your-repo/
+cd your-repo
+
+# Run validation
+bash scripts/verify
+# or on Windows:
+powershell -ExecutionPolicy Bypass -File scripts/verify.ps1
+```
+
+After copying, set up your project context in `docs/PROJECT_CONTEXT.md` and point Codex CLI to `AGENTS.md`.
+
+> **Note:** Fork this repository only if you plan to contribute changes back to the source. For consumer installation, copying `template/` is the intended path.
+
+### Existing consumer repository
+
+If you already have a Codex-enabled repository, see the [consumer update guide](template/docs/guides/consumer-update.md) for safe migration steps.
+
+## Repository layout
+
+| Path | Purpose |
 | --- | --- |
-| Codex の作業ルール、計画、レビュー、実行記録を標準化する | 何もしなくても完全自律運用を保証する |
-| `safe` / `readonly` / `auto-net` の使い分けを定義する | `danger-full-access` や raw `--full-auto` 前提で高速化する |
-| wrapper、execpolicy rules、hook による安全補助を提供する | hook だけで破壊的操作を完全防御する |
-| consumer repo に展開できるテンプレート一式を提供する | consumer 固有の `docs/PROJECT_CONTEXT.md` を自動で正しく埋める |
-| source repo 側で spec と validation により template 契約を検証する | 人間レビューなしで安全な実装・配布を保証する |
+| `template/` | Consumer-facing distribution surface — copy this into your repo |
+| `maintainers/` | Source repository maintenance context, ADRs, plans, reports |
+| `spec/` | Single source of truth for template behavior contracts |
+| `tools/` | Maintainer helper scripts (sync-template, validate-spec) |
+| `tests/` | Integration and smoke tests for the source repository |
+| `examples/` | Sample runs and reference consumer repository layouts |
+| `docs/` | Additional documentation |
+| `inputs/` | Planning and research input documents |
 
-## 最短導入手順
+## Execution modes
 
-新規 consumer repo へ導入する場合は、まず次の順で進めます。
+The wrapper (`codex-safe` / `codex-task`) supports three presets:
 
-1. `template/` の内容を対象 repo のルートへコピーする。
-2. `scripts/init-project.*` を実行して、必要なディレクトリと初期 metadata を作る。
-3. `docs/PROJECT_CONTEXT.md` を対象プロジェクト向けに更新する。
-4. `bash scripts/verify` または `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` を実行する。
-5. Codex に repo ルートの `AGENTS.md` を読ませ、依頼内容に応じて `PLANS.md` / `CODE_REVIEW.md` を使う。
+### `safe` (default)
+- Approval required for workspace writes
+- Network disabled
+- Restricted command set
+- Use for: general development, file editing, code review
 
-## Consumer への配布
-1. `template/` の内容を新規 repo のルートへ展開する。
-2. もしくは `tools/sync-template.*` で別ディレクトリへ同期する。
-3. consumer repo 側では `template/AGENTS.md` 相当の内容が repo ルートにある前提で運用する。
+### `readonly`
+- No workspace writes allowed
+- Network disabled
+- Use for: code review, research, investigation
 
-## 既存 consumer repo の更新手順
+### `auto-net`
+- Network enabled
+- Approval never (unattended)
+- Restricted command set (no delete, no git mutation)
+- Use only when explicitly specified for dependency resolution or external API calls
 
-既存 repo へ template 更新を反映する場合は、新規導入より慎重に扱います。詳細は [`template/docs/guides/consumer-update.md`](template/docs/guides/consumer-update.md) を参照してください。
+Do not use `danger-full-access`, raw `--full-auto`, or `--dangerously-bypass-approvals-and-sandbox` in normal operation.
 
-1. consumer repo 側の現在の `template_version` を確認する。
-2. [`CHANGELOG.md`](CHANGELOG.md) と [`MIGRATION.md`](MIGRATION.md) を確認する。
-3. consumer repo 側で作業ブランチを切る。
-4. source repo 側で更新計画を出す。
-   - Bash: `bash tools/plan-consumer-update.sh <destination>`
-   - PowerShell: `powershell -ExecutionPolicy Bypass -File tools/plan-consumer-update.ps1 -Destination <destination>`
-5. 既存 repo に直接反映する場合は、まず `--plan-only` または dry-run で確認する。
-   - Bash: `bash tools/sync-template.sh --plan-only --exclude-protected --force <destination>`
-   - PowerShell: `powershell -ExecutionPolicy Bypass -File tools/sync-template.ps1 -Destination <destination> -Force -PlanOnly -ExcludeProtected`
-6. protected path を保ったまま overlay sync する場合は `--exclude-protected` を使う。
-   - Bash: `bash tools/sync-template.sh --exclude-protected --force <destination>`
-   - PowerShell: `powershell -ExecutionPolicy Bypass -File tools/sync-template.ps1 -Destination <destination> -Force -ExcludeProtected`
-7. destructive overwrite を使う場合は、dry-run の削除対象が想定通りのときだけ明示確認フラグ付きで実行する。
-8. `docs/PROJECT_CONTEXT.md`、`docs/adr/`、`docs/plans/`、`docs/reports/`、`docs/history/`、`.codex/runs/`、`.env*` は機械的に上書きしない。
-9. consumer repo 側で `bash scripts/verify` または PowerShell 版 verify を実行する。
-10. PR で差分をレビューし、運用ルールや安全制約が consumer repo の実態と矛盾しないことを確認する。
+## New repository vs existing consumer repository
 
-## sync-template safety
+- **New repository**: Copy `template/` contents into the root, run `scripts/init-project.*`, update `docs/PROJECT_CONTEXT.md`, and verify.
+- **Existing consumer repository**: Use `tools/plan-consumer-update.*` first to review changes, then sync with `--exclude-protected` to preserve custom content. See the [consumer update guide](template/docs/guides/consumer-update.md).
 
-`tools/sync-template.*` で既存ディレクトリへ同期すると、同期先の top-level contents を置き換えるため、誤った destination を指定すると重要ファイルを失うリスクがあります。
+## Template copy vs fork
 
-- `tools/plan-consumer-update.*` で source / consumer の `template_version`、protected path、候補差分を先に確認する。
-- `template/scripts/cleanup-runs.sh --dry-run` または `template/scripts/cleanup-runs.ps1 -DryRun` で generated run artifact の cleanup 候補を preview できる。
-- `--dry-run` / `-DryRun` で必ず削除対象を確認する。
-- `--plan-only` / `-PlanOnly` は更新計画だけを出し、コピーを行わない。
-- `--exclude-protected` / `-ExcludeProtected` は non-protected path だけを overlay copy し、protected path と destination-only file を残す。
-- 既存 destination に `--force` / `-Force` だけでは同期しない。
-- destructive overwrite には `--confirm-destructive-overwrite` / `-ConfirmDestructiveOverwrite` を追加する。
-- consumer 固有ファイルを残す必要がある場合は、直接同期ではなく別ディレクトリに同期して差分を手動反映する。
+| Approach | When to use |
+| --- | --- |
+| Copy `template/` contents | You want to use this template in your own repository (recommended) |
+| Fork the repository | You want to contribute changes back to this source repository |
 
-## auto-net の利用条件
+Forking is **not** the primary consumer installation method. Copy `template/` instead.
 
-`auto-net` は外部通信や依存解決が必要なときだけ明示的に使います。通常の文書修正、静的調査、PRレビューでは `safe` または `readonly` を使います。
+## Safety model
 
-`auto-net` でも削除、rename、git add/commit/push/rm、dangerous bypass は許可しません。外部通信が必要な調査・検証でも、不要ファイルは削除せず `REPORT.md` に削除候補として記録します。
+- Multi-layer defense: execpolicy rules limit dangerous commands, hooks provide pre-flight checks, wrappers enforce presets
+- No single layer is a complete security boundary
+- Run artifacts and logs should not contain secrets or credentials
+- Always review changes before committing, especially in `auto-net` mode
+- `auto-net` still forbids deletion, git mutation, and remote script piping
 
-## Maintainer ワークフロー
-1. root [`AGENTS.md`](AGENTS.md) に従って source repo を更新する。
-2. consumer-facing ルールを変えるときは `spec/` を先に更新する。
-3. source repo で `bash template/scripts/verify --strict-harness` または `powershell -ExecutionPolicy Bypass -File template/scripts/verify.ps1 -StrictHarness` を実行する。
-4. `tools/validate-spec.*` と `tests/` を通してから完了報告する。
-5. generated run artifact の整理が必要なら `cleanup-runs` は dry-run から使う。
+## Do not use this for
+
+- Bypassing sandbox or approval mechanisms
+- Running unreviewed commands on production repositories
+- Storing secrets in run artifacts or logs
+- Delegating broad destructive changes to unattended agents
+- Treating hooks, wrappers, or execpolicy rules as a complete security boundary
+
+## Known limitations
+
+- Local shell differences may affect wrapper behavior (Bash vs PowerShell)
+- Unofficial Codex providers or non-standard configurations are best-effort only
+- No SLA for issue response or PR review
+- Template does not automatically configure GitHub settings or branch protection
+- `codex-sandbox` (Docker) mode requires explicit `CODEX_DOCKER_IMAGE` environment variable
+
+## Validation
+
+After any change, run the validation suite:
+
+```bash
+bash template/scripts/verify
+bash template/scripts/verify --strict-harness
+```
+
+PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File template/scripts/verify.ps1
+powershell -ExecutionPolicy Bypass -File template/scripts/verify.ps1 -StrictHarness
+```
+
+Additional validation:
+
+```bash
+bash tools/validate-spec.sh
+```
+
+### Cleanup
+
+Generated run artifacts can be cleaned up with `scripts/cleanup-runs.sh` or `scripts/cleanup-runs.ps1`. Always use `--dry-run` / `-DryRun` first to preview candidates.
 
 ## Versioning
 
-配布テンプレートの変更は [`CHANGELOG.md`](CHANGELOG.md) に記録します。`template/codex-project.toml` の `template_version` は、consumer-facing contract の変更に合わせて更新します。
+Template versions follow `Major.Minor.Patch`:
 
-- Major: 既存 consumer repo の運用や配置に破壊的変更がある。
-- Minor: consumer-facing file、workflow、safety rule、配布手順を追加・拡張する。
-- Patch: 誤字、説明補足、validator の非破壊的修正、内部メンテナンス。
+- Major: Breaking changes to consumer repo layout or workflow
+- Minor: Additions to consumer-facing files, workflows, safety rules
+- Patch: Fixes, documentation clarifications, non-breaking maintenance
 
-release hygiene:
-- `template/codex-project.toml` の `template_version`
-- [`CHANGELOG.md`](CHANGELOG.md) の同 version entry
-- [`MIGRATION.md`](MIGRATION.md) の同 version entry
+See [CHANGELOG.md](CHANGELOG.md) for version history and [MIGRATION.md](MIGRATION.md) for migration guidance.
 
-これら 3 つは PR 完了前に一致させる。maintainer は template 配布前に strict harness verify を通す。
+## Contributing
 
-## 関連文書
-- 変更履歴: [`CHANGELOG.md`](CHANGELOG.md)
-- 移行案内: [`MIGRATION.md`](MIGRATION.md)
-- source repo 文脈: [`maintainers/PROJECT_CONTEXT.md`](maintainers/PROJECT_CONTEXT.md)
-- consumer 向け quickstart: [`template/docs/guides/quickstart.md`](template/docs/guides/quickstart.md)
-- consumer 更新ガイド: [`template/docs/guides/consumer-update.md`](template/docs/guides/consumer-update.md)
-- consumer 向け safety harness: [`template/docs/reference/codex-safety-harness.md`](template/docs/reference/codex-safety-harness.md)
-- run examples: [`examples/runs/`](examples/runs/)
-- SDK runner evaluation example: [`examples/codex-sdk-runner/`](examples/codex-sdk-runner/)
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
+
+## Support
+
+See [SUPPORT.md](SUPPORT.md) for support channels.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).
