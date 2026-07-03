@@ -50,7 +50,11 @@ License copyright holder:
 
 ### 4.2 Public-facing surface
 
-外部ユーザー向けの入口は以下に集約する。
+Public-facing surface は、単なる入口ドキュメントだけではなく、consumer repository に配布される template contract surface も含めて扱う。監査時は以下の 3 分類を分けて確認する。
+
+#### 4.2.1 Public entry points
+
+外部ユーザーが最初に読む・使う入口は以下に集約する。
 
 - `README.md`
 - `LICENSE`
@@ -64,7 +68,35 @@ License copyright holder:
 - `template/docs/guides/quickstart.md`
 - `template/docs/reference/*`
 
-`maintainers/` は source repository の保守文脈を残す場所とする。ただし public repository に置く以上、内部事情、個人情報、非公開 repository 名、token、API key、顧客情報、業務上の秘密にあたる記述がないかを精査する。
+#### 4.2.2 Consumer-facing template contract surface
+
+`template/scripts/verify --strict-harness` の template contract check で必須扱いされる配布対象は、consumer-facing surface として audit 対象に含める。最低限、以下を明示対象にする。
+
+- `template/AGENTS.md`
+- `template/PLANS.md`
+- `template/CODE_REVIEW.md`
+- `template/MIGRATION.md`
+- `template/codex-project.toml`
+- `template/.codex/config.toml`
+- `template/.codex/requirements.toml`
+- `template/.codex/agents/*`
+- `template/.codex/hooks/*`
+- `template/.codex/templates/*`
+- `template/.codex/rules/*`
+- `template/.codex/rules-auto-net/*`
+- `template/scripts/*`
+- `template/.agents/skills/*`
+- `template/docs/reference/*`
+- `template/docs/guides/*`
+- `template/examples/*`
+- `template/docs/plans/TEMPLATE.md`
+- `template/spec/change-scope-policy.json` または source repository 側の `spec/change-scope-policy.json`
+
+上記は representative list ではなく、実際の template contract check と整合させるための最低監査対象である。PR 2 の detailed audit では、`template/scripts/verify --strict-harness` の check 対象が増減していないかを確認し、差分があれば audit scope に反映する。
+
+#### 4.2.3 Source repository / maintainer surface
+
+`maintainers/`、root files、`.github/`、`tools/`、`tests/`、`spec/` は source repository の保守文脈を持つ surface として扱う。ただし public repository に置く以上、内部事情、個人情報、非公開 repository 名、token、API key、顧客情報、業務上の秘密にあたる記述がないかを精査する。
 
 ### 4.3 Safety messaging
 
@@ -130,10 +162,17 @@ Quick audit は、公開継続に対する即時リスクの有無だけを確�
 
 Root files include:
 - `README.md`
+- `LICENSE`
 - `AGENTS.md`
 - `CODE_REVIEW.md`
 - `MIGRATION.md`
 - `PLANS.md`
+- `.gitignore`
+- `.gitattributes`
+- `.editorconfig`
+- `Dockerfile`
+- root-level dotfiles
+- root-level extensionless files
 - root-level config / md / yml / yaml / json / toml / sh / ps1 files
 
 実施方法:
@@ -742,6 +781,13 @@ README / docs 変更時の追加確認:
 対策:
 - PR 1 では `template/` / `tools/` / `tests/` / `spec/` を detailed audit required として `not-applicable` にできる。
 - ただし、ファイル名または top-level entry から明らかに secret / log / artifact / trace / customer data と分かるものは、PR 1 でも finding に記録する。
+
+### リスク 10: Public entry points と consumer-facing template contract surface を混同する
+
+対策:
+- Public-facing surface を public entry points、consumer-facing template contract surface、source repository / maintainer surface に分ける。
+- `template/scripts/verify --strict-harness` の check 対象を template contract surface の最低監査対象とする。
+- PR 2 の detailed audit では、template contract check の対象増減がないかを確認する。
 
 ## 13. 推奨する次アクション
 
