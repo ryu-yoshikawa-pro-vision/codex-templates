@@ -88,34 +88,19 @@ OSS 化後の運用負荷を無制限に増やさないため、以下を前提�
 
 ## 5. PR 分割
 
-### PR 0: Public surface quick audit
+OSS readiness は 2 PR にまとめる。1 PR に全てまとめると、community files、public surface audit、release readiness のレビュー観点が混ざりすぎる。4 PR に分けると安全寄りだが、ほとんどが docs / report / checklist のため分割が細かすぎる。したがって、以下の 2 PR を標準とする。
 
-ブランチ案: `chore/public-surface-quick-audit`
+### PR 1: OSS readiness baseline
 
-実施すること:
-- すでに public で見えている repository surface に危険物がないかを短期確認する。
-- `.codex/`, `.vscode/`, `inputs/`, `examples/`, `maintainers/`, `.github/` を重点確認する。
-- token / secret / private URL / private repo 名 / 顧客情報 / 個人情報 / 内部運用だけの記述の有無を確認する。
-- GitHub UI でしか確認できない項目を `Manual check required` として明示する。
-- 結果を `maintainers/reports/{yyyy-mm-dd}_{HHMMSS}_public_surface_quick_audit.md` に保存する。
+ブランチ案: `chore/oss-readiness-baseline`
 
-実施しないこと:
-- ファイル削除。
-- Git history rewrite。
-- credential rotation の代行。
-- repository settings 変更。
-- README / LICENSE / community files の追加。
+目的:
+- すでに public で見えている repository surface の quick audit を行う。
+- LICENSE / README / community files / templates / checklist をまとめて整備する。
+- 外部ユーザーが安全制約を誤解せず、利用・貢献・報告の入口に到達できる状態にする。
 
-完了条件:
-- public repository に残る主要 directory の確認結果が report に記録されている。
-- 即時対応が必要な疑いがあれば、対象、理由、推奨対応、手動確認要否が明記されている。
-- AI エージェントでは確認できない項目が、未確認のまま完了扱いされていない。
-
-### PR 1: OSS community files と README 整備
-
-ブランチ案: `chore/oss-readiness`
-
-実施すること:
+含める内容:
+- Public surface quick audit report を作成する。
 - `LICENSE` を追加する。ライセンスは `Apache-2.0` とする。
 - `README.md` を外部ユーザー向けに再構成する。
 - `CONTRIBUTING.md` を追加する。
@@ -126,6 +111,12 @@ OSS 化後の運用負荷を無制限に増やさないため、以下を前提�
 - `.github/ISSUE_TEMPLATE/feature_request.yml` を追加する。
 - `.github/PULL_REQUEST_TEMPLATE.md` を追加する。
 - `docs/oss-readiness-checklist.md` を追加する。
+
+Public surface quick audit で確認すること:
+- `.codex/`, `.vscode/`, `inputs/`, `examples/`, `maintainers/`, `.github/` を重点確認する。
+- token / secret / private URL / private repo 名 / 顧客情報 / 個人情報 / 内部運用だけの記述の有無を確認する。
+- GitHub UI でしか確認できない項目を `Manual check required` として明示する。
+- 結果を `maintainers/reports/{yyyy-mm-dd}_{HHMMSS}_public_surface_quick_audit.md` に保存する。
 
 README に必ず含めること:
 - この repository が何であるか。
@@ -152,8 +143,14 @@ README に書く非推奨ユースケース:
 - release 作成。
 - GitHub repository settings 変更。
 - ファイル削除。
+- Git history rewrite。
+- credential rotation の代行。
 
 完了条件:
+- Public surface quick audit report が作成されている。
+- public repository に残る主要 directory の確認結果が report に記録されている。
+- 即時対応が必要な疑いがあれば、対象、理由、推奨対応、手動確認要否が明記されている。
+- AI エージェントでは確認できない項目が、未確認のまま完了扱いされていない。
 - README から、目的・対象ユーザー・quickstart・安全制約・貢献方法・サポート範囲へ到達できる。
 - README に対象環境、利用パターン、非推奨ユースケース、既知の制約が明記されている。
 - OSS community files が root に揃っている。
@@ -162,37 +159,18 @@ README に書く非推奨ユースケース:
 - `docs/oss-readiness-checklist.md` が automated / manual / maintainer decision に分類されている。
 - `bash tools/validate-spec.sh` と `bash template/scripts/verify --strict-harness` が成功する、または実行不可理由が PR 本文に明記されている。
 
-### PR 2: Public surface detailed audit と不要情報の整理
+### PR 2: OSS release readiness
 
-ブランチ案: `chore/public-surface-audit`
+ブランチ案: `chore/oss-release-readiness`
 
-実施すること:
-- PR 0 より詳細に public repository に残る top-level directory と履歴文書を棚卸しする。
-- `.codex/`, `.vscode/`, `inputs/`, `examples/`, `maintainers/`, `.github/` を重点確認する。
-- token / secret / private URL / private repo 名 / 顧客情報 / 個人情報 / 内部運用だけの記述を確認する。
-- 問題がなければ `maintainers/reports/` に監査結果を記録する。
-- 問題があれば削除ではなく、まず影響範囲・必要な rotation・移動方針を report に整理する。
-- `.gitignore` の不足があれば、追跡済みファイルとの関係を整理してから補正案を出す。
+目的:
+- PR 1 で整備した OSS baseline を前提に、初回 release 直前の詳細監査と release note を整える。
+- `v0.1.0` を手動作成できる状態にする。
 
-実施しないこと:
-- Git history rewrite。
-- credential rotation の代行。
-- 大量削除。
-- 設計変更。
-
-完了条件:
-- public に残してよい directory / file と、残す理由が説明されている。
-- 秘密情報の疑いがある場合、対応方針が明記されている。
-- `.gitignore` の不足があれば補正案が出ている。
-- AI エージェントが確認できない GitHub UI 項目が manual check として残っている。
-
-### PR 3: 初回 release readiness
-
-ブランチ案: `chore/v0.1.0-release-readiness`
-
-実施すること:
+含める内容:
+- Public surface detailed audit report を作成する。
 - `CHANGELOG.md` に OSS 初回公開用の entry を追加する。
-- 必要であれば `MIGRATION.md` に「既存 consumer repo への影響なし」を明記する。
+- `MIGRATION.md` 更新要否を判断し、必要であれば「既存 consumer repo への影響なし」を明記する。
 - `template/codex-project.toml` の `template_version` を変更するかどうかを判断する。
   - consumer-facing contract を変更しない場合は更新しない。
   - README / community files のみなら version 更新は不要。
@@ -200,11 +178,33 @@ README に書く非推奨ユースケース:
 - release note draft を `docs/releases/v0.1.0.md` または `maintainers/plans/` に保存する。
 - release 前提条件を `docs/oss-readiness-checklist.md` と照合する。
 
+Public surface detailed audit で確認すること:
+- PR 1 の quick audit より詳細に public repository に残る top-level directory と履歴文書を棚卸しする。
+- `.codex/`, `.vscode/`, `inputs/`, `examples/`, `maintainers/`, `.github/` を重点確認する。
+- token / secret / private URL / private repo 名 / 顧客情報 / 個人情報 / 内部運用だけの記述を確認する。
+- public に残してよい directory / file と、残す理由を説明する。
+- `.gitignore` の不足があれば、追跡済みファイルとの関係を整理してから補正案を出す。
+
 実施しないこと:
 - GitHub release の作成自体。
 - npm / package publish などの配布作業。
+- Git history rewrite。
+- credential rotation の代行。
+- 大量削除。
+- 設計変更。
+- 問題が見つかった場合の公開不可情報の削除・移動・履歴修正。
+
+問題が見つかった場合:
+- release readiness と混ぜず、別 PR / 別対応として扱う。
+- 対象、理由、影響範囲、必要な rotation、削除・移動・history rewrite 要否を report に記録する。
+- `v0.1.0` release は保留する。
 
 完了条件:
+- Public surface detailed audit report が作成されている。
+- public に残してよい directory / file と、残す理由が説明されている。
+- 秘密情報の疑いがある場合、対応方針が明記され、release 保留条件が明確になっている。
+- `.gitignore` の不足があれば補正案が出ている。
+- AI エージェントが確認できない GitHub UI 項目が manual check として残っている。
 - `v0.1.0` release を手動作成できる説明が揃っている。
 - README / CHANGELOG / MIGRATION / template_version の整合判断が明記されている。
 - release 前提条件の未完了項目が明記されている。
@@ -252,6 +252,7 @@ PR ではなく repository settings で実施する。
 - [ ] README から quickstart / security / contribution に到達できる。
 - [ ] README に対象環境、利用パターン、非推奨ユースケース、既知の制約がある。
 - [ ] public surface quick audit report がある。
+- [ ] public surface detailed audit report がある。
 - [ ] public repository に残す directory の理由が説明できる。
 - [ ] `.codex/` 配下に runtime log / run artifact / secret が残っていない。
 - [ ] `inputs/` 配下に非公開情報がない。
@@ -276,6 +277,7 @@ PR ではなく repository settings で実施する。
 - [ ] Discussions を有効化するか判断した。
 - [ ] Code scanning を有効化するか判断した。
 - [ ] history rewrite が必要な事象がないか判断した。
+- [ ] detailed audit で問題が見つかった場合、release を保留するか判断した。
 
 ## 8. v0.1.0 release 前提条件
 
@@ -287,11 +289,13 @@ PR ではなく repository settings で実施する。
 - [ ] `CONTRIBUTING.md` が存在する。
 - [ ] `SUPPORT.md` が存在する。
 - [ ] Public surface quick audit が完了している。
+- [ ] Public surface detailed audit が完了している。
 - [ ] Secret scanning alerts を確認済み。
 - [ ] GitHub Actions logs の秘密情報確認が完了している。
 - [ ] `bash tools/validate-spec.sh` が成功、または実行不可理由が明記されている。
 - [ ] `bash template/scripts/verify --strict-harness` が成功、または実行不可理由が明記されている。
 - [ ] release note draft が作成済み。
+- [ ] detailed audit で公開不可情報の疑いが残っていない。
 
 ## 9. 検証コマンド
 
@@ -320,7 +324,8 @@ README / docs 変更時の追加確認:
 ### リスク 1: Public であることを軽く見て、内部文脈を残しすぎる
 
 対策:
-- `PR 0: Public surface quick audit` を先に行う。
+- PR 1 に Public surface quick audit を含める。
+- PR 2 に Public surface detailed audit を含める。
 - `maintainers/` は残してよいが、公開前提の監査を必須にする。
 - 迷う情報は削除ではなく、まず audit report に分類する。
 
@@ -334,7 +339,8 @@ README / docs 変更時の追加確認:
 ### リスク 3: OSS 化に合わせて機能変更まで混ぜる
 
 対策:
-- PR 1 は community files と README のみに絞る。
+- PR 1 は quick audit、community files、README、checklist に絞る。
+- PR 2 は detailed audit、release note、CHANGELOG、version / migration 判断に絞る。
 - wrapper / validator / execpolicy の変更は別タスクに分ける。
 
 ### リスク 4: ライセンス判断を曖昧にする
@@ -350,12 +356,18 @@ README / docs 変更時の追加確認:
 - GitHub UI でしか確認できない項目は `Manual / GitHub UI で確認` に残す。
 - PR 完了条件では、未確認項目を未確認として明記できていることを成功条件にする。
 
+### リスク 6: 問題が見つかったのに release readiness まで進める
+
+対策:
+- PR 2 の detailed audit で公開不可情報や secret 疑いが見つかった場合、release readiness を完了扱いしない。
+- 対応は別 PR / 別タスクに切り出す。
+- `v0.1.0` release は保留する。
+
 ## 11. 推奨する次アクション
 
 1. この計画書をレビューする。
-2. 問題なければ `PR 0: Public surface quick audit` の実装指示を作成する。
-3. PR 0 では削除・修正を行わず、確認結果と手動確認項目を report に保存する。
-4. PR 0 マージ後に PR 1 `chore/oss-readiness` の実装指示を作成する。
-5. PR 1 では docs / community files のみを追加し、機能変更を混ぜない。
-6. PR 1 マージ後に public surface detailed audit を行う。
-7. audit 完了後に `v0.1.0` release readiness を整える。
+2. 問題なければ PR 1 `chore/oss-readiness-baseline` の実装指示を作成する。
+3. PR 1 では quick audit、docs、community files、checklist のみを扱い、機能変更を混ぜない。
+4. PR 1 マージ後に PR 2 `chore/oss-release-readiness` の実装指示を作成する。
+5. PR 2 の detailed audit で問題がなければ、manual check を完了したうえで `v0.1.0` release を作成する。
+6. detailed audit で問題が見つかった場合は、release を保留し、別PRで対応する。
