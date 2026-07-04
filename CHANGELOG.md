@@ -2,6 +2,24 @@
 
 このファイルは、consumer repo へ配布する template の変更履歴を記録します。
 
+## v0.1.0 - Unreleased
+
+Initial OSS readiness release candidate.
+
+### Added
+
+- OSS readiness baseline documentation.
+- Apache-2.0 license.
+- Community files for contribution, security, support, and conduct.
+- GitHub issue and pull request templates.
+- Public surface quick and detailed audit reports.
+- Release note draft for the first OSS release.
+
+### Notes
+
+- GitHub release `v0.1.0` must be created manually after maintainer-owned manual checks are completed.
+- This release does not change consumer-facing template behavior.
+
 ## Version policy
 
 `template/codex-project.toml` の `template_version` は、consumer-facing contract の変更に合わせて更新します。
