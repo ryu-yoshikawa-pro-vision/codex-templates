@@ -200,6 +200,9 @@ if (( preview_only )); then
   exit 0
 fi
 
+# Validate the complete candidate set before deleting anything. If an unsafe
+# path appears later in find order, cleanup must not partially delete earlier
+# valid candidates before refusing the operation.
 for index in "${!candidate_paths[@]}"; do
   raw_path="${candidate_paths[$index]}"
   abs_path="$(normalize_abs_path "$raw_path")"
@@ -213,7 +216,9 @@ for index in "${!candidate_paths[@]}"; do
     echo "Refusing to delete path outside repo root: $abs_path" >&2
     exit 1
   fi
+done
 
+for raw_path in "${candidate_paths[@]}"; do
   rm -rf -- "$raw_path"
   deleted_count=$((deleted_count + 1))
 done
